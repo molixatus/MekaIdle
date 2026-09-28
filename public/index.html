@@ -7,7 +7,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Chakra+Petch:wght@600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Chakra+Petch:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -34,11 +34,8 @@
             </label>
             <label class="field">Mech name
               <input name="mech" required maxlength="24" placeholder="e.g. Rustbucket">
+              <small>Your mech’s colour comes from the class of the weapon you fit.</small>
             </label>
-            <fieldset class="field paints">
-              <legend>Paint</legend>
-              <div class="swatches" id="paints"></div>
-            </fieldset>
           </div>
           <div class="auth-preview" id="create-preview"></div>
         </div>
@@ -56,7 +53,6 @@
         <p class="form-error" id="login-error" role="alert"></p>
         <button class="btn primary wide" type="submit">Log in</button>
       </form>
-      <p class="auth-credits">Icons by Lorc, Delapouite, Carl Olsen, Caro Asercion, Lucas and Skoll from <a href="https://game-icons.net" target="_blank" rel="noopener">game-icons.net</a>, licensed <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>.</p>
     </div>
   </div>
 
@@ -65,23 +61,27 @@
     <aside class="sidebar" id="sidebar">
       <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>MEKA<b>IDLE</b></span></div>
       <div class="now-card" id="now-card"></div>
+      <div class="queue-box" id="queue-box"></div>
       <nav class="nav" id="nav" aria-label="Game sections"></nav>
-      <button type="button" class="nav-item logout" id="logout"></button>
-      <p class="credits">Icons by Lorc, Delapouite, Carl Olsen, Caro Asercion, Lucas and Skoll from <a href="https://game-icons.net" target="_blank" rel="noopener">game-icons.net</a>, licensed <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>.</p>
+      <div class="side-foot">
+        <div class="pilot-card" id="pilot"></div>
+        <button type="button" class="nav-item logout" id="logout"></button>
+        <button type="button" class="nav-item" id="credits-link"></button>
+      </div>
     </aside>
     <div class="scrim" id="scrim" hidden></div>
 
     <div class="main">
       <header class="topbar">
         <button type="button" class="icon-btn menu-btn" id="menu-btn" aria-label="Open menu"></button>
-        <div class="wallet" id="wallet"></div>
-        <div class="pilot" id="pilot"></div>
+        <div class="topline" id="topline"></div>
       </header>
       <main class="page" id="page" tabindex="-1"></main>
     </div>
   </div>
 
   <div class="toasts" id="toasts" aria-live="polite"></div>
+  <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
 
   <div class="modal" id="modal" hidden>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -89,7 +89,6 @@
       <div id="modal-body"></div>
     </div>
   </div>
-
 
   <script src="data.js"></script>
   <script src="gameicons.js"></script>

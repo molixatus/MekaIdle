@@ -221,6 +221,22 @@
     tome(c) { c.rect(27, 28, 34, 37, 'W'); c.rect(28, 29, 33, 36, 'Y'); c.rect(30, 30, 31, 35, 'X'); c.rect(29, 32, 32, 33, 'X'); },
     codex(c) { c.rect(25, 24, 36, 32, 'Y'); c.rect(30, 24, 31, 32, 'W'); c.rect(25, 32, 36, 33, 'W'); c.px(24, 21, 'X'); c.px(37, 21, 'X'); c.px(30, 20, 'X'); c.px(27, 28, 'w'); c.px(34, 28, 'w'); },
   };
+  // More main-hand weapons.
+  Object.assign(WEAPONS, {
+    axe(c) { c.rect(29, 14, 30, 35, 'w'); c.rect(31, 13, 35, 19, 'W'); c.rect(35, 12, 35, 20, 'Y'); c.rect(29, 31, 30, 35, 'D'); },
+    mace(c) { c.rect(29, 18, 30, 35, 'w'); c.disc(29.5, 15, 3.2, 'W'); c.px(26, 15, 'Y'); c.px(33, 15, 'Y'); c.px(29, 11, 'Y'); c.rect(29, 31, 30, 35, 'D'); },
+    daggers(c) { c.rect(28, 26, 28, 31, 'W'); c.rect(31, 24, 31, 29, 'W'); c.rect(34, 22, 34, 27, 'W'); c.px(28, 25, 'Y'); c.px(31, 23, 'Y'); c.px(34, 21, 'Y'); c.rect(27, 32, 29, 33, 'D'); },
+    sceptre(c) { c.rect(30, 12, 30, 40, 'W'); c.rect(28, 9, 32, 11, 'w'); c.disc(30, 7, 2, 'X'); c.px(27, 5, 'Y'); c.px(33, 5, 'Y'); c.px(30, 3, 'Y'); },
+    crystal(c) { c.rect(30, 17, 31, 26, 'X'); c.rect(29, 19, 32, 24, 'X'); c.px(30, 16, 'Y'); c.px(31, 18, 'Y'); c.rect(28, 28, 33, 29, 'W'); c.px(34, 14, 'Y'); c.px(27, 15, 'Y'); },
+    lantern(c) { c.rect(30, 20, 30, 27, 'w'); c.rect(28, 28, 33, 36, 'W'); c.rect(29, 29, 32, 35, 'X'); c.rect(30, 30, 31, 33, 'Y'); c.rect(28, 37, 33, 37, 'w'); },
+  });
+  // Off-hands, held in the left hand (the viewer's left).
+  const OFFHANDS = {
+    shield(c) { c.rect(3, 18, 11, 38, 'V'); c.rect(3, 18, 11, 18, 'v'); c.rect(3, 38, 11, 38, 'v'); c.rect(3, 18, 3, 38, 'v'); c.rect(11, 18, 11, 38, 'v'); c.rect(7, 22, 7, 34, 'X'); c.rect(5, 26, 9, 27, 'X'); },
+    quiver(c) { c.rect(5, 9, 8, 22, 'V'); c.rect(5, 9, 5, 22, 'v'); c.rect(6, 6, 6, 8, 'Y'); c.rect(7, 5, 7, 8, 'Y'); c.px(6, 5, 'X'); c.px(7, 4, 'X'); },
+    orb(c) { c.disc(7, 27, 3.2, 'V'); c.disc(7, 27, 1.4, 'X'); c.px(3, 22, 'X'); c.px(11, 23, 'X'); c.px(4, 32, 'X'); },
+    relic(c) { c.rect(6, 25, 8, 34, 'V'); c.rect(4, 27, 10, 28, 'V'); c.disc(7, 23, 1.6, 'X'); c.px(7, 23, 'Y'); },
+  };
   const GLOW = { melee: '#ffe08a', ranged: '#fff3c4', magic: '#c58cff', healer: '#6dffb0' };
 
   function mech(opts) {
@@ -229,19 +245,26 @@
     const accent = o.accent || '#8cff5a';
     const c = Canvas(W, H, { H: 'P' });
     drawFrame(c);
-    if (o.legs && LEGS[o.legs.type]) LEGS[o.legs.type](c);
-    if (o.body && BODIES[o.body.type]) BODIES[o.body.type](c);
-    if (o.head && HEADS[o.head.type]) HEADS[o.head.type](c);
+    const shape = p => (p && p.type === 'vestment' ? 'cloth' : p && p.type);
+    if (o.legs && LEGS[shape(o.legs)]) LEGS[shape(o.legs)](c);
+    if (o.body && BODIES[shape(o.body)]) BODIES[shape(o.body)](c);
+    if (o.head && HEADS[shape(o.head)]) HEADS[shape(o.head)](c);
     c.srect(19, 16, 19, 17, 'R');
+    // Vestments share the robed silhouette with cloth.
+    if (o.hands) c.srect(11, 32, 13, 33, 'I');
+    if (o.feet) { c.srect(14, 52, 18, 53, 'F'); c.srect(14, 53, 18, 53, 'f'); }
     if (o.weapon && WEAPONS[o.weapon]) WEAPONS[o.weapon](c);
+    if (o.offhand && OFFHANDS[o.offhand]) OFFHANDS[o.offhand](c);
     c.outline('K');
     const tone = (slot, fallback) => (o[slot] ? o[slot].colour : fallback);
     const A = tone('head', paint), B = tone('body', paint), C = tone('legs', paint);
     const wc = o.weaponColour || '#b4bcc6';
+    const vc = o.offhandColour || '#b4bcc6';
+    const hc = o.hands ? o.hands.colour : '#1b1e26', fc = o.feet ? o.feet.colour : paint;
     return c.svg({
       K: '#07080c', P: paint, p: mix(paint, -0.32), H: mix(paint, 0.35), G: accent, E: '#ffdf4d', D: '#1b1e26',
       R: o.core || '#b3261e', A, a: mix(A, -0.32), B, b: mix(B, -0.32), C, c: mix(C, -0.32),
-      W: wc, w: mix(wc, -0.35), X: GLOW[o.role] || accent, Y: '#f4efe0',
+      W: wc, w: mix(wc, -0.35), X: GLOW[o.role] || accent, Y: '#f4efe0', V: vc, v: mix(vc, -0.35), I: hc, F: fc, f: mix(fc, -0.35),
     }, 'Mech');
   }
 

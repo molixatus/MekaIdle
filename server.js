@@ -50,10 +50,16 @@ for (const sql of [
   'ALTER TABLE players ADD COLUMN combat_level INTEGER NOT NULL DEFAULT 4',
   'ALTER TABLE players ADD COLUMN activity TEXT',
   'ALTER TABLE players ADD COLUMN guild_rank TEXT',
+  "ALTER TABLE parties ADD COLUMN diff TEXT NOT NULL DEFAULT 'normal'",
+  "ALTER TABLE parties ADD COLUMN visibility TEXT NOT NULL DEFAULT 'friends'",
 ]) {
   try { db.exec(sql); } catch (e) { /* already there */ }
 }
 db.exec('DROP TABLE IF EXISTS raid_runs');
+// Parties for raids that no longer exist (content changes) are dropped; members go idle on load.
+for (const p of db.prepare('SELECT id, raid FROM parties').all()) {
+  if (!G.RAID_BY_ID[p.raid]) { db.prepare('DELETE FROM party_members WHERE party_id = ?').run(p.id); db.prepare('DELETE FROM parties WHERE id = ?').run(p.id); }
+}
 
 const stmts = new Map();
 const q = sql => {
@@ -132,22 +138,28 @@ function fresh(id) {
 }
 
 function savePlayer(p) {
-  q('UPDATE players SET state = ?, total_level = ?, power = ?, combat_level = ?, activity = ? WHERE id = ?')
-    .run(JSON.stringify(p.state), game.totalLevel(p.state), game.power(p.state), G.combatLevel(game.levels(p.state)), activityLabel(p.state), p.id);
+  q('UPDATE players SET state = ?, total_level = ?, power = ?, combat_level = ?, activity = ?, colour = ? WHERE id = ?')
+    .run(JSON.stringify(p.state), game.totalLevel(p.state), game.power(p.state), G.combatLevel(game.levels(p.state)), activityLabel(p.state), classColour(p.state), p.id);
 }
 
 // A short description of what a pilot is doing, e.g. "Mining: Iron vein".
 function activityLabel(state) {
   const a = state.activity;
   if (!a) return 'Idle';
-  if (a.type === 'raid') return `Raiding ${G.RAID_BY_ID[a.raid].name}`;
+  const raidName = (id, diff) => (G.RAID_BY_ID[id] ? `${G.RAID_BY_ID[id].name}${diff && diff !== 'normal' ? ` (${G.DIFF_BY_ID[diff].name})` : ''}` : 'a raid');
+  if (a.type === 'raid') return `Raiding ${raidName(a.raid, a.diff)}`;
   if (a.type === 'party') {
-    const party = q('SELECT raid FROM parties WHERE id = ?').get(a.party);
-    return party ? `Party raid: ${G.RAID_BY_ID[party.raid].name}` : 'Idle';
+    const party = q('SELECT raid, diff FROM parties WHERE id = ?').get(a.party);
+    return party ? `Party raid: ${raidName(party.raid, party.diff)}` : 'Idle';
   }
   const action = G.ACTION_BY_ID[a.id];
-  return action ? `${G.SKILL_BY_ID[action.skill].name}: ${action.name}` : 'Idle';
+  return action ? `${G.SKILL_BY_ID[action.skill].name}: ${action.name}${a.left ? ` (${a.left} left)` : ''}` : 'Idle';
 }
+
+const classColour = state => {
+  const it = G.ITEMS[state.equipment.weapon];
+  return it ? G.CLASSES[it.cls].colour : G.UNARMED_COLOUR;
+};
 
 // The state as the client sees it: raid sessions are summarised, without the fight timeline.
 function clientState(state) {
@@ -259,15 +271,13 @@ route('POST', '/api/register', ctx => {
   const name = str(ctx.body.name).trim();
   const password = str(ctx.body.password);
   const mech = str(ctx.body.mech).trim().replace(/\s+/g, ' ');
-  const colour = str(ctx.body.colour);
   if (!/^[A-Za-z0-9_]{3,16}$/.test(name)) bad('Pilot names are 3 to 16 letters, numbers or underscores.');
   if (password.length < 8 || password.length > 200) bad('Your password needs at least 8 characters.');
   if (!/^[A-Za-z0-9 .'-]{1,24}$/.test(mech)) bad('Mech names are up to 24 letters, numbers, spaces or . \' -');
-  if (!G.PAINTS.includes(colour)) bad('Pick one of the paint colours.');
   if (findByName(name)) bad('That pilot name is already taken.');
   const now = Date.now();
   const info = q(`INSERT INTO players (name, name_key, pass, mech, colour, state, created, last_seen) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(name, name.toLowerCase(), hashPassword(password), mech, colour, JSON.stringify(game.newState(now)), now, now);
+    .run(name, name.toLowerCase(), hashPassword(password), mech, G.UNARMED_COLOUR, JSON.stringify(game.newState(now)), now, now);
   startSession(ctx, Number(info.lastInsertRowid));
 }, false);
 
@@ -294,7 +304,7 @@ route('GET', '/api/me', ctx => tx(() => {
   const party = q('SELECT party_id FROM party_members WHERE player_id = ?').get(ctx.me);
   return {
     now: Date.now(),
-    player: { id: p.id, name: p.name, mech: p.mech, colour: p.colour },
+    player: { id: p.id, name: p.name, mech: p.mech, colour: classColour(p.state) },
     state: clientState(p.state),
     away,
     guild: p.guild_id ? q('SELECT id, name, tag FROM guilds WHERE id = ?').get(p.guild_id) : null,
@@ -310,8 +320,11 @@ route('GET', '/api/me', ctx => tx(() => {
 route('POST', '/api/action/start', ctx => withPlayer(ctx.me, (s, p) => {
   const action = G.ACTION_BY_ID[str(ctx.body.id)];
   if (action && game.level(s, action.skill) >= action.level && game.hasItems(s.items, action.inputs)) leaveRaid(p);
-  game.startAction(s, str(ctx.body.id));
+  game.startAction(s, str(ctx.body.id), ctx.body.count);
 }));
+route('POST', '/api/queue', ctx => withPlayer(ctx.me, s => game.setQueue(s, ctx.body.queue)));
+route('POST', '/api/abilities', ctx => withPlayer(ctx.me, s => game.setAbilities(s, ctx.body.cls, str(ctx.body.generic) || null)));
+route('POST', '/api/subclass', ctx => withPlayer(ctx.me, s => game.setSubclass(s, str(ctx.body.cls), str(ctx.body.sub), str(ctx.body.second))));
 route('POST', '/api/action/stop', ctx => withPlayer(ctx.me, (s, p) => { leaveRaid(p); game.stopAction(s); }));
 route('POST', '/api/equip', ctx => withPlayer(ctx.me, s => game.equip(s, str(ctx.body.item))));
 route('POST', '/api/unequip', ctx => withPlayer(ctx.me, s => game.unequip(s, str(ctx.body.slot))));
@@ -394,14 +407,18 @@ function purgeParties() {
 
 function partyView(party) {
   return {
-    id: party.id, raid: party.raid, leader: party.leader_id, created: party.created, expires: party.created + PARTY_TTL,
+    id: party.id, raid: party.raid, diff: party.diff || 'normal', visibility: party.visibility || 'friends', leader: party.leader_id, created: party.created, expires: party.created + PARTY_TTL,
     members: memberIds(party.id).map(pubById).filter(Boolean),
     running: party.session ? game.sessionSummary(JSON.parse(party.session)) : null,
   };
 }
 
+// visibility: private (nobody else), friends (friends and guildmates) or public (anyone).
+const VISIBILITY = ['private', 'friends', 'public'];
 function canJoin(me, party) {
   if (party.leader_id === me) return true;
+  if (party.visibility === 'private') return false;
+  if (party.visibility === 'public') return true;
   if (friendIds(me).includes(party.leader_id)) return true;
   const mine = q('SELECT guild_id FROM players WHERE id = ?').get(me).guild_id;
   return !!mine && q('SELECT guild_id FROM players WHERE id = ?').get(party.leader_id).guild_id === mine;
@@ -430,28 +447,82 @@ route('GET', '/api/raid/current', ctx => tx(() => {
     leader = party ? party.leader_id : null;
   }
   if (!session || !session.fight) return { current: null };
-  return { current: { ...game.sessionSummary(session), party: a.type === 'party', leader, fight: session.fight } };
+  let partyInfo = null;
+  if (a.type === 'party') {
+    const row = q('SELECT * FROM parties WHERE id = ?').get(a.party);
+    if (row) partyInfo = partyView(row);
+  }
+  return { current: { ...game.sessionSummary(session), party: a.type === 'party', leader, partyInfo, fight: session.fight } };
 }));
+
+const diffOf = v => (G.DIFF_BY_ID[str(v)] ? str(v) : 'normal');
+function requireUnlocked(state, raid, diff) {
+  if (!game.raidUnlocked(state, raid.id, diff)) {
+    bad(diff === 'normal' ? `Clear ${G.RAIDS[raid.n - 2].name} first.` : `Clear ${raid.name} on ${diff === 'heroic' ? 'Normal' : 'Heroic'} first.`);
+  }
+}
 
 route('POST', '/api/raid/start', ctx => {
   const raid = G.RAID_BY_ID[str(ctx.body.raid)];
   if (!raid) bad('Unknown raid.');
+  const diff = diffOf(ctx.body.diff);
   return withPlayer(ctx.me, (s, p) => {
+    requireUnlocked(s, raid, diff);
     leaveRaid(p);
     const m = q('SELECT party_id FROM party_members WHERE player_id = ?').get(p.id);
     if (m) leaveParty(p, q('SELECT * FROM parties WHERE id = ?').get(m.party_id));
-    s.activity = { type: 'raid', ...game.newSession(raid.id, Date.now()) };
+    s.activity = { type: 'raid', ...game.newSession(raid.id, diff, Date.now()) };
     game.advanceRaid(s.activity, [p], Date.now(), null);
   });
 });
+
+// Opens the raid you're in to others. A solo raid becomes a party raid (same fight carries on).
+route('POST', '/api/raid/open', ctx => tx(() => {
+  const visibility = str(ctx.body.visibility);
+  if (!VISIBILITY.includes(visibility)) bad('Unknown setting.');
+  const p = fresh(ctx.me);
+  const a = p.state.activity;
+  if (a && a.type === 'raid') {
+    const now = Date.now();
+    const session = { raid: a.raid, diff: a.diff || 'normal', start: a.start, n: a.n, fight: a.fight };
+    const id = Number(q('INSERT INTO parties (leader_id, raid, diff, visibility, created, session) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(ctx.me, a.raid, session.diff, visibility, now, JSON.stringify(session)).lastInsertRowid);
+    q('INSERT INTO party_members (party_id, player_id, joined) VALUES (?, ?, ?)').run(id, ctx.me, now);
+    p.state.activity = { type: 'party', party: id };
+  } else {
+    const m = q('SELECT party_id FROM party_members WHERE player_id = ?').get(ctx.me);
+    const party = m && q('SELECT * FROM parties WHERE id = ?').get(m.party_id);
+    if (!party) bad('You\u2019re not in a raid.');
+    if (party.leader_id !== ctx.me) bad('Only the party leader can change who may join.');
+    q('UPDATE parties SET visibility = ? WHERE id = ?').run(visibility, party.id);
+  }
+  savePlayer(p);
+  return { state: clientState(p.state) };
+}));
+
+route('POST', '/api/party/kick', ctx => tx(() => {
+  const m = q('SELECT party_id FROM party_members WHERE player_id = ?').get(ctx.me);
+  const party = m && q('SELECT * FROM parties WHERE id = ?').get(m.party_id);
+  if (!party || party.leader_id !== ctx.me) bad('Only the party leader can remove pilots.');
+  const target = int(ctx.body.id);
+  if (target === ctx.me || !memberIds(party.id).includes(target)) bad('That pilot isn\u2019t in your party.');
+  if (party.session) advanceParty(party, Date.now(), null);
+  const o = loadPlayer(target);
+  q('DELETE FROM party_members WHERE player_id = ?').run(target);
+  if (o && o.state.activity && o.state.activity.type === 'party' && o.state.activity.party === party.id) { o.state.activity = null; savePlayer(o); }
+  if (party.session) restartParty(q('SELECT * FROM parties WHERE id = ?').get(party.id));
+}));
 
 route('POST', '/api/party/create', ctx => tx(() => {
   purgeParties();
   const raid = G.RAID_BY_ID[str(ctx.body.raid)];
   if (!raid) bad('Unknown raid.');
+  const diff = diffOf(ctx.body.diff);
+  const visibility = VISIBILITY.includes(str(ctx.body.visibility)) ? str(ctx.body.visibility) : 'friends';
+  requireUnlocked(loadPlayer(ctx.me).state, raid, diff);
   if (q('SELECT 1 FROM party_members WHERE player_id = ?').get(ctx.me)) bad('Leave your current party first.');
   const now = Date.now();
-  const id = Number(q('INSERT INTO parties (leader_id, raid, created) VALUES (?, ?, ?)').run(ctx.me, raid.id, now).lastInsertRowid);
+  const id = Number(q('INSERT INTO parties (leader_id, raid, diff, visibility, created) VALUES (?, ?, ?, ?, ?)').run(ctx.me, raid.id, diff, visibility, now).lastInsertRowid);
   q('INSERT INTO party_members (party_id, player_id, joined) VALUES (?, ?, ?)').run(id, ctx.me, now);
 }));
 
@@ -459,14 +530,14 @@ route('POST', '/api/party/join', ctx => tx(() => {
   purgeParties();
   const party = q('SELECT * FROM parties WHERE id = ?').get(int(ctx.body.id));
   if (!party) bad('That party has broken up.');
-  if (!canJoin(ctx.me, party)) bad('You can only join parties led by a friend or guildmate.');
+  if (!canJoin(ctx.me, party)) bad('That party isn\u2019t open to you.');
   if (q('SELECT 1 FROM party_members WHERE player_id = ?').get(ctx.me)) bad('Leave your current party first.');
   if (memberIds(party.id).length >= G.PARTY_MAX) bad('That party is full.');
   const p = fresh(ctx.me);
+  if (party.session) leaveRaid(p);
   q('INSERT INTO party_members (party_id, player_id, joined) VALUES (?, ?, ?)').run(party.id, ctx.me, Date.now());
   if (party.session) {
     // Joining a raid that's already running puts you straight into its next fight.
-    leaveRaid(p);
     p.state.activity = { type: 'party', party: party.id };
     restartParty(party);
   }
@@ -495,7 +566,7 @@ route('POST', '/api/party/start', ctx => tx(() => {
     if (p.state.activity && p.state.activity.type === 'raid') p.state.activity = null;
     p.state.activity = { type: 'party', party: party.id };
   });
-  const session = game.newSession(party.raid, now);
+  const session = game.newSession(party.raid, party.diff || 'normal', now);
   game.advanceRaid(session, players, now, null);
   q('UPDATE parties SET session = ? WHERE id = ?').run(JSON.stringify(session), party.id);
   players.forEach(savePlayer);
@@ -755,6 +826,8 @@ const SECURITY_HEADERS = {
   'Referrer-Policy': 'same-origin',
 };
 
+const zlib = require('node:zlib');
+const gzCache = new Map();
 function serveStatic(req, res, pathname) {
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
   let rel;
@@ -764,8 +837,17 @@ function serveStatic(req, res, pathname) {
   if (!file.startsWith(PUBLIC_DIR + path.sep)) { res.writeHead(403); return res.end(); }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache', ...SECURITY_HEADERS });
-    res.end(req.method === 'HEAD' ? undefined : data);
+    const headers = { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'Vary': 'Accept-Encoding', ...SECURITY_HEADERS };
+    let body = data;
+    if (/\bgzip\b/.test(req.headers['accept-encoding'] || '') && /\.(js|css|html|svg|json)$/.test(file)) {
+      // Compressed copies are cached per file version (size and content hash).
+      const key = `${file}:${data.length}:${sha(data.toString('latin1')).slice(0, 12)}`;
+      if (!gzCache.has(key)) gzCache.set(key, zlib.gzipSync(data, { level: 9 }));
+      body = gzCache.get(key);
+      headers['Content-Encoding'] = 'gzip';
+    }
+    res.writeHead(200, headers);
+    res.end(req.method === 'HEAD' ? undefined : body);
   });
 }
 

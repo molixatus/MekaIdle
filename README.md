@@ -1,24 +1,25 @@
 # MekaIdle
 
-An online idle game about building a mech and raiding bosses, solo or with your guild. Pick one skill action at a time and it keeps running while you're away (up to 12 hours). Gather and craft your way to better parts, then use them to beat the next raid boss, whose drops unlock the tier after that.
+An online idle game about building a mech and raiding, solo or with your guild. Pick one skill action at a time (or queue up to five) and it keeps running while you're away, for up to 12 hours. Gather and craft your way to better gear, then use it on the next raid, whose drops unlock the tier after that.
 
 ## How it plays
 
-- **Characters:** create a pilot (name, password, mech name and paint), then log in from any device. Progress is saved on the server.
-- **Skills come in chains.** Each combat skill has one gathering skill feeding two artisan skills:
+- **Characters:** create a pilot (name, password and mech name), then log in from any device. Progress is saved on the server. Your mech's colour follows the class of its main-hand weapon.
+- **Skills come in chains.** Each combat skill has one gathering skill feeding three artisan skills:
 
-  | Combat | Gathering | Artisan | Artisan |
-  |---|---|---|---|
-  | Melee | Mining | Smithing (swords, greatswords, bulwarks) | Armoursmithing (plate) |
-  | Ranged | Hunting | Fletching (shortbows, longbows, crossbows) | Leatherworking (leather) |
-  | Magic | Foraging | Enchanting (wands, staves, orbs, sigils) | Tailoring (cloth) |
-  | Healing | Herbalism | Scribing (scrolls, tomes, codices) | Alchemy (potions and tonics) |
+  | Combat | Gathering | Weapons | Armour | Consumables |
+  |---|---|---|---|---|
+  | Melee | Mining | Smithing (swords, axes, maces, greatswords, shields) | Armoursmithing (plate) | Honing (whetstones, oils) |
+  | Ranged | Hunting | Fletching (bows, crossbows, daggers, quivers) | Leatherworking (leather) | Poisoncraft (poisons) |
+  | Magic | Foraging | Enchanting (wands, staves, sceptres, crystals, orbs) | Tailoring (cloth) | Runecrafting (runes, sigils) |
+  | Healing | Herbalism | Scribing (scrolls, tomes, lanterns, codices, relics) | Weaving (vestments) | Alchemy (potions and tonics) |
 
-- **Gear:** 12 weapon types across 5 tiers, each with its own rhythm or effect (heavy crits, armour pierce, burn, surges, group heals, tanking). Three armour types with 3-piece bonuses: plate (defence and hull), leather (crit), cloth (power). Sigils are crafted from raid materials.
-- **Raid loot:** five bosses, each weak to some attack styles. Wins drop the material for the next tier, gold, and rarely a piece of that boss's 3-piece set (Thorns, Multishot, Prismatic, Overflow shields, Lifesteal) or its trinket.
-- **Raids farm like skills:** press Fight and fights repeat on their own, including offline (up to 12 hours), solo or in parties of up to four. The fight plays in the Raids page with cast bars and damage numbers coloured by pilot and labelled with the damage type.
-- **Every class can solo.** A damage dealer in matching-tier gear wins roughly half its solo fights against a neutral boss and nearly all of them against a boss weak to its style; healers heal themselves and smite, so they clear everything, just more slowly.
-- **Guilds** show who is online, each member's rank (leader, officer, member), combat level and current activity. Founding costs 500 gold. Also friends and escrowed trades.
+- **Gear:** 10 material tiers, 16 main-hand weapons with different rhythms and effects, 4 off-hands, and head/body/legs/hands/feet armour in four types with 3- and 5-piece bonuses. An off-hand from another class also unlocks that class's abilities.
+- **Abilities and subclasses:** 7 abilities per combat class plus 7 generic ones; equip 2 class abilities and 1 generic. At level 5 each class picks one of two subclasses (for example the Guardian tank or the Shadowmender healer); at level 10 you can multiclass instead.
+- **Raids:** 250 raids in 10 regions, each a random number of trash waves then a boss, on Normal, Heroic or Mythic. Raids unlock in order. Fights repeat on their own, including offline, solo or in parties of up to four, and never time out: downed pilots respawn after 25 seconds and still share the loot.
+- **Raid screen:** wave tracker, animated HP bars, cast bars coloured by action, damage numbers coloured by class, a damage meter (DPS, HPS, damage taken, mitigated) with per-source breakdowns, a hoverable graph and a filterable raid log. A running raid can be opened to friends and guildmates or to everyone, and the leader can remove pilots.
+- **Pacing:** tuned so one class chain takes about four days of play to finish.
+- **Guilds** show who is online, each member's rank, combat level and current activity. Also friends and escrowed trades.
 
 ## Running locally
 
@@ -34,19 +35,19 @@ then go to http://localhost:3000. Data is stored in `data/mekaidle.db`.
 
 Railway runs `npm start` on the `PORT` it provides and redeploys on every push to `main`.
 
-**Attach a volume** to the service. Without one, every deploy starts with an empty database, so all accounts and progress reset. Visit `/api/health` on the live site to check: it says whether saves are kept between deploys. Attach it (any mount path) so accounts and progress survive redeploys. The server finds it through `RAILWAY_VOLUME_MOUNT_PATH`. Without a volume, the database is wiped on every deploy. You can also set `DATA_DIR` to choose the folder yourself.
+**Attach a volume** to the service (right-click the service on the project canvas, or use + New → Volume, and mount it at `/data`). Without one, every deploy starts with an empty database, so all accounts and progress reset. The server finds the volume through `RAILWAY_VOLUME_MOUNT_PATH`; you can also set `DATA_DIR` to choose the folder yourself. Visit `/api/health` on the live site to check: `persistentStorage` should be `true`.
 
 ## Files
 
 - `server.js` – HTTP server, accounts and sessions, the JSON API, and the SQLite schema
-- `lib/game.js` – server-side rules: offline progress, actions, equipment, supplies, repeating raid sessions, the combat timeline and loot
-- `public/data.js` – game content (skills, items, recipes, raids) and formulas, shared by server and browser
+- `lib/game.js` – server-side rules: offline progress, the action queue, equipment, abilities, subclasses, repeating raid sessions, the wave combat timeline, loot, and save migrations
+- `public/data.js` – game content (skills, items, recipes, abilities, raids, patch notes) and formulas, shared by server and browser
 - `public/app.js` – the browser client
-- `public/gameicons.js` – item, skill and boss icons from game-icons.net (generated; see Credits)
+- `public/gameicons.js` – item, skill, ability and enemy icons from game-icons.net (generated; see Credits)
 - `public/icons.js` – small line icons for interface controls
 - `public/sprites.js` – the 8-bit pixel mech, drawn from the equipped loadout
 - `public/index.html`, `public/style.css` – layout and styling
 
 ## Credits
 
-Item, skill, weapon and boss icons are from [game-icons.net](https://game-icons.net), made by Lorc, Delapouite, Carl Olsen, Caro Asercion, Lucas and Skoll, and licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). They are recoloured in the game. The credit is also shown in the game's sidebar and on the login screen.
+Item, skill, ability, subclass and enemy icons are from [game-icons.net](https://game-icons.net), made by Carl Olsen, Caro Asercion, Cathelineau, Delapouite, Faithtoken, Irongamer, Lorc, Lucas, Sbed, Skoll and Willdabeast, and licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). They are recoloured in the game, and enemies are redrawn from them as pixel art. The credit is also shown on the in-game Credits page.
