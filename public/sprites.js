@@ -1,4 +1,4 @@
-// 8-bit pixel sprites for mechs and raid bosses, drawn on a small grid and rendered as crisp SVG.
+// 8-bit pixel sprite for the player mech, drawn on a small grid and rendered as crisp SVG.
 (function (root) {
   'use strict';
 
@@ -74,179 +74,176 @@
   }
 
   // ---------- Mech ----------
-  // A tall, lanky frame with a forehead horn, jaw plates and tall shoulder pylons.
-  // opts: { paint, accent, armour, legs, reactor, module, weapon (kind id), weaponColour }
+  // A lanky frame with a forehead horn, built from layers so every armour slot changes its
+  // silhouette: plate is heavy and spiked, leather is lean, cloth is draped. Armour pieces take
+  // the tier colour on their main plates and the pilot's paint shows on the frame and trims.
+  // opts: { paint, accent, head, body, legs: { type, colour } | null, weapon, weaponColour, core }
+  const W = 40, H = 56;
+
+  function drawFrame(c) {
+    c.srect(17, 6, 19, 11, 'P');
+    c.srect(18, 8, 19, 8, 'E');
+    c.srect(18, 10, 19, 11, 'G');
+    c.spx(16, 7, 'p');
+    c.srect(18, 12, 19, 12, 'D');
+    c.srect(15, 13, 19, 22, 'P');
+    c.srect(16, 14, 17, 15, 'H');
+    c.srect(17, 23, 19, 26, 'D');
+    c.srect(16, 27, 19, 28, 'p');
+    c.srect(15, 29, 19, 31, 'P');
+    c.srect(12, 13, 14, 15, 'D');
+    c.srect(12, 16, 13, 23, 'P');
+    c.srect(12, 16, 12, 23, 'p');
+    c.srect(12, 24, 13, 24, 'D');
+    c.srect(11, 25, 13, 31, 'P');
+    c.srect(11, 25, 11, 31, 'p');
+    c.srect(11, 32, 13, 33, 'D');
+    c.srect(15, 32, 17, 40, 'P');
+    c.srect(15, 32, 15, 40, 'p');
+    c.srect(15, 41, 17, 41, 'D');
+    c.srect(15, 42, 17, 50, 'P');
+    c.srect(15, 42, 15, 50, 'p');
+    c.srect(15, 51, 17, 51, 'D');
+    c.srect(14, 52, 18, 53, 'p');
+  }
+
+  const HEADS = {
+    plate(c) {
+      c.srect(16, 5, 19, 11, 'A');
+      c.srect(16, 5, 16, 11, 'a');
+      c.srect(17, 8, 19, 8, 'E');
+      c.srect(19, 1, 19, 4, 'H');
+      c.srect(18, 3, 18, 4, 'P');
+      c.srect(15, 6, 15, 9, 'A');
+      c.srect(17, 10, 19, 11, 'P');
+      c.srect(18, 11, 19, 11, 'G');
+    },
+    leather(c) {
+      c.srect(15, 5, 19, 12, 'A');
+      c.srect(15, 5, 15, 12, 'a');
+      c.srect(18, 3, 19, 4, 'A');
+      c.srect(17, 8, 19, 11, 'D');
+      c.srect(18, 9, 19, 9, 'E');
+      c.srect(14, 12, 19, 13, 'a');
+    },
+    cloth(c) {
+      c.srect(19, 0, 19, 1, 'A');
+      c.srect(18, 2, 19, 3, 'A');
+      c.srect(17, 4, 19, 5, 'A');
+      c.srect(14, 6, 19, 6, 'a');
+      c.srect(16, 5, 19, 5, 'G');
+      c.srect(17, 7, 19, 11, 'P');
+      c.srect(18, 8, 19, 8, 'E');
+      c.srect(18, 10, 19, 11, 'p');
+    },
+  };
+
+  const BODIES = {
+    plate(c) {
+      c.srect(15, 13, 19, 21, 'P');
+      c.srect(15, 13, 19, 13, 'B');
+      c.srect(15, 19, 19, 21, 'B');
+      c.srect(16, 22, 19, 23, 'b');
+      c.srect(9, 11, 14, 17, 'B');
+      c.srect(9, 11, 9, 17, 'b');
+      c.srect(10, 9, 11, 10, 'B');
+      c.spx(10, 8, 'H');
+      c.srect(10, 18, 14, 18, 'b');
+      c.srect(11, 25, 13, 29, 'B');
+    },
+    leather(c) {
+      c.srect(15, 14, 19, 23, 'B');
+      c.srect(15, 14, 15, 23, 'b');
+      c.srect(16, 16, 16, 16, 'b'); c.srect(17, 17, 17, 17, 'b'); c.srect(18, 18, 18, 18, 'b');
+      c.srect(11, 13, 14, 15, 'B');
+      c.srect(11, 13, 11, 15, 'b');
+      c.srect(15, 26, 19, 27, 'b');
+      c.srect(19, 26, 19, 27, 'G');
+      c.srect(11, 28, 13, 30, 'b');
+    },
+    cloth(c) {
+      c.srect(13, 12, 19, 14, 'b');
+      c.srect(15, 15, 19, 24, 'B');
+      c.srect(19, 15, 19, 24, 'G');
+      c.srect(10, 16, 13, 24, 'B');
+      c.srect(10, 16, 10, 24, 'b');
+      c.srect(10, 24, 13, 24, 'G');
+      c.srect(17, 25, 19, 40, 'B');
+      c.srect(17, 25, 17, 40, 'b');
+      c.srect(17, 40, 19, 40, 'G');
+    },
+  };
+
+  const LEGS = {
+    plate(c) {
+      c.srect(14, 32, 17, 39, 'C');
+      c.srect(14, 32, 14, 39, 'c');
+      c.srect(15, 40, 17, 42, 'c');
+      c.spx(16, 39, 'H');
+      c.srect(14, 43, 17, 50, 'C');
+      c.srect(14, 43, 14, 50, 'c');
+      c.srect(13, 51, 18, 53, 'C');
+      c.srect(13, 53, 18, 53, 'c');
+    },
+    leather(c) {
+      c.srect(15, 34, 17, 35, 'c');
+      c.srect(15, 38, 17, 38, 'c');
+      c.srect(14, 44, 17, 51, 'C');
+      c.srect(14, 44, 17, 44, 'c');
+      c.srect(14, 44, 14, 51, 'c');
+      c.srect(13, 52, 18, 53, 'c');
+    },
+    cloth(c) {
+      c.srect(14, 32, 17, 47, 'C');
+      c.srect(14, 32, 14, 47, 'c');
+      c.srect(13, 45, 17, 48, 'C');
+      c.srect(15, 30, 19, 31, 'c');
+      c.srect(14, 52, 18, 53, 'c');
+    },
+  };
+
+  // Weapons sit in the right hand (the viewer's right), apart from the bulwark's shield.
+  const WEAPONS = {
+    sword(c) { c.rect(29, 11, 30, 29, 'W'); c.rect(30, 11, 30, 29, 'Y'); c.rect(27, 30, 32, 30, 'w'); c.rect(29, 31, 30, 35, 'D'); },
+    greatsword(c) { c.rect(29, 3, 31, 28, 'W'); c.rect(31, 3, 31, 28, 'Y'); c.px(30, 2, 'W'); c.rect(26, 29, 34, 30, 'w'); c.rect(29, 31, 31, 37, 'D'); c.px(30, 38, 'X'); },
+    bulwark(c) {
+      c.rect(3, 17, 12, 40, 'W'); c.rect(3, 17, 12, 17, 'w'); c.rect(3, 40, 12, 40, 'w'); c.rect(3, 17, 3, 40, 'w'); c.rect(12, 17, 12, 40, 'w');
+      c.rect(7, 22, 8, 34, 'X'); c.rect(5, 26, 10, 27, 'X');
+      c.rect(29, 21, 30, 30, 'W'); c.rect(27, 31, 32, 31, 'w'); c.rect(29, 32, 30, 34, 'D');
+    },
+    shortbow(c) { c.rect(32, 20, 32, 42, 'W'); c.rect(31, 18, 31, 20, 'W'); c.rect(31, 42, 31, 44, 'W'); c.rect(30, 19, 30, 43, 'Y'); c.rect(33, 29, 33, 33, 'w'); },
+    longbow(c) { c.rect(32, 9, 32, 50, 'W'); c.rect(31, 6, 31, 9, 'W'); c.rect(31, 50, 31, 53, 'W'); c.rect(30, 7, 30, 52, 'Y'); c.rect(33, 27, 33, 33, 'w'); },
+    crossbow(c) { c.rect(24, 28, 36, 30, 'W'); c.rect(24, 30, 36, 30, 'w'); c.rect(34, 22, 35, 36, 'w'); c.rect(33, 29, 39, 29, 'Y'); c.rect(25, 31, 27, 34, 'w'); },
+    wand(c) { c.rect(29, 22, 29, 34, 'W'); c.disc(29, 20, 1.6, 'X'); c.px(29, 20, 'Y'); c.px(32, 17, 'X'); c.px(26, 18, 'X'); },
+    staff(c) { c.rect(30, 6, 30, 53, 'W'); c.rect(29, 6, 29, 8, 'w'); c.rect(31, 6, 31, 8, 'w'); c.disc(30, 3, 2.2, 'X'); c.px(30, 3, 'Y'); },
+    orb(c) { c.disc(31, 23, 3.4, 'X'); c.disc(31, 23, 1.6, 'Y'); c.rect(28, 29, 34, 29, 'W'); c.px(36, 18, 'X'); c.px(27, 18, 'X'); c.px(35, 28, 'X'); },
+    scroll(c) { c.rect(28, 29, 35, 37, 'Y'); c.rect(28, 28, 28, 38, 'W'); c.rect(35, 28, 35, 38, 'W'); c.rect(30, 31, 33, 31, 'w'); c.rect(30, 33, 33, 33, 'w'); c.rect(30, 35, 32, 35, 'w'); },
+    tome(c) { c.rect(27, 28, 34, 37, 'W'); c.rect(28, 29, 33, 36, 'Y'); c.rect(30, 30, 31, 35, 'X'); c.rect(29, 32, 32, 33, 'X'); },
+    codex(c) { c.rect(25, 24, 36, 32, 'Y'); c.rect(30, 24, 31, 32, 'W'); c.rect(25, 32, 36, 33, 'W'); c.px(24, 21, 'X'); c.px(37, 21, 'X'); c.px(30, 20, 'X'); c.px(27, 28, 'w'); c.px(34, 28, 'w'); },
+  };
+  const GLOW = { melee: '#ffe08a', ranged: '#fff3c4', magic: '#c58cff', healer: '#6dffb0' };
+
   function mech(opts) {
     const o = opts || {};
     const paint = o.paint || '#8d95a5';
     const accent = o.accent || '#8cff5a';
-    const armour = o.armour || mix(paint, -0.45);
-    const legs = o.legs || paint;
-    const c = Canvas(34, 46, { H: 'P', A: 'a', L: 'l' });
-    // Horn and head.
-    c.srect(16, 1, 16, 5, 'H');
-    c.srect(14, 5, 16, 11, 'P');
-    c.srect(14, 5, 14, 5, '.');
-    c.srect(14, 7, 16, 7, 'E');
-    c.srect(15, 9, 16, 11, 'G');
-    c.srect(14, 10, 14, 11, 'p');
-    c.srect(15, 12, 16, 12, 'D');
-    // Shoulder pylons.
-    c.srect(6, 5, 10, 15, 'A');
-    c.srect(6, 5, 6, 15, 'a');
-    c.srect(7, 7, 9, 7, 'G');
-    c.srect(6, 4, 9, 4, 'A');
-    // Collar, chest and core.
-    c.srect(10, 13, 16, 14, 'P');
-    c.srect(12, 15, 16, 19, 'P');
-    c.srect(13, 15, 14, 16, 'H');
-    c.srect(16, 16, 16, 18, 'R');
-    // Waist, belt and hips.
-    c.srect(14, 20, 16, 22, 'p');
-    c.srect(13, 23, 16, 23, 'G');
-    c.srect(12, 24, 16, 25, 'P');
-    // Arms.
-    c.srect(8, 16, 10, 23, 'P');
-    c.srect(8, 16, 8, 23, 'p');
-    c.srect(8, 24, 10, 24, 'D');
-    c.srect(8, 25, 10, 30, 'A');
-    c.srect(8, 31, 10, 32, 'D');
-    // Legs.
-    c.srect(12, 26, 14, 32, 'L');
-    c.srect(12, 26, 12, 32, 'l');
-    c.srect(12, 33, 14, 33, 'D');
-    c.srect(13, 33, 13, 33, 'A');
-    c.srect(12, 34, 14, 40, 'L');
-    c.srect(12, 34, 12, 40, 'l');
-    c.srect(12, 41, 14, 41, 'D');
-    c.srect(10, 42, 14, 43, 'L');
-    c.srect(10, 43, 14, 43, 'l');
-
-    // Weapons sit in or over the hands.
-    const w = o.weapon;
-    if (w === 'blade') {
-      c.rect(22, 31, 26, 31, 'w');
-      c.rect(24, 32, 25, 44, 'W');
-      c.rect(25, 32, 25, 44, 'Y');
-      c.px(24, 45, 'W');
-    } else if (w === 'bulwark') {
-      c.rect(3, 17, 11, 34, 'W');
-      c.rect(3, 17, 4, 34, 'w');
-      c.rect(6, 22, 8, 28, 'X');
-      c.rect(7, 20, 7, 30, 'X');
-    } else if (w === 'rifle') {
-      c.rect(20, 27, 26, 31, 'w');
-      c.rect(26, 28, 33, 29, 'W');
-      c.rect(21, 25, 24, 26, 'X');
-      c.rect(19, 30, 21, 33, 'w');
-    } else if (w === 'focus') {
-      c.disc(28, 24, 3, 'X');
-      c.disc(28, 24, 1, 'Y');
-      c.rect(23, 29, 25, 30, 'W');
-      c.px(32, 20, 'X'); c.px(24, 19, 'X'); c.px(31, 29, 'X');
-    } else if (w === 'staff') {
-      c.rect(26, 7, 26, 45, 'W');
-      c.ring(26, 5, 3, 1, 'X');
-      c.rect(26, 3, 26, 7, 'Y');
-      c.rect(24, 5, 28, 5, 'Y');
-    }
+    const c = Canvas(W, H, { H: 'P' });
+    drawFrame(c);
+    if (o.legs && LEGS[o.legs.type]) LEGS[o.legs.type](c);
+    if (o.body && BODIES[o.body.type]) BODIES[o.body.type](c);
+    if (o.head && HEADS[o.head.type]) HEADS[o.head.type](c);
+    c.srect(19, 16, 19, 17, 'R');
+    if (o.weapon && WEAPONS[o.weapon]) WEAPONS[o.weapon](c);
     c.outline('K');
-
-    const weaponGlow = { blade: '#ff6b6b', bulwark: accent, rifle: '#5bc8ff', focus: '#c58cff', staff: '#3ddc84' }[w] || accent;
-    const wc = o.weaponColour || '#a3adb8';
+    const tone = (slot, fallback) => (o[slot] ? o[slot].colour : fallback);
+    const A = tone('head', paint), B = tone('body', paint), C = tone('legs', paint);
+    const wc = o.weaponColour || '#b4bcc6';
     return c.svg({
-      K: '#07080c', P: paint, p: mix(paint, -0.3), H: mix(paint, 0.3), G: accent,
-      E: o.module || '#ffdf4d', R: o.reactor || '#b3261e',
-      A: armour, a: mix(armour, -0.3), L: legs, l: mix(legs, -0.3), D: '#1d2028',
-      W: wc, w: mix(wc, -0.35), X: weaponGlow, Y: '#f4f6fa',
+      K: '#07080c', P: paint, p: mix(paint, -0.32), H: mix(paint, 0.35), G: accent, E: '#ffdf4d', D: '#1b1e26',
+      R: o.core || '#b3261e', A, a: mix(A, -0.32), B, b: mix(B, -0.32), C, c: mix(C, -0.32),
+      W: wc, w: mix(wc, -0.35), X: GLOW[o.role] || accent, Y: '#f4efe0',
     }, 'Mech');
   }
 
-  // ---------- Bosses ----------
-  const BOSSES = {
-    warden() {
-      const c = Canvas(48, 48, { B: 'b', M: 'm' });
-      c.srect(10, 15, 23, 21, 'B');
-      c.disc(12, 16, 4, 'B'); c.disc(35, 16, 4, 'b');
-      c.srect(8, 10, 9, 15, 'S'); c.spx(8, 9, 'S');
-      c.srect(14, 21, 23, 31, 'B');
-      c.srect(15, 23, 20, 23, 'S'); c.srect(15, 26, 20, 26, 'S'); c.srect(16, 29, 20, 29, 'S');
-      c.srect(21, 25, 23, 29, 'R'); c.srect(22, 26, 23, 28, 'r');
-      c.srect(5, 19, 9, 35, 'B'); c.srect(5, 19, 5, 35, 'b');
-      c.srect(4, 36, 5, 41, 'S'); c.srect(7, 36, 8, 42, 'S');
-      c.srect(16, 32, 22, 34, 'b');
-      c.srect(14, 35, 18, 45, 'B'); c.srect(14, 35, 14, 45, 'b');
-      c.srect(12, 45, 18, 46, 'b');
-      c.srect(19, 3, 23, 15, 'M'); c.srect(19, 3, 19, 15, 'm');
-      c.srect(20, 16, 23, 17, 'm'); c.srect(22, 18, 23, 19, 'm');
-      c.srect(20, 7, 21, 10, 'O'); c.srect(22, 12, 23, 13, 'O');
-      c.outline('K');
-      return c.svg({ K: '#07080c', B: '#26382c', b: '#172219', M: '#efeadc', m: '#b8b19c', O: '#07080c', S: '#d9d2bd', R: '#ff3b30', r: '#ffd0c9' }, 'The Warden');
-    },
-    hydra() {
-      const c = Canvas(48, 48, { B: 'b', M: 'm' });
-      c.srect(7, 33, 23, 45, 'B'); c.disc(15, 35, 8, 'B'); c.disc(32, 35, 8, 'b');
-      c.srect(7, 42, 23, 45, 'b');
-      c.srect(20, 36, 23, 41, 'R'); c.srect(22, 37, 23, 40, 'r');
-      c.srect(20, 14, 23, 34, 'B'); c.srect(20, 14, 20, 34, 'S');
-      c.sline(15, 33, 7, 18, 'B', 4);
-      c.sline(15, 33, 7, 18, 'S', 1);
-      c.srect(17, 3, 23, 14, 'M'); c.srect(17, 3, 17, 14, 'm');
-      c.srect(19, 7, 21, 9, 'O'); c.spx(20, 8, 'R');
-      c.srect(18, 12, 23, 14, 'm'); c.spx(19, 14, 'M'); c.spx(21, 14, 'M');
-      c.srect(1, 9, 10, 18, 'M'); c.srect(1, 9, 1, 18, 'm');
-      c.srect(3, 12, 5, 13, 'O'); c.spx(4, 12, 'R');
-      c.srect(1, 16, 10, 18, 'm'); c.spx(3, 18, 'M'); c.spx(6, 18, 'M'); c.spx(9, 18, 'M');
-      c.outline('K');
-      return c.svg({ K: '#07080c', B: '#9b4226', b: '#62281a', M: '#efeadc', m: '#b8b19c', O: '#07080c', S: '#f28a5b', R: '#ff3b30', r: '#ffd0c9' }, 'Rust Hydra');
-    },
-    colossus() {
-      const c = Canvas(48, 48);
-      for (let y = 3; y <= 44; y++) {
-        const half = y <= 23 ? Math.round((y - 3) * 0.95) : Math.round((44 - y) * 0.95);
-        for (let x = 23 - half; x <= 23; x++) { c.px(x, y, y <= 23 ? 'H' : 'c'); c.px(47 - x, y, y <= 23 ? 'C' : 'd'); }
-      }
-      c.rect(22, 3, 25, 44, 'C');
-      c.rect(20, 21, 27, 26, 'R'); c.rect(22, 22, 25, 25, 'Y');
-      c.rect(1, 16, 3, 20, 'C'); c.rect(44, 26, 46, 30, 'c');
-      c.rect(6, 36, 7, 38, 'H'); c.rect(40, 9, 41, 11, 'C');
-      c.outline('K');
-      return c.svg({ K: '#07080c', H: '#8fb4ff', C: '#4d7cf0', c: '#2d4fa8', d: '#1d3474', R: '#ff3b30', Y: '#fff2c9' }, 'Prism Colossus');
-    },
-    sentinel() {
-      const c = Canvas(48, 48, { c: 'd' });
-      c.ring(23.5, 9, 8, 2, 'Y');
-      for (let y = 14; y <= 42; y++) {
-        const half = Math.max(1, Math.round(Math.min(y - 14, 42 - y) / 2) + 1);
-        c.srect(24 - half, y, 23, y, y < 28 ? 'C' : 'c');
-      }
-      c.sline(19, 22, 11, 18, 'Y', 2); c.sline(11, 18, 13, 26, 'Y', 2); c.sline(13, 26, 3, 24, 'Y', 2);
-      c.sline(19, 31, 10, 35, 'Y', 2); c.sline(10, 35, 12, 39, 'Y', 2); c.sline(12, 39, 4, 43, 'Y', 2);
-      c.disc(23.5, 26, 3.4, 'W'); c.disc(23.5, 26, 1.4, 'R');
-      c.outline('K');
-      return c.svg({ K: '#07080c', Y: '#fff3a1', C: '#7fd8ff', c: '#3a8fb8', d: '#276582', W: '#f4fbff', R: '#ff3b30' }, 'Storm Sentinel');
-    },
-    titan() {
-      const c = Canvas(48, 48, { V: 'v', U: 'V' });
-      c.ring(23.5, 9, 9, 1, 't');
-      c.srect(19, 4, 23, 12, 'V'); c.srect(18, 1, 18, 5, 'V');
-      c.srect(19, 7, 21, 8, 'T');
-      c.srect(8, 13, 23, 19, 'V'); c.srect(9, 9, 10, 13, 'V');
-      c.srect(8, 13, 23, 13, 'U'); c.srect(9, 9, 9, 13, 'U');
-      c.srect(13, 19, 23, 33, 'V'); c.srect(13, 19, 13, 33, 'U');
-      c.srect(4, 15, 8, 36, 'V'); c.srect(4, 15, 4, 36, 'U'); c.srect(3, 37, 8, 41, 'v');
-      c.srect(14, 34, 19, 45, 'V'); c.srect(14, 34, 14, 45, 'U'); c.srect(12, 45, 19, 46, 'v');
-      c.sline(21, 21, 18, 27, 'T'); c.sline(18, 27, 20, 32, 'T');
-      c.srect(22, 24, 23, 27, 'T');
-      c.spx(2, 7, 't'); c.spx(5, 3, 't'); c.spx(1, 28, 't'); c.spx(10, 44, 't');
-      c.outline('K');
-      return c.svg({ K: '#1f6b5a', V: '#222c3b', v: '#141b26', U: '#34435a', T: '#2ee6b6', t: '#1b8f71' }, 'Void Titan');
-    },
-  };
-
-  root.SPRITES = {
-    mech,
-    boss: id => (BOSSES[id] ? BOSSES[id]() : ''),
-    mix,
-  };
+  root.SPRITES = { mech, mix };
 })(window);

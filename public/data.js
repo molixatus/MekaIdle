@@ -17,226 +17,335 @@
   const skillMult = level => 1 + (level - 1) / 100;
 
   // ---------- Tiers ----------
+  // One row per tier, naming what each gathering skill finds at that tier.
   const TIERS = [
-    { n: 1, id: 'iron', name: 'Iron', ore: 'Iron ore', vein: 'Iron vein', level: 1, colour: '#a3adb8', mult: 1 },
-    { n: 2, id: 'titanium', name: 'Titanium', ore: 'Titanium ore', vein: 'Titanium vein', level: 15, colour: '#e3e9f0', mult: 2.2 },
-    { n: 3, id: 'cobalt', name: 'Cobalt', ore: 'Cobalt ore', vein: 'Cobalt vein', level: 30, colour: '#4f8ff0', mult: 4 },
-    { n: 4, id: 'iridium', name: 'Iridium', ore: 'Iridium ore', vein: 'Iridium vein', level: 45, colour: '#c46cf5', mult: 6.8 },
-    { n: 5, id: 'void', name: 'Voidsteel', ore: 'Void crystal', vein: 'Void rift', level: 60, colour: '#2ee6b6', mult: 11 },
+    { n: 1, id: 'iron', level: 1, mult: 1, colour: '#b4bcc6', metal: 'Iron', ore: 'Iron ore', vein: 'Iron vein',
+      beast: 'Boar', hide: 'Boar hide', bone: 'Boar tusk', leather: 'Boarhide', bow: 'Tusk',
+      grove: 'Ash grove', branch: 'Ash branch', fibre: 'Flax', wood: 'Ash', cloth: 'Linen',
+      herb: 'Mendleaf', order: 'Acolyte’s' },
+    { n: 2, id: 'titanium', level: 15, mult: 2.2, colour: '#e8edf3', metal: 'Titanium', ore: 'Titanium ore', vein: 'Titanium vein',
+      beast: 'Dire wolf', hide: 'Wolf pelt', bone: 'Wolf fang', leather: 'Wolfhide', bow: 'Fang',
+      grove: 'Yew thicket', branch: 'Yew branch', fibre: 'Silkweed', wood: 'Yew', cloth: 'Silk',
+      herb: 'Sunpetal', order: 'Cleric’s' },
+    { n: 3, id: 'cobalt', level: 30, mult: 4, colour: '#5b9bff', metal: 'Cobalt', ore: 'Cobalt ore', vein: 'Cobalt vein',
+      beast: 'Rock drake', hide: 'Drake hide', bone: 'Drake horn', leather: 'Drakehide', bow: 'Horn',
+      grove: 'Elder wood', branch: 'Elder branch', fibre: 'Moonthread', wood: 'Elder', cloth: 'Moonweave',
+      herb: 'Frostmoss', order: 'Bishop’s' },
+    { n: 4, id: 'iridium', level: 45, mult: 6.8, colour: '#c87bff', metal: 'Iridium', ore: 'Iridium ore', vein: 'Iridium vein',
+      beast: 'Storm wyvern', hide: 'Wyvern hide', bone: 'Wyvern talon', leather: 'Wyvernhide', bow: 'Talon',
+      grove: 'Starwood grove', branch: 'Starwood branch', fibre: 'Starsilk', wood: 'Starwood', cloth: 'Starsilk',
+      herb: 'Starlily', order: 'Saint’s' },
+    { n: 5, id: 'void', level: 60, mult: 11, colour: '#2ee6b6', metal: 'Voidsteel', ore: 'Void crystal', vein: 'Void rift',
+      beast: 'Void beast', hide: 'Void hide', bone: 'Void horn', leather: 'Voidhide', bow: 'Void',
+      grove: 'Voidwood', branch: 'Voidwood branch', fibre: 'Voidsilk', wood: 'Voidwood', cloth: 'Voidsilk',
+      herb: 'Voidroot', order: 'Seraph’s' },
   ];
 
-  // ---------- Combat classes and weapons ----------
-  // Bosses resist or are weak to the three attack styles.
-  const STYLES = [
-    { id: 'melee', name: 'Melee' },
-    { id: 'ranged', name: 'Ranged' },
-    { id: 'magic', name: 'Magic' },
-  ];
-  const STYLE_BY_ID = Object.fromEntries(STYLES.map(s => [s.id, s]));
-
-  const ROLES = {
-    melee: { id: 'melee', name: 'Melee', colour: '#ef5a45' },
-    ranged: { id: 'ranged', name: 'Ranged', colour: '#f2c14e' },
-    magic: { id: 'magic', name: 'Magic', colour: '#b66cf0' },
-    healer: { id: 'healer', name: 'Healer', colour: '#3ddc84' },
-  };
-  const STANCES = {
-    dps: 'Damage',
-    tank: 'Tank: the boss aims every normal attack at you, and your shield adds 60% defence and 30% hull, but you hit for about half.',
-    heal: 'Heals whoever is most damaged, and fires nanite bolts when everyone is healthy.',
-  };
-
-  // cast: ms per action. Damage per cast is normalised so the damage weapons share the same
-  // average damage per second before skills and boss weaknesses; they differ in rhythm and swing.
-  const WEAPON_KINDS = [
-    { id: 'blade', noun: 'vibro-blade', role: 'melee', stance: 'dps', skill: 'melee', cast: 1000, action: 'Blade slash', crit: 0.1, spread: 0.15, circuits: 0, offset: 0 },
-    { id: 'bulwark', noun: 'bulwark', role: 'melee', stance: 'tank', skill: 'melee', cast: 1400, action: 'Shield bash', crit: 0.05, spread: 0.1, dmg: 0.55, defMult: 1.6, hpMult: 1.3, circuits: 0, offset: 2 },
-    { id: 'rifle', noun: 'rail rifle', role: 'ranged', stance: 'dps', skill: 'ranged', cast: 1600, action: 'Rail shot', crit: 0.22, spread: 0.12, circuits: 1, offset: 1 },
-    { id: 'focus', noun: 'psi focus', role: 'magic', stance: 'dps', skill: 'magic', cast: 2200, action: 'Psi blast', crit: 0.1, spread: 0.3, burn: 0.3, circuits: 2, offset: 2 },
-    { id: 'staff', noun: 'nanite staff', role: 'healer', stance: 'heal', skill: 'healing', cast: 2000, action: 'Nanite mend', circuits: 1, offset: 3 },
-  ];
-  const WEAPON_BY_ID = Object.fromEntries(WEAPON_KINDS.map(w => [w.id, w]));
-
+  // ---------- Skills ----------
+  // Every combat skill has one gathering skill feeding two artisan skills.
   const SKILLS = [
-    { id: 'salvaging', name: 'Salvaging', group: 'gathering', desc: 'Strip wrecks for scrap and the odd intact circuit. Scrap feeds almost everything else.' },
-    { id: 'mining', name: 'Mining', group: 'gathering', desc: 'Drill ore from the asteroid belt, ready to smelt into plate.' },
-    { id: 'harvesting', name: 'Harvesting', group: 'gathering', desc: 'Harvest volatile gases from the nebula for Alchemy.' },
-    { id: 'smelting', name: 'Smelting', group: 'artisan', desc: 'Melt ore down with scrap into plates for weapons, armour and kits.' },
-    { id: 'alchemy', name: 'Alchemy', group: 'artisan', desc: 'Brew raid tonics from harvested gas. Each tonic you bring is used up in a fight for a boost.' },
-    { id: 'crafting', name: 'Crafting', group: 'artisan', desc: 'Craft repair kits to survive raids, and core modules from raid materials.' },
-    { id: 'weaponsmithing', name: 'Weaponsmithing', group: 'artisan', desc: 'Forge weapons. The weapon you fit decides your combat class and which combat skill you train.' },
-    { id: 'armoursmithing', name: 'Armoursmithing', group: 'artisan', desc: 'Forge armour, reactors and legs from plates, scrap and the materials raid bosses drop.' },
-    { id: 'melee', name: 'Melee', group: 'combat', role: 'melee', desc: 'Trained by fighting with a vibro-blade (damage) or a bulwark (tank). Each level adds 1% melee damage.' },
-    { id: 'ranged', name: 'Ranged', group: 'combat', role: 'ranged', desc: 'Trained by fighting with a rail rifle. Each level adds 1% ranged damage.' },
-    { id: 'magic', name: 'Magic', group: 'combat', role: 'magic', desc: 'Trained by fighting with a psi focus. Each level adds 1% magic damage, burn included.' },
-    { id: 'healing', name: 'Healing', group: 'combat', role: 'healer', desc: 'Trained by fighting with a nanite staff. Each level adds 1% healing.' },
+    { id: 'mining', name: 'Mining', group: 'gathering', chain: 'melee', desc: 'Mine ore for Smithing and Armoursmithing.' },
+    { id: 'hunting', name: 'Hunting', group: 'gathering', chain: 'ranged', desc: 'Hunt beasts for hides and bone, for Fletching and Leatherworking.' },
+    { id: 'foraging', name: 'Foraging', group: 'gathering', chain: 'magic', desc: 'Forage enchanted groves for branches and fibre, for Enchanting and Tailoring.' },
+    { id: 'herbalism', name: 'Herbalism', group: 'gathering', chain: 'healing', desc: 'Gather herbs and reeds for Scribing and Alchemy.' },
+    { id: 'smithing', name: 'Smithing', group: 'artisan', chain: 'melee', desc: 'Forge swords, greatswords and bulwarks from ore.' },
+    { id: 'armoursmithing', name: 'Armoursmithing', group: 'artisan', chain: 'melee', desc: 'Forge heavy plate armour from ore. Three plate pieces: +10% defence and hull.' },
+    { id: 'fletching', name: 'Fletching', group: 'artisan', chain: 'ranged', desc: 'Make shortbows, longbows and crossbows from bone and hide.' },
+    { id: 'leatherworking', name: 'Leatherworking', group: 'artisan', chain: 'ranged', desc: 'Stitch leather armour from hides. Three leather pieces: +8% critical chance and +6% hull.' },
+    { id: 'enchanting', name: 'Enchanting', group: 'artisan', chain: 'magic', desc: 'Enchant wands, staves and orbs, and bind raid materials into sigils.' },
+    { id: 'tailoring', name: 'Tailoring', group: 'artisan', chain: 'magic', desc: 'Weave cloth armour. Three cloth pieces: +10% damage and healing.' },
+    { id: 'scribing', name: 'Scribing', group: 'artisan', chain: 'healing', desc: 'Write the holy scrolls, tomes and codices that healers fight with.' },
+    { id: 'alchemy', name: 'Alchemy', group: 'artisan', chain: 'healing', desc: 'Brew healing potions and tonics that anyone can take into a raid.' },
+    { id: 'melee', name: 'Melee', group: 'combat', role: 'melee', desc: 'Trained by fighting with a sword, greatsword or bulwark. Each level adds 1% melee damage.' },
+    { id: 'ranged', name: 'Ranged', group: 'combat', role: 'ranged', desc: 'Trained by fighting with a bow or crossbow. Each level adds 1% ranged damage.' },
+    { id: 'magic', name: 'Magic', group: 'combat', role: 'magic', desc: 'Trained by fighting with a wand, staff or orb. Each level adds 1% magic damage.' },
+    { id: 'healing', name: 'Healing', group: 'combat', role: 'healer', desc: 'Trained by fighting with a scroll, tome or codex. Each level adds 1% healing and smite damage.' },
   ];
   const SKILL_BY_ID = Object.fromEntries(SKILLS.map(s => [s.id, s]));
+  const COMBAT_SKILLS = SKILLS.filter(s => s.group === 'combat').map(s => s.id);
+  const combatLevel = levels => COMBAT_SKILLS.reduce((a, k) => a + ((levels && levels[k]) || 1), 0);
 
+  // ---------- Combat classes and weapons ----------
+  // Bosses resist or are weak to melee, ranged and magic. Healers smite with holy damage.
+  const STYLES = { melee: 'Melee', ranged: 'Ranged', magic: 'Magic', holy: 'Holy' };
+  const ROLES = {
+    melee: { id: 'melee', name: 'Melee', colour: '#ef5a45', style: 'melee' },
+    ranged: { id: 'ranged', name: 'Ranged', colour: '#f2c14e', style: 'ranged' },
+    magic: { id: 'magic', name: 'Magic', colour: '#b66cf0', style: 'magic' },
+    healer: { id: 'healer', name: 'Healer', colour: '#3ddc84', style: 'holy' },
+  };
+
+  // cast: ms per action. Hits are normalised so every damage weapon averages the same damage
+  // per second before skills, gear and boss weaknesses; they differ in rhythm, crits and effects.
+  const WEAPON_KINDS = [
+    { id: 'sword', noun: 'sword', role: 'melee', stance: 'dps', skill: 'melee', maker: 'smithing', cast: 1000, action: 'Slash', dtype: 'Slash', crit: 0.1, spread: 0.15, mats: { ore: 5 }, offset: 0,
+      note: 'Quick, steady slashes.' },
+    { id: 'greatsword', noun: 'greatsword', role: 'melee', stance: 'dps', skill: 'melee', maker: 'smithing', cast: 2000, action: 'Cleave', dtype: 'Cleave', crit: 0.15, critMult: 2.4, spread: 0.15, mats: { ore: 8 }, offset: 2,
+      note: 'Slow cleaves. Critical hits deal 2.4× instead of 1.75×.' },
+    { id: 'bulwark', noun: 'bulwark', role: 'melee', stance: 'tank', skill: 'melee', maker: 'smithing', cast: 1400, action: 'Shield bash', dtype: 'Bash', crit: 0.05, spread: 0.1, dmg: 0.55, defMult: 1.6, hpMult: 1.3, mats: { ore: 7 }, offset: 4,
+      note: 'Tank: the boss aims every normal attack at you. +60% defence, +30% hull, about half damage.' },
+    { id: 'shortbow', noun: 'shortbow', role: 'ranged', stance: 'dps', skill: 'ranged', maker: 'fletching', cast: 1000, action: 'Quick shot', dtype: 'Pierce', crit: 0.12, spread: 0.12, mats: { bone: 4 }, offset: 0,
+      note: 'Fast arrows.' },
+    { id: 'longbow', noun: 'longbow', role: 'ranged', stance: 'dps', skill: 'ranged', maker: 'fletching', cast: 2000, action: 'Aimed shot', dtype: 'Pierce', crit: 0.3, spread: 0.12, mats: { bone: 6, hide: 1 }, offset: 2,
+      note: 'Slow aimed shots with a 30% critical chance.' },
+    { id: 'crossbow', noun: 'crossbow', role: 'ranged', stance: 'dps', skill: 'ranged', maker: 'fletching', cast: 1600, action: 'Heavy bolt', dtype: 'Bolt', crit: 0.08, spread: 0.1, pierce: 0.5, dmg: 0.9, mats: { bone: 5, hide: 2 }, offset: 4,
+      note: 'Bolts ignore half of the boss’s defence. Best against armoured bosses.' },
+    { id: 'wand', noun: 'wand', role: 'magic', stance: 'dps', skill: 'magic', maker: 'enchanting', cast: 1000, action: 'Arcane bolt', dtype: 'Arcane', crit: 0.1, spread: 0.15, mats: { branch: 3, fibre: 1 }, offset: 0,
+      note: 'Rapid arcane bolts.' },
+    { id: 'staff', noun: 'staff', role: 'magic', stance: 'dps', skill: 'magic', maker: 'enchanting', cast: 2200, action: 'Fireball', dtype: 'Fire', crit: 0.08, spread: 0.25, burn: 0.35, mats: { branch: 7 }, offset: 4,
+      note: 'Fireballs that leave the boss burning for a third of the damage over 3 seconds.' },
+    { id: 'orb', noun: 'orb', role: 'magic', stance: 'dps', skill: 'magic', maker: 'enchanting', cast: 1600, action: 'Arcane pulse', dtype: 'Arcane', crit: 0.12, spread: 0.15, surge: 4, mats: { branch: 4, fibre: 2 }, offset: 2,
+      note: 'Every 4th pulse surges for double damage.' },
+    { id: 'scroll', noun: 'scroll', role: 'healer', stance: 'heal', skill: 'healing', maker: 'scribing', cast: 1000, action: 'Quick mend', dtype: 'Holy', crit: 0.05, spread: 0.1, mats: { reed: 3, herb: 1 }, offset: 0,
+      note: 'Small, fast heals.' },
+    { id: 'tome', noun: 'tome', role: 'healer', stance: 'heal', skill: 'healing', maker: 'scribing', cast: 2000, action: 'Greater mend', dtype: 'Holy', crit: 0.05, spread: 0.1, mats: { reed: 5, herb: 2 }, offset: 2,
+      note: 'Big heals on the most hurt pilot.' },
+    { id: 'codex', noun: 'codex', role: 'healer', stance: 'heal', skill: 'healing', maker: 'scribing', cast: 2000, action: 'Prayer of mending', dtype: 'Holy', crit: 0.05, spread: 0.1, group: 0.5, mats: { reed: 6, herb: 3 }, offset: 4,
+      note: 'Heals the whole party at once, each for half as much. Best in groups.' },
+  ];
+  const WEAPON_BY_ID = Object.fromEntries(WEAPON_KINDS.map(w => [w.id, w]));
+  // Healers smite when everyone is healthy. Strong enough to clear content solo, slowly.
+  const HEALER = { smiteAt: 0.8, smite: 0.65, smiteCast: 1200 };
+
+  // ---------- Armour ----------
   const SLOTS = [
     { id: 'weapon', name: 'Weapon' },
-    { id: 'armour', name: 'Armour', noun: 'plating', plates: 6, base: { def: 6, hp: 20 } },
-    { id: 'reactor', name: 'Reactor', noun: 'reactor', plates: 3, base: { hp: 40, atk: 3 } },
-    { id: 'legs', name: 'Legs', noun: 'legs', plates: 5, base: { def: 4, hp: 20 } },
-    { id: 'module', name: 'Core module' },
+    { id: 'head', name: 'Head' },
+    { id: 'body', name: 'Body' },
+    { id: 'legs', name: 'Legs' },
+    { id: 'trinket', name: 'Trinket' },
   ];
-  const PART_SLOTS = SLOTS.filter(s => s.plates);
+  const ARMOUR_SLOTS = ['head', 'body', 'legs'];
+  // Stats per piece at tier 1. Every type has about the same defence and hull, so every class can
+  // solo; plate adds a little defence and its set bonus, leather adds critical chance, cloth power.
+  const ARMOUR_TYPES = {
+    plate: { name: 'Plate', maker: 'armoursmithing', mat: 'ore', bonus: { name: 'Fortified', defPct: 10, hpPct: 10 },
+      pieces: { head: { noun: 'helm', def: 4, hp: 12, mats: 4, offset: 0 }, legs: { noun: 'greaves', def: 5, hp: 14, mats: 5, offset: 2 }, body: { noun: 'breastplate', def: 7, hp: 22, mats: 7, offset: 4 } } },
+    leather: { name: 'Leather', maker: 'leatherworking', mat: 'hide', bonus: { name: 'Keen eye', crit: 8, hpPct: 6 },
+      pieces: { head: { noun: 'hood', def: 3, hp: 12, crit: 2, mats: 3, offset: 0 }, legs: { noun: 'boots', def: 4, hp: 14, crit: 2, mats: 4, offset: 2 }, body: { noun: 'jerkin', def: 6, hp: 22, crit: 3, mats: 6, offset: 4 } } },
+    cloth: { name: 'Cloth', maker: 'tailoring', mat: 'fibre', bonus: { name: 'Attuned', power: 10 },
+      pieces: { head: { noun: 'hat', def: 3, hp: 12, power: 2, mats: 3, offset: 0 }, legs: { noun: 'trousers', def: 4, hp: 14, power: 3, mats: 4, offset: 2 }, body: { noun: 'robe', def: 6, hp: 22, power: 4, mats: 6, offset: 4 } } },
+  };
+  const tierLabel = (t, type) => (type === 'plate' ? t.metal : type === 'leather' ? t.leather : t.cloth);
 
-  // res: damage taken multiplier by attack style (above 1 is a weakness).
+  // ---------- Raids ----------
+  // res: damage taken multiplier by style (above 1 is a weakness).
   const RAIDS = [
     { id: 'warden', tier: 1, name: 'The Warden', desc: 'A masked giant that guards the outer scrapyard. Its bone mask has never cracked.',
-      mat: { id: 'servo_coil', name: 'Servo coil', colour: '#e8b923' }, res: { magic: 1.12, melee: 0.9 },
-      moves: { basic: 'Bone claw', sweep: 'Mask scream' } },
-    { id: 'hydra', tier: 2, name: 'Rust Hydra', desc: 'Three masked heads on one corroded body, all of them hungry.',
-      mat: { id: 'hydraulic_heart', name: 'Hydraulic heart', colour: '#e5533d' }, res: { ranged: 1.12, magic: 0.9 },
-      moves: { basic: 'Piston bite', sweep: 'Acid spray' } },
+      mat: { id: 'servo_coil', name: 'Bone shard', colour: '#e8dcc0', icon: 'mat_warden' }, res: { magic: 1.12, melee: 0.9 },
+      moves: { basic: 'Bone claw', sweep: 'Mask scream' }, dtype: 'Crush' },
+    { id: 'hydra', tier: 2, name: 'Rust Hydra', desc: 'Three heads on one corroded body, all of them hungry.',
+      mat: { id: 'hydraulic_heart', name: 'Hydra scale', colour: '#e5533d', icon: 'mat_hydra' }, res: { ranged: 1.12, magic: 0.9 },
+      moves: { basic: 'Piston bite', sweep: 'Acid spray' }, dtype: 'Acid' },
     { id: 'colossus', tier: 3, name: 'Prism Colossus', desc: 'A floating crystal that focuses starlight into a cutting beam. Get close and it cracks.',
-      mat: { id: 'graviton_core', name: 'Graviton core', colour: '#5d7bff' }, res: { melee: 1.12, ranged: 0.9 },
-      moves: { basic: 'Prism lance', sweep: 'Refraction' } },
-    { id: 'sentinel', tier: 4, name: 'Storm Sentinel', desc: 'A haloed eye that rides the lightning down from orbit.',
-      mat: { id: 'storm_capacitor', name: 'Storm capacitor', colour: '#7fd8ff' }, res: { magic: 1.12, ranged: 0.9 },
-      moves: { basic: 'Arc bolt', sweep: 'Thunderstorm' } },
+      mat: { id: 'graviton_core', name: 'Prism shard', colour: '#7aa8ff', icon: 'mat_colossus' }, res: { melee: 1.12, ranged: 0.9 },
+      moves: { basic: 'Prism lance', sweep: 'Refraction' }, dtype: 'Light' },
+    { id: 'sentinel', tier: 4, name: 'Storm Sentinel', desc: 'A great eye that rides the lightning down from orbit.',
+      mat: { id: 'storm_capacitor', name: 'Storm core', colour: '#7fd8ff', icon: 'mat_sentinel' }, res: { magic: 1.12, ranged: 0.9 },
+      moves: { basic: 'Arc bolt', sweep: 'Thunderstorm' }, dtype: 'Shock' },
     { id: 'titan', tier: 5, name: 'Void Titan', desc: 'Something vast, stepping out of the rift. The end of the line.',
-      mat: { id: 'void_shard', name: 'Void shard', colour: '#2ee6b6' }, res: { melee: 1.08, ranged: 1.08, magic: 0.92 },
-      moves: { basic: 'Void lash', sweep: 'Collapse' } },
+      mat: { id: 'void_shard', name: 'Void shard', colour: '#2ee6b6', icon: 'mat_titan' }, res: { melee: 1.08, ranged: 1.08, magic: 0.92 },
+      moves: { basic: 'Void lash', sweep: 'Collapse' }, dtype: 'Void' },
   ];
   const BOSS_MOVES = { basic: 2000, sweep: 3000, sweepEvery: 4, sweepShare: 0.6 };
+
+  // Raid sets: three pieces (head, body, legs) that drop from one boss, with 2- and 3-piece bonuses.
+  const PASSIVES = {
+    thorns: v => `Thorns: reflects ${v}% of damage taken back at the boss.`,
+    multishot: v => `Multishot: ${v}% chance for an attack to strike twice.`,
+    prismatic: v => `Prismatic: critical hits also burn for ${v}% more over 3 seconds.`,
+    overflow: v => `Overflow: overhealing becomes a shield, up to ${v}% of hull.`,
+    lifesteal: v => `Lifesteal: heals you for ${v}% of the damage you deal.`,
+    bleed: v => `Bleed: your hits bleed for ${v}% more over 3 seconds.`,
+    surge: v => `Surge: ${v}% chance for a heal to be doubled.`,
+  };
+  const RAID_SETS = {
+    warden: { name: 'Bonewarden', type: 'plate', two: { hpPct: 10 }, three: { passives: { thorns: 25 } } },
+    hydra: { name: 'Hydrascale', type: 'leather', two: { crit: 5 }, three: { passives: { multishot: 20 } } },
+    colossus: { name: 'Prismweave', type: 'cloth', two: { power: 8 }, three: { passives: { prismatic: 40 } } },
+    sentinel: { name: 'Stormvestment', type: 'cloth', two: { heal: 12 }, three: { passives: { overflow: 30 } } },
+    titan: { name: 'Voidforged', type: 'plate', two: { power: 8, hpPct: 8 }, three: { passives: { lifesteal: 10 } } },
+  };
+  const RAID_TRINKETS = {
+    warden: { name: 'Warden’s mask', stats: { hpPct: 8, defPct: 5 } },
+    hydra: { name: 'Hydra fang', stats: { crit: 4 }, passives: { bleed: 10 } },
+    colossus: { name: 'Prism heart', stats: { power: 10 } },
+    sentinel: { name: 'Storm eye', stats: { heal: 10 }, passives: { surge: 10 } },
+    titan: { name: 'Void heart', stats: { power: 6, defPct: 6, hpPct: 6 }, passives: { lifesteal: 5 } },
+  };
+  const SET_DROP = 0.04, TRINKET_DROP = 0.025;
 
   // ---------- Items ----------
   const ITEMS = {};
   const item = (id, o) => { ITEMS[id] = Object.assign({ id }, o); };
   const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
+  const MAT_OF = { ore: t => `${t.id}_ore`, hide: t => `${t.id}_hide`, bone: t => `${t.id}_bone`, branch: t => `${t.id}_branch`, fibre: t => `${t.id}_fibre`, herb: t => `${t.id}_herb`, reed: () => 'reed' };
 
-  item('scrap', { name: 'Scrap', type: 'resource', icon: 'scrap', colour: '#c9a36b', desc: 'Twisted metal from the wrecks. Smelting, crafting and smithing all eat it, and founding a guild costs 500.' });
-  item('circuit', { name: 'Intact circuit', type: 'resource', icon: 'circuit', colour: '#57c46b', desc: 'A rare find while salvaging, and a small reward from raids. Needed for kits, reactors, most weapons and core modules.' });
+  item('gold', { name: 'Gold', type: 'resource', icon: 'gold', colour: '#f2c14e', desc: 'Raid bosses drop it. Founding a guild costs 500.' });
+  item('reed', { name: 'Reed', type: 'resource', icon: 'reed', colour: '#c9d08a', desc: 'Gathered alongside herbs. Scribes press it into pages.' });
   TIERS.forEach(t => {
-    item(t.id + '_ore', { name: t.ore, type: 'resource', icon: 'ore', colour: t.colour, tier: t.n, desc: `Mined from the ${t.vein.toLowerCase()} at Mining level ${t.level}. Smelt it into plate.` });
-    item(t.id + '_plate', { name: `${t.name} plate`, type: 'resource', icon: 'plate', colour: t.colour, tier: t.n, desc: `Smelted at Smelting level ${t.level}. Used for ${t.name.toLowerCase()} weapons and armour.` });
+    const tierNote = `Tier ${t.n}.`;
+    item(`${t.id}_ore`, { name: t.ore, type: 'resource', icon: 'ore', colour: t.colour, tier: t.n, desc: `${tierNote} Mined at Mining ${t.level}. Used by Smithing and Armoursmithing.` });
+    item(`${t.id}_hide`, { name: t.hide, type: 'resource', icon: 'hide', colour: t.colour, tier: t.n, desc: `${tierNote} From hunting the ${t.beast.toLowerCase()} at Hunting ${t.level}. Used by Leatherworking and Fletching.` });
+    item(`${t.id}_bone`, { name: t.bone, type: 'resource', icon: 'bone', colour: t.colour, tier: t.n, desc: `${tierNote} From hunting the ${t.beast.toLowerCase()} at Hunting ${t.level}. Used by Fletching.` });
+    item(`${t.id}_branch`, { name: t.branch, type: 'resource', icon: 'branch', colour: t.colour, tier: t.n, desc: `${tierNote} Foraged at Foraging ${t.level}. Used by Enchanting.` });
+    item(`${t.id}_fibre`, { name: t.fibre, type: 'resource', icon: 'fibre', colour: t.colour, tier: t.n, desc: `${tierNote} Foraged at Foraging ${t.level}. Used by Tailoring and Enchanting.` });
+    item(`${t.id}_herb`, { name: t.herb, type: 'resource', icon: 'herb', colour: t.colour, tier: t.n, desc: `${tierNote} Gathered at Herbalism ${t.level}. Used by Scribing and Alchemy.` });
   });
-  const GASES = [
-    { id: 'hydrogen', name: 'Hydrogen', level: 1, colour: '#9fd3ff', xp: 8 },
-    { id: 'plasma_gas', name: 'Plasma gas', level: 20, colour: '#ff6fb1', xp: 20 },
-    { id: 'cryo_gas', name: 'Cryo gas', level: 40, colour: '#7ff0ff', xp: 35 },
-  ];
-  GASES.forEach(g => item(g.id, { name: g.name, type: 'resource', icon: 'gas', colour: g.colour, desc: `Harvested at Harvesting level ${g.level}. Used in Alchemy.` }));
-  RAIDS.forEach(r => item(r.mat.id, { name: r.mat.name, type: 'material', icon: 'mat', colour: r.mat.colour, tier: r.tier,
-    desc: `Dropped by ${r.name}. Used for ${r.tier < 5 ? `tier ${r.tier + 1} weapons and armour, and ` : ''}the Mk ${ROMAN[r.tier - 1]} core module.` }));
-  item('repair_kit', { name: 'Repair kit', type: 'consumable', icon: 'kit', colour: '#e5533d', heal: 0.35, supply: true, desc: 'Used automatically in a fight when your hull drops below 40%. Restores 35% hull. Up to three kits per fight.' });
-  item('nano_kit', { name: 'Nano repair kit', type: 'consumable', icon: 'kit', colour: '#2ee6b6', heal: 0.6, supply: true, desc: 'Used before ordinary kits when your hull drops below 40%. Restores 60% hull. Up to three kits per fight.' });
-  item('coolant_gel', { name: 'Coolant tonic', type: 'consumable', icon: 'vial', colour: '#9fd3ff', supply: true, boost: { def: 0.1 }, desc: 'Raid tonic: +10% defence for one fight.' });
-  item('overdrive_fuel', { name: 'Overdrive tonic', type: 'consumable', icon: 'vial', colour: '#ff6fb1', supply: true, boost: { dmg: 0.1 }, desc: 'Raid tonic: +10% damage and healing for one fight.' });
-  item('cryo_plating', { name: 'Cryo tonic', type: 'consumable', icon: 'vial', colour: '#7ff0ff', supply: true, boost: { hp: 0.15 }, desc: 'Raid tonic: +15% hull for one fight.' });
-  const BOOSTS = ['coolant_gel', 'overdrive_fuel', 'cryo_plating'];
+  RAIDS.forEach(r => item(r.mat.id, { name: r.mat.name, type: 'material', icon: r.mat.icon, colour: r.mat.colour, tier: r.tier,
+    desc: `Dropped by ${r.name}. Needed for ${r.tier < 5 ? `every tier ${r.tier + 1} weapon and armour piece, and ` : ''}the ${ROMAN[r.tier - 1]} sigil.` }));
 
+  // Consumables from Alchemy.
+  item('healing_potion', { name: 'Healing potion', type: 'consumable', icon: 'potion', colour: '#ef5a45', heal: 0.35, supply: true, desc: 'Drunk automatically in a fight when your hull drops below 40%. Restores 35%. Up to three potions per fight.' });
+  item('greater_healing_potion', { name: 'Greater healing potion', type: 'consumable', icon: 'potion_big', colour: '#ff7aa2', heal: 0.6, supply: true, desc: 'Drunk before ordinary potions when your hull drops below 40%. Restores 60%.' });
+  item('ironskin_tonic', { name: 'Ironskin tonic', type: 'consumable', icon: 'tonic_def', colour: '#b4bcc6', supply: true, boost: { def: 0.1 }, desc: 'Raid tonic: +10% defence for one fight.' });
+  item('fury_tonic', { name: 'Fury tonic', type: 'consumable', icon: 'tonic_dmg', colour: '#ff6fb1', supply: true, boost: { dmg: 0.1 }, desc: 'Raid tonic: +10% damage and healing for one fight.' });
+  item('vigour_tonic', { name: 'Vigour tonic', type: 'consumable', icon: 'tonic_hp', colour: '#3ddc84', supply: true, boost: { hp: 0.15 }, desc: 'Raid tonic: +15% hull for one fight.' });
+  const BOOSTS = ['ironskin_tonic', 'fury_tonic', 'vigour_tonic'];
+  const POTIONS = ['greater_healing_potion', 'healing_potion'];
+
+  // Gear.
   TIERS.forEach(t => {
-    WEAPON_KINDS.forEach(w => item(`${t.id}_${w.id}`, {
-      name: `${t.name} ${w.noun}`, type: 'gear', slot: 'weapon', weapon: w.id, icon: w.id, colour: t.colour, tier: t.n,
-      stats: { atk: Math.round(10 * t.mult) },
-      desc: `Tier ${t.n} ${ROLES[w.role].name.toLowerCase()} weapon${w.stance === 'tank' ? ' for tanks' : ''}. ${w.action} every ${(w.cast / 1000).toFixed(1)}s.`,
-    }));
-    PART_SLOTS.forEach(s => {
-      const stats = {};
-      Object.entries(s.base).forEach(([k, v]) => { stats[k] = Math.round(v * t.mult); });
-      item(`${t.id}_${s.id}`, { name: `${t.name} ${s.noun}`, type: 'gear', slot: s.id, icon: s.id, colour: t.colour, tier: t.n, stats, desc: `Tier ${t.n} ${s.name.toLowerCase()}.` });
+    WEAPON_KINDS.forEach(w => {
+      const name = w.role === 'melee' ? `${t.metal} ${w.noun}` : w.role === 'ranged' ? `${t.bow} ${w.noun}` : w.role === 'magic' ? `${t.wood} ${w.noun}` : `${t.order} ${w.noun}`;
+      item(`${t.id}_${w.id}`, { name, type: 'gear', slot: 'weapon', weapon: w.id, icon: w.id, colour: t.colour, tier: t.n, stats: { atk: Math.round(10 * t.mult) }, desc: `Tier ${t.n}. ${w.note}` });
     });
+    Object.entries(ARMOUR_TYPES).forEach(([type, a]) => ARMOUR_SLOTS.forEach(slot => {
+      const p = a.pieces[slot];
+      const stats = { def: Math.round(p.def * t.mult), hp: Math.round(p.hp * t.mult) };
+      if (p.crit) stats.crit = p.crit + (t.n - 1) * 0.5;
+      if (p.power) stats.power = p.power + (t.n - 1);
+      item(`${t.id}_${type}_${slot}`, { name: `${tierLabel(t, type)} ${p.noun}`, type: 'gear', slot, armour: type, icon: `${type}_${slot}`, colour: t.colour, tier: t.n, stats,
+        desc: `Tier ${t.n} ${a.name.toLowerCase()} armour. Wear three ${a.name.toLowerCase()} pieces for ${a.bonus.name}.` });
+    }));
   });
-  RAIDS.forEach(r => item(`module_${r.tier}`, { name: `Core module Mk ${ROMAN[r.tier - 1]}`, type: 'gear', slot: 'module', icon: 'module', colour: r.mat.colour, tier: r.tier, pct: 5 * r.tier, desc: `Adds ${5 * r.tier}% to damage, healing, defence and hull.` }));
+  // Sigils: trinkets bound from raid materials.
+  RAIDS.forEach(r => item(`sigil_${r.tier}`, { name: `${r.mat.name.split(' ')[0]} sigil`, type: 'gear', slot: 'trinket', icon: 'sigil', colour: r.mat.colour, tier: r.tier,
+    stats: { power: 4 * r.tier, hpPct: 4 * r.tier }, desc: `A trinket bound from ${r.mat.name.toLowerCase()}s. Crafted with Enchanting.` }));
+  // Raid set pieces and trinkets: drops only, a little stronger than crafted gear of their tier.
+  RAIDS.forEach(r => {
+    const set = RAID_SETS[r.id];
+    const t = TIERS[r.tier - 1];
+    const a = ARMOUR_TYPES[set.type];
+    ARMOUR_SLOTS.forEach(slot => {
+      const p = a.pieces[slot];
+      const stats = { def: Math.round(p.def * t.mult * 1.15), hp: Math.round(p.hp * t.mult * 1.15) };
+      if (p.crit) stats.crit = p.crit + (t.n - 1) * 0.5 + 1;
+      if (p.power) stats.power = p.power + t.n;
+      item(`${r.id}_set_${slot}`, { name: `${set.name} ${p.noun}`, type: 'gear', slot, armour: set.type, set: r.id, icon: `${set.type}_${slot}`, colour: r.mat.colour, tier: r.tier, rare: true, stats,
+        desc: `Raid set piece from ${r.name}. Counts as ${a.name.toLowerCase()} armour.` });
+    });
+    const tr = RAID_TRINKETS[r.id];
+    item(`${r.id}_trinket`, { name: tr.name, type: 'gear', slot: 'trinket', icon: `trinket_${r.id}`, colour: r.mat.colour, tier: r.tier, rare: true, stats: tr.stats, passives: tr.passives,
+      desc: `A rare trinket from ${r.name}.` });
+  });
 
   // ---------- Actions ----------
   // outputs: { itemId: [min, max] }, chance: extra rolls, inputs consumed per action.
-  // Action ids are kept stable across renames so saved activities keep working.
   const ACTIONS = [];
   const action = o => ACTIONS.push(Object.assign({ inputs: {}, chance: [] }, o));
-
-  [
-    ['scrap_heap', 'Scrap heap', 1, 3000, 5, [1, 2], 0.05],
-    ['drone_wrecks', 'Wrecked drones', 10, 3000, 10, [2, 4], 0.08],
-    ['tank_graveyard', 'Tank graveyard', 25, 3500, 18, [4, 7], 0.1],
-    ['crashed_frigate', 'Crashed frigate', 40, 4000, 28, [7, 12], 0.12],
-    ['titan_carcass', 'Titan carcass', 55, 4000, 40, [10, 18], 0.15],
-  ].forEach(([id, name, level, time, xp, scrap, p]) => action({
-    id, skill: 'salvaging', name, level, time, xp, item: 'scrap', outputs: { scrap }, chance: [{ item: 'circuit', p, qty: 1 }],
-  }));
+  const GATHER_XP = [8, 16, 25, 36, 50];
+  const CRAFT_XP = [6, 12, 19, 28, 40]; // per material used
 
   TIERS.forEach((t, i) => {
-    action({ id: `mine_${t.id}`, skill: 'mining', name: t.vein, level: t.level, time: 3000, xp: [7, 14, 22, 32, 45][i], item: t.id + '_ore', outputs: { [t.id + '_ore']: [1, 1] } });
-    action({ id: `smelt_${t.id}`, skill: 'smelting', name: `${t.name} plate`, level: t.level, time: 3000, xp: [10, 20, 30, 44, 60][i], item: t.id + '_plate', inputs: { [t.id + '_ore']: 2, scrap: 2 * t.n }, outputs: { [t.id + '_plate']: [1, 1] } });
+    action({ id: `mine_${t.id}`, skill: 'mining', name: t.vein, level: t.level, time: 3000, xp: GATHER_XP[i], item: `${t.id}_ore`, outputs: { [`${t.id}_ore`]: [1, 1] } });
+    action({ id: `hunt_${t.id}`, skill: 'hunting', name: t.beast, level: t.level, time: 3500, xp: Math.round(GATHER_XP[i] * 1.2), item: `${t.id}_hide`, outputs: { [`${t.id}_hide`]: [1, 1], [`${t.id}_bone`]: [1, 1] } });
+    action({ id: `forage_${t.id}`, skill: 'foraging', name: t.grove, level: t.level, time: 3500, xp: Math.round(GATHER_XP[i] * 1.2), item: `${t.id}_branch`, outputs: { [`${t.id}_branch`]: [1, 1], [`${t.id}_fibre`]: [1, 1] } });
+    action({ id: `herb_${t.id}`, skill: 'herbalism', name: `${t.herb} patch`, level: t.level, time: 3000, xp: GATHER_XP[i], item: `${t.id}_herb`, outputs: { [`${t.id}_herb`]: [1, 1], reed: [1, 2] } });
   });
 
-  GASES.forEach(g => action({ id: `siphon_${g.id}`, skill: 'harvesting', name: g.name, level: g.level, time: 3000, xp: g.xp, item: g.id, outputs: { [g.id]: [1, 1] } }));
-  action({ id: 'chem_coolant_gel', skill: 'alchemy', name: 'Coolant tonic', level: 1, time: 3000, xp: 10, item: 'coolant_gel', inputs: { hydrogen: 2, scrap: 3 }, outputs: { coolant_gel: [1, 1] } });
-  action({ id: 'chem_overdrive_fuel', skill: 'alchemy', name: 'Overdrive tonic', level: 15, time: 3500, xp: 25, item: 'overdrive_fuel', inputs: { plasma_gas: 2, scrap: 5 }, outputs: { overdrive_fuel: [1, 1] } });
-  action({ id: 'chem_cryo_plating', skill: 'alchemy', name: 'Cryo tonic', level: 35, time: 4000, xp: 45, item: 'cryo_plating', inputs: { cryo_gas: 2, circuit: 1 }, outputs: { cryo_plating: [1, 1] } });
-
-  action({ id: 'eng_repair_kit', skill: 'crafting', name: 'Repair kit', level: 1, time: 4000, xp: 20, item: 'repair_kit', inputs: { iron_plate: 1, circuit: 1, scrap: 5 }, outputs: { repair_kit: [1, 1] } });
-  action({ id: 'eng_nano_kit', skill: 'crafting', name: 'Nano repair kit', level: 35, time: 4000, xp: 45, item: 'nano_kit', inputs: { cobalt_plate: 1, circuit: 2, scrap: 15 }, outputs: { nano_kit: [1, 1] } });
-  RAIDS.forEach(r => {
-    const t = TIERS[r.tier - 1];
-    action({
-      id: `eng_module_${r.tier}`, skill: 'crafting', name: ITEMS[`module_${r.tier}`].name, level: [10, 25, 40, 55, 70][r.tier - 1], time: 6000, xp: 60 * r.tier,
-      item: `module_${r.tier}`, inputs: { [r.mat.id]: 5, circuit: 3 * r.tier, [t.id + '_plate']: 2, scrap: 50 * r.tier }, outputs: { [`module_${r.tier}`]: [1, 1] },
-    });
-  });
-
-  const SMITH_XP = [12, 24, 38, 56, 80];
+  const craftInputs = (t, i, mats, extra) => {
+    const inputs = {};
+    Object.entries(mats).forEach(([m, n]) => { inputs[MAT_OF[m](t)] = n; });
+    if (i > 0) inputs[RAIDS[i - 1].mat.id] = 2 + t.n;
+    return Object.assign(inputs, extra || {});
+  };
+  const matCount = mats => Object.values(mats).reduce((a, n) => a + n, 0);
   TIERS.forEach((t, i) => {
-    const prevMat = i > 0 ? RAIDS[i - 1].mat.id : null;
     WEAPON_KINDS.forEach(w => {
       const id = `${t.id}_${w.id}`;
-      const inputs = { [t.id + '_plate']: 4, scrap: 8 * t.n };
-      if (w.circuits) inputs.circuit = w.circuits * t.n;
-      if (prevMat) inputs[prevMat] = 2 + t.n;
-      action({ id: `smith_${id}`, skill: 'weaponsmithing', name: ITEMS[id].name, level: t.level + w.offset, time: 4000, xp: SMITH_XP[i] * 4, item: id, inputs, outputs: { [id]: [1, 1] } });
+      action({ id: `craft_${id}`, skill: w.maker, name: ITEMS[id].name, level: t.level + w.offset, time: 4000, xp: CRAFT_XP[i] * matCount(w.mats), item: id, inputs: craftInputs(t, i, w.mats), outputs: { [id]: [1, 1] } });
     });
-    PART_SLOTS.forEach((s, j) => {
-      const id = `${t.id}_${s.id}`;
-      const inputs = { [t.id + '_plate']: s.plates, scrap: 8 * t.n };
-      if (s.id === 'reactor') inputs.circuit = 2 * t.n;
-      if (prevMat) inputs[prevMat] = 2 + t.n;
-      action({ id: `fab_${id}`, skill: 'armoursmithing', name: ITEMS[id].name, level: t.level + 2 * j, time: 4000, xp: SMITH_XP[i] * s.plates, item: id, inputs, outputs: { [id]: [1, 1] } });
-    });
+    Object.entries(ARMOUR_TYPES).forEach(([type, a]) => ARMOUR_SLOTS.forEach(slot => {
+      const p = a.pieces[slot];
+      const id = `${t.id}_${type}_${slot}`;
+      action({ id: `craft_${id}`, skill: a.maker, name: ITEMS[id].name, level: t.level + p.offset, time: 4000, xp: CRAFT_XP[i] * p.mats, item: id, inputs: craftInputs(t, i, { [a.mat]: p.mats }), outputs: { [id]: [1, 1] } });
+    }));
   });
+  RAIDS.forEach(r => {
+    const t = TIERS[r.tier - 1];
+    const id = `sigil_${r.tier}`;
+    action({ id: `craft_${id}`, skill: 'enchanting', name: ITEMS[id].name, level: [10, 25, 40, 55, 70][r.tier - 1], time: 6000, xp: 60 * r.tier, item: id,
+      inputs: { [r.mat.id]: 5, [`${t.id}_branch`]: 3, [`${t.id}_fibre`]: 3 }, outputs: { [id]: [1, 1] } });
+  });
+  [
+    ['healing_potion', 1, { iron_herb: 2 }, 3000, 12],
+    ['ironskin_tonic', 5, { iron_herb: 2, reed: 1 }, 3000, 15],
+    ['fury_tonic', 15, { titanium_herb: 2, reed: 1 }, 3500, 28],
+    ['greater_healing_potion', 30, { cobalt_herb: 2, reed: 2 }, 3500, 45],
+    ['vigour_tonic', 45, { iridium_herb: 2, reed: 2 }, 4000, 60],
+  ].forEach(([id, level, inputs, time, xp]) => action({ id: `brew_${id}`, skill: 'alchemy', name: ITEMS[id].name, level, time, xp, item: id, inputs, outputs: { [id]: [1, 1] } }));
 
   const ACTION_BY_ID = Object.fromEntries(ACTIONS.map(a => [a.id, a]));
 
   // ---------- Mech stats ----------
+  const STAT_LABELS = { atk: v => `+${v} damage/s`, def: v => `+${v} defence`, hp: v => `+${v} hull`, crit: v => `+${v}% crit`, power: v => `+${v}% power`, heal: v => `+${v}% healing`, defPct: v => `+${v}% defence`, hpPct: v => `+${v}% hull` };
+  const describe = stats => Object.entries(stats || {}).filter(([k, v]) => STAT_LABELS[k] && typeof v === 'number').map(([k, v]) => STAT_LABELS[k](v)).join(', ');
   // levels: { skillId: level }. boosts: { dmg, def, hp } fractions from raid tonics.
+  // Stat keys on gear: atk, def, hp (flat); crit, power, heal, defPct, hpPct (percent).
   function mechStats(equipment, levels, boosts) {
-    const s = Object.assign({}, BASE_STATS);
-    let pct = 0;
+    const s = { ...BASE_STATS, crit: 0, power: 0, heal: 0, defPct: 0, hpPct: 0 };
+    const passives = {};
+    const types = {}, sets = {};
+    const add = (stats, pas) => {
+      Object.entries(stats || {}).forEach(([k, v]) => { if (typeof v === 'number') s[k] = (s[k] || 0) + v; });
+      Object.entries(pas || {}).forEach(([k, v]) => { passives[k] = (passives[k] || 0) + v; });
+    };
     Object.values(equipment || {}).forEach(id => {
       const it = id && ITEMS[id];
       if (!it) return;
-      Object.entries(it.stats || {}).forEach(([k, v]) => { s[k] += v; });
-      pct += it.pct || 0;
+      add(it.stats, it.passives);
+      if (it.armour) types[it.armour] = (types[it.armour] || 0) + 1;
+      if (it.set) sets[it.set] = (sets[it.set] || 0) + 1;
+    });
+    const bonuses = [];
+    Object.entries(types).forEach(([type, n]) => {
+      if (n >= 3) { add(ARMOUR_TYPES[type].bonus); bonuses.push(`${ARMOUR_TYPES[type].bonus.name} (3 ${type}): ${describe(ARMOUR_TYPES[type].bonus)}`); }
+    });
+    Object.entries(sets).forEach(([id, n]) => {
+      const set = RAID_SETS[id];
+      if (n >= 2) { add(set.two); bonuses.push(`${set.name} (2): ${describe(set.two)}`); }
+      if (n >= 3) { add(set.three, set.three.passives); bonuses.push(`${set.name} (3): ${Object.keys(set.three.passives).map(k => k[0].toUpperCase() + k.slice(1)).join(', ')}`); }
     });
     const weapon = WEAPON_BY_ID[(ITEMS[equipment && equipment.weapon] || {}).weapon] || null;
     const lv = k => (levels && levels[k]) || 1;
     const b = boosts || {};
-    const mod = 1 + pct / 100;
     const skill = weapon ? weapon.skill : 'melee';
     return {
-      atk: Math.round(s.atk * mod * skillMult(lv(skill)) * (1 + (b.dmg || 0))),
-      def: Math.round(s.def * mod * (weapon && weapon.defMult || 1) * (1 + (b.def || 0))),
-      hp: Math.round(s.hp * mod * (weapon && weapon.hpMult || 1) * (1 + (b.hp || 0))),
+      atk: Math.round(s.atk * (1 + s.power / 100) * skillMult(lv(skill)) * (1 + (b.dmg || 0))),
+      def: Math.round(s.def * (1 + s.defPct / 100) * ((weapon && weapon.defMult) || 1) * (1 + (b.def || 0))),
+      hp: Math.round(s.hp * (1 + s.hpPct / 100) * ((weapon && weapon.hpMult) || 1) * (1 + (b.hp || 0))),
+      crit: s.crit / 100,
+      heal: s.heal / 100,
+      passives,
+      bonuses,
       weapon: weapon ? weapon.id : null,
       role: weapon ? weapon.role : 'melee',
       stance: weapon ? weapon.stance : 'dps',
       skill,
     };
   }
-  const power = s => Math.round(s.atk * 2 + s.def * 2 + s.hp / 5);
+  const power = s => Math.round(s.atk * 2 * (1 + (s.crit || 0)) + s.def * 2 + s.hp / 5);
 
-  // Boss stats are set against a reference pilot: a full set of that tier's gear with a
-  // rail rifle, the previous module and Ranged around the tier's level. That pilot wins
-  // roughly half the time solo with no supplies; kits, tonics or a party make it safe.
+  // Boss stats are set against a reference pilot: that tier's sword and full plate, the
+  // previous sigil and Melee around the tier's level. That pilot wins roughly half the time
+  // solo with no supplies; potions, tonics, better gear choices or a party make it safe.
   const FIGHT = { maxMs: 90000, killMs: 40000, deathMs: 36000, gapMs: 3000 };
   RAIDS.forEach(r => {
     const t = TIERS[r.tier - 1];
-    const eq = { weapon: `${t.id}_rifle` };
-    PART_SLOTS.forEach(s => { eq[s.id] = `${t.id}_${s.id}`; });
-    if (r.tier > 1) eq.module = `module_${r.tier - 1}`;
-    const ref = mechStats(eq, { ranged: t.level + 5 });
+    const eq = { weapon: `${t.id}_sword`, head: `${t.id}_plate_head`, body: `${t.id}_plate_body`, legs: `${t.id}_plate_legs` };
+    if (r.tier > 1) eq.trinket = `sigil_${r.tier - 1}`;
+    const ref = mechStats(eq, { melee: t.level + 5 });
     const def = Math.round(10 * t.mult);
     r.boss = {
       def,
@@ -247,20 +356,20 @@
     r.xp = [60, 150, 320, 600, 1000][r.tier - 1];
     r.drops = [
       { item: r.mat.id, qty: [2, 4] },
-      { item: 'scrap', qty: [15 * r.tier, 30 * r.tier] },
-      { item: t.id + '_ore', qty: [2, 5] },
-      { item: 'circuit', qty: [1, r.tier], p: 0.25 },
+      { item: 'gold', qty: [10 * r.tier, 25 * r.tier] },
+      ...ARMOUR_SLOTS.map(slot => ({ item: `${r.id}_set_${slot}`, qty: [1, 1], p: SET_DROP })),
+      { item: `${r.id}_trinket`, qty: [1, 1], p: TRINKET_DROP },
     ];
   });
   const RAID_BY_ID = Object.fromEntries(RAIDS.map(r => [r.id, r]));
 
   const GAME = {
-    MAX_LEVEL, OFFLINE_CAP, BASE_STATS, TIERS, STYLES, STYLE_BY_ID, ROLES, STANCES, WEAPON_KINDS, WEAPON_BY_ID,
-    SKILLS, SKILL_BY_ID, SLOTS, PART_SLOTS, RAIDS, RAID_BY_ID, BOSS_MOVES, FIGHT, ITEMS, BOOSTS, ACTIONS, ACTION_BY_ID,
-    xpForLevel, levelFromXp, skillMult, mechStats, power,
-    PARTY_MAX: 4, PARTY_HP_SCALE: 1, KITS_PER_RAID: 3, GUILD_COST: 500,
+    MAX_LEVEL, OFFLINE_CAP, BASE_STATS, TIERS, STYLES, ROLES, WEAPON_KINDS, WEAPON_BY_ID, HEALER,
+    SKILLS, SKILL_BY_ID, COMBAT_SKILLS, SLOTS, ARMOUR_SLOTS, ARMOUR_TYPES, RAIDS, RAID_BY_ID, RAID_SETS, RAID_TRINKETS, PASSIVES,
+    BOSS_MOVES, FIGHT, ITEMS, BOOSTS, POTIONS, ACTIONS, ACTION_BY_ID,
+    xpForLevel, levelFromXp, skillMult, mechStats, power, combatLevel,
+    PARTY_MAX: 4, PARTY_HP_SCALE: 1, POTIONS_PER_RAID: 3, GUILD_COST: 500,
     PAINTS: ['#b66cf0', '#e5533d', '#e8b923', '#3fa7f5', '#57c46b', '#d9dde3'],
-    // Trim colour for each paint, for the mech's jaw, belt and highlights.
     ACCENTS: { '#b66cf0': '#8cff5a', '#e5533d': '#ffb13b', '#e8b923': '#3fa7f5', '#3fa7f5': '#f2f4f7', '#57c46b': '#ff8f3d', '#d9dde3': '#3fa7f5' },
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = GAME;

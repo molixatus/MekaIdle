@@ -48,18 +48,10 @@ a { color: var(--blue); }
 .ico.lg { width: 40px; height: 40px; }
 .ico.xl { width: 64px; height: 64px; }
 .ico .hole { fill: var(--card); }
-.skill-salvaging { color: #d9ad6e; }
-.skill-mining { color: #b8c2cc; }
-.skill-harvesting { color: #9fd3ff; }
-.skill-smelting { color: #f08a3c; }
-.skill-alchemy { color: #ff6fb1; }
-.skill-crafting { color: var(--gold); }
-.skill-weaponsmithing { color: #ff8f7a; }
-.skill-armoursmithing { color: var(--blue); }
-.skill-melee { color: #ef5a45; }
-.skill-ranged { color: var(--gold); }
-.skill-magic { color: var(--purple); }
-.skill-healing { color: var(--green); }
+.skill-mining, .skill-smithing, .skill-armoursmithing, .skill-melee { color: #ef7a5a; }
+.skill-hunting, .skill-fletching, .skill-leatherworking, .skill-ranged { color: #f2c14e; }
+.skill-foraging, .skill-enchanting, .skill-tailoring, .skill-magic { color: #c08bff; }
+.skill-herbalism, .skill-scribing, .skill-alchemy, .skill-healing { color: #4ee08f; }
 
 /* ---------- Buttons and fields ---------- */
 .btn {
@@ -443,9 +435,10 @@ button.card:hover:not(:disabled) { background: var(--card-hover); }
   background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--tier, #5d6575) 22%, #12151c), #12151c 75%);
   border: 1px solid color-mix(in srgb, var(--tier, #5d6575) 40%, transparent);
 }
-.boss-portrait .boss-sprite { width: 100%; }
+.boss-portrait .boss-sprite { width: 100%; height: 100%; }
 .boss-portrait.small { width: 56px; height: 56px; }
-.boss-ico { flex: none; width: 40px; height: 40px; padding: 3px; background: #12151c; border-radius: 8px; }
+.boss-ico { flex: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 5px; background: #12151c; border-radius: 8px; }
+.boss-ico .ico { width: 100%; height: 100%; }
 .raid.fighting { box-shadow: inset 0 0 0 2px var(--green); }
 
 /* ---------- Battle panel ---------- */
@@ -483,56 +476,51 @@ button.card:hover:not(:disabled) { background: var(--card-hover); }
 .unit-art { position: relative; width: 64px; height: 64px; display: grid; place-items: center; }
 .unit-art .mech-sprite { height: 64px; }
 .unit.big .unit-art { width: 100%; height: 196px; }
-.unit.big .boss-sprite { width: 188px; height: 188px; }
+.unit.big .boss-sprite { width: 170px; height: 170px; }
 .unit-info { display: grid; gap: 6px; min-width: 0; }
 .unit-name { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; flex-wrap: wrap; }
 .unit-name > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .unit.down { opacity: .45; }
 .unit.down .unit-art { filter: grayscale(1); }
 
-.hpbar, .castbar { position: relative; height: 22px; border-radius: 5px; background: #0f1218; overflow: hidden; }
-.hpbar > span { position: absolute; inset: 0 auto 0 0; background: linear-gradient(to bottom, #45e08d, #2cb86c); transition: width .25s ease-out; }
-.hpbar.low > span { background: linear-gradient(to bottom, #f2685a, #cf4433); }
-.unit.big .hpbar > span { background: linear-gradient(to bottom, #f2685a, #b8392a); }
+.hpbar, .castbar { position: relative; height: 24px; border-radius: 4px; background: #0d1016; border: 1px solid #262c38; overflow: hidden; }
+.hpbar > span { position: absolute; inset: 0 auto 0 0; background: #2fae68; transition: width .25s ease-out; }
+.hpbar.low > span { background: #c9483a; }
+.unit.big .hpbar > span { background: #b8453a; }
 .hpbar b, .castbar b {
-  position: relative; display: block; padding: 0 8px; font-size: 12px; line-height: 22px; font-weight: 700;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, .8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums;
+  position: relative; display: block; padding: 0 8px; font-size: 13px; line-height: 22px; font-weight: 700; color: #fff;
+  text-shadow: 0 1px 2px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums;
 }
-.castbar { height: 18px; }
-.castbar b { line-height: 18px; font-weight: 600; }
-.castbar > span { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(to bottom, #f5cf6b, #d9a531); }
-.unit.big .castbar > span { background: linear-gradient(to bottom, #b58cff, #8457e0); }
-.castbar.danger > span { background: linear-gradient(to bottom, #ff7a66, #d4402c); }
+.castbar { height: 22px; }
+.castbar b { line-height: 20px; font-weight: 600; }
+.castbar > span { position: absolute; inset: 0 auto 0 0; width: 0; background: #7a6424; }
+.unit.big .castbar > span { background: #5a3f94; }
+.castbar.danger > span { background: #8f2f24; }
 .castbar.idle { opacity: .5; }
 .statuses { display: flex; gap: 4px; flex-wrap: wrap; min-height: 20px; }
 .status { padding: 1px 7px; border-radius: 9px; font-size: 11px; font-weight: 700; }
 .status.taunt { color: #ff8f7a; background: rgba(239, 90, 69, .14); }
-.status.burn { color: #c58cff; background: rgba(182, 108, 240, .15); }
+.status.burn { color: #ffb070; background: rgba(255, 150, 80, .14); }
 
-.floats { position: absolute; inset: 0; pointer-events: none; }
+.floats { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 2; }
 .float {
-  position: absolute; top: 40%; transform: translateX(-50%); font: 700 16px/1 var(--display); white-space: nowrap;
-  text-shadow: 0 2px 3px rgba(0, 0, 0, .9); animation: float-up 1s ease-out forwards;
+  position: absolute; top: 30%; transform: translateX(-50%); display: grid; justify-items: center; gap: 1px;
+  padding: 2px 7px 3px; border-radius: 6px; background: rgba(8, 10, 14, .82); border: 1px solid color-mix(in srgb, var(--fc) 55%, transparent);
+  color: var(--fc); white-space: nowrap; animation: float-up 1.3s ease-out forwards;
 }
-.float.dmg { color: #fff; }
-.float.taken { color: #ff8f7a; }
-.float.crit { color: var(--gold); font-size: 22px; }
-.float.burn { color: #c58cff; font-size: 13px; }
-.float.heal { color: var(--green); }
+.float b { font: 800 18px/1 var(--font); font-variant-numeric: tabular-nums; text-shadow: 0 1px 0 #000; }
+.float small { font: 700 10px/1 var(--font); letter-spacing: .06em; text-transform: uppercase; color: #d9dde3; opacity: .9; }
+.float.big b { font-size: 24px; }
 @keyframes float-up {
-  0% { opacity: 0; transform: translate(-50%, 6px) scale(.8); }
-  15% { opacity: 1; transform: translate(-50%, 0) scale(1.1); }
-  100% { opacity: 0; transform: translate(-50%, -46px) scale(1); }
+  0% { opacity: 0; transform: translate(-50%, 4px); }
+  12% { opacity: 1; transform: translate(-50%, 0); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -40px); }
 }
-.unit-art.shake { animation: shake .22s ease-out; }
-.unit-art.glow { animation: glow .4s ease-out; }
-@keyframes shake {
-  0%, 100% { transform: translate(0); filter: none; }
-  20% { transform: translate(-4px, 1px); filter: brightness(1.8); }
-  45% { transform: translate(3px, -1px); }
-  70% { transform: translate(-2px, 0); }
-}
-@keyframes glow { 0%, 100% { filter: none; } 40% { filter: drop-shadow(0 0 10px rgba(61, 220, 132, .9)) brightness(1.2); } }
+.unit-art.hit { animation: hit-flash .18s ease-out; }
+.unit-art.healed { animation: heal-flash .3s ease-out; }
+@keyframes hit-flash { 0%, 100% { filter: none; } 30% { filter: brightness(1.7); } }
+@keyframes heal-flash { 0%, 100% { filter: none; } 40% { filter: brightness(1.3) drop-shadow(0 0 6px rgba(78, 224, 143, .8)); } }
 
 .meter { display: grid; gap: 8px; }
 .meter-row { display: grid; gap: 4px; }
@@ -565,6 +553,80 @@ button.card:hover:not(:disabled) { background: var(--card-hover); }
   .unit-art .mech-sprite { height: 52px; }
   .boss-portrait { width: 64px; height: 64px; }
   .battle-head, .battle-cell, .battle-foot { padding-left: 14px; padding-right: 14px; }
+}
+
+/* ---------- Icons, rarity and gear details ---------- */
+.ico.gi svg { display: block; }
+.ico.rare { filter: drop-shadow(0 0 3px rgba(242, 193, 78, .8)); }
+.tile.rare-tile, .slot.rare-slot { border-color: rgba(242, 193, 78, .5); }
+.need.rare-need { color: var(--gold); }
+.rare-loot { color: var(--gold); font-weight: 700; }
+.type-chip, .set-chip { padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+.type-chip { color: #c3c9d4; background: #2b313d; }
+.set-chip { color: var(--gold); background: rgba(242, 193, 78, .14); }
+.stat-passive { color: #ffb070; }
+.bonus-list { margin-top: 14px; padding: 12px; background: #151920; border-radius: 8px; font-size: 13px; }
+.bonus-list ul, .set-box ul, .passive-list { margin: 6px 0 0; padding-left: 18px; color: #c3c9d4; }
+.bonus-list li.passive, .passive-list li { color: #ffcf9a; }
+.set-box { padding: 10px 12px; background: #151920; border-radius: 8px; border-left: 3px solid var(--gold); font-size: 13px; }
+.set-box li.ok { color: var(--green); }
+
+/* Gathering -> artisan -> combat chain on skill pages. */
+.chain { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -10px 0 18px; }
+.chain-group { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+.chain-step {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 15px; font-size: 13px; font-weight: 600; color: #c3c9d4;
+}
+.chain-step:hover { background: var(--card-hover); }
+.chain-step.here { border-color: currentColor; color: var(--text); background: #2b313d; }
+.chain-arrow { color: var(--faint); font-weight: 700; }
+
+/* Weapon tables on combat skill pages. */
+.weapon-table { display: grid; gap: 12px; }
+.weapon-kind { display: grid; gap: 10px; padding: 14px; background: var(--card); border-radius: 8px; }
+.weapon-kind-head { display: flex; gap: 12px; align-items: center; }
+.weapon-kind-head small { display: block; }
+.tier-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.tier-cell { display: grid; justify-items: center; gap: 4px; padding: 8px 4px; background: #1a1e27; border: 1px solid transparent; border-radius: 8px; color: var(--muted); font-size: 11px; }
+.tier-cell:disabled { cursor: default; }
+.tier-cell:not(.owned) .ico { opacity: .45; }
+.tier-cell.owned { color: var(--text); }
+.tier-cell.owned:not(:disabled):hover { background: #232833; border-color: var(--line); }
+.tier-cell.on { border-color: var(--green); color: var(--green); }
+
+/* Guild members table. */
+.guild-table { display: grid; gap: 4px; }
+.guild-row {
+  display: grid; grid-template-columns: minmax(140px, 1.3fr) 110px 90px minmax(160px, 2fr) auto; gap: 12px; align-items: center;
+  padding: 10px 12px; background: var(--card); border-radius: 6px; font-size: 13px;
+}
+.guild-row.head { background: none; padding-top: 0; padding-bottom: 0; color: var(--faint); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.guild-row .members, .guild-table .members { display: contents; }
+.guild-row.away { color: var(--muted); }
+.guild-row .who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.guild-row .who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guild-row .combat { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.guild-row .combat .ico { color: #ef7a5a; }
+.guild-row .doing { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.rank-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+.rank-chip.leader { color: var(--gold); background: rgba(242, 193, 78, .14); }
+.rank-chip.officer { color: #7fb3ff; background: rgba(91, 155, 255, .14); }
+.rank-chip.member { color: #c3c9d4; background: #2b313d; }
+.guild-chat-wrap { max-width: 720px; }
+
+.credits { margin-top: 10px; padding: 0 12px; font-size: 11px; line-height: 1.5; color: var(--faint); }
+.credits a { color: var(--muted); }
+.auth-credits { margin-top: 16px; text-align: center; font-size: 11px; color: var(--faint); }
+.auth-credits a { color: var(--muted); }
+
+@media (max-width: 900px) {
+  .guild-row { grid-template-columns: 1fr auto; }
+  .guild-row.head { display: none; }
+  .guild-row .doing { grid-column: 1 / -1; white-space: normal; }
+  .guild-row .row-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .tier-row { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

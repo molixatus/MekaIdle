@@ -45,7 +45,14 @@ db.exec(`
 `);
 
 // Added after launch: a running party raid's session. Existing databases get the column here.
-try { db.exec('ALTER TABLE parties ADD COLUMN session TEXT'); } catch (e) { /* already there */ }
+for (const sql of [
+  'ALTER TABLE parties ADD COLUMN session TEXT',
+  'ALTER TABLE players ADD COLUMN combat_level INTEGER NOT NULL DEFAULT 4',
+  'ALTER TABLE players ADD COLUMN activity TEXT',
+  'ALTER TABLE players ADD COLUMN guild_rank TEXT',
+]) {
+  try { db.exec(sql); } catch (e) { /* already there */ }
+}
 db.exec('DROP TABLE IF EXISTS raid_runs');
 
 const stmts = new Map();
@@ -125,8 +132,21 @@ function fresh(id) {
 }
 
 function savePlayer(p) {
-  q('UPDATE players SET state = ?, total_level = ?, power = ? WHERE id = ?')
-    .run(JSON.stringify(p.state), game.totalLevel(p.state), game.power(p.state), p.id);
+  q('UPDATE players SET state = ?, total_level = ?, power = ?, combat_level = ?, activity = ? WHERE id = ?')
+    .run(JSON.stringify(p.state), game.totalLevel(p.state), game.power(p.state), G.combatLevel(game.levels(p.state)), activityLabel(p.state), p.id);
+}
+
+// A short description of what a pilot is doing, e.g. "Mining: Iron vein".
+function activityLabel(state) {
+  const a = state.activity;
+  if (!a) return 'Idle';
+  if (a.type === 'raid') return `Raiding ${G.RAID_BY_ID[a.raid].name}`;
+  if (a.type === 'party') {
+    const party = q('SELECT raid FROM parties WHERE id = ?').get(a.party);
+    return party ? `Party raid: ${G.RAID_BY_ID[party.raid].name}` : 'Idle';
+  }
+  const action = G.ACTION_BY_ID[a.id];
+  return action ? `${G.SKILL_BY_ID[action.skill].name}: ${action.name}` : 'Idle';
 }
 
 // The state as the client sees it: raid sessions are summarised, without the fight timeline.
@@ -493,6 +513,18 @@ route('POST', '/api/party/stop', ctx => tx(() => {
   return { state: clientState(p.state) };
 }));
 
+// ---------- Health ----------
+// On Railway, data only survives redeploys when a volume is attached (RAILWAY_VOLUME_MOUNT_PATH)
+// or DATA_DIR points somewhere persistent.
+const onRailway = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_ENVIRONMENT_NAME || process.env.RAILWAY_PROJECT_ID);
+const persistent = !onRailway || !!(process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DATA_DIR);
+route('GET', '/api/health', () => ({
+  ok: true,
+  persistentStorage: persistent,
+  storage: persistent ? 'Saves are kept between deploys.' : 'WARNING: no volume attached. Every deploy wipes all accounts and progress.',
+  pilots: q('SELECT COUNT(*) AS n FROM players').get().n,
+}), false);
+
 // ---------- Friends ----------
 route('GET', '/api/social', ctx => {
   const me = ctx.me;
@@ -531,8 +563,15 @@ route('POST', '/api/friends/remove', ctx => {
 });
 
 // ---------- Guilds ----------
-function guildMembers(guildId) {
-  return q(`${PUB_SQL} WHERE p.guild_id = ? ORDER BY p.guild_joined`).all(guildId).map(pub);
+const RANK_ORDER = { leader: 0, officer: 1, member: 2 };
+function guildMembers(guild) {
+  return q(`SELECT p.id, p.name, p.mech, p.colour, p.total_level, p.power, p.last_seen, p.combat_level, p.activity, p.guild_rank, g.tag
+    FROM players p LEFT JOIN guilds g ON g.id = p.guild_id WHERE p.guild_id = ? ORDER BY p.guild_joined`).all(guild.id)
+    .map(row => ({
+      ...pub(row), combat: row.combat_level, activity: row.activity || 'Idle',
+      rank: row.id === guild.leader_id ? 'leader' : row.guild_rank === 'officer' ? 'officer' : 'member',
+    }))
+    .sort((a, b) => RANK_ORDER[a.rank] - RANK_ORDER[b.rank] || b.online - a.online || b.combat - a.combat);
 }
 
 route('GET', '/api/guild', ctx => {
@@ -544,7 +583,8 @@ route('GET', '/api/guild', ctx => {
   }
   const g = q('SELECT * FROM guilds WHERE id = ?').get(me.guild_id);
   const chat = q('SELECT id, player_id, name, text, at FROM guild_chat WHERE guild_id = ? ORDER BY id DESC LIMIT 50').all(g.id).reverse();
-  return { guild: { id: g.id, name: g.name, tag: g.tag, leader: g.leader_id, created: g.created, max: GUILD_MAX }, members: guildMembers(g.id), chat };
+  const members = guildMembers(g);
+  return { guild: { id: g.id, name: g.name, tag: g.tag, leader: g.leader_id, created: g.created, max: GUILD_MAX }, members, myRank: members.find(m => m.id === ctx.me).rank, chat };
 });
 
 route('POST', '/api/guild/create', ctx => {
@@ -556,8 +596,8 @@ route('POST', '/api/guild/create', ctx => {
     if (p.guild_id) bad('Leave your current guild first.');
     if (q('SELECT 1 FROM guilds WHERE name_key = ?').get(name.toLowerCase())) bad('A guild with that name already exists.');
     if (q('SELECT 1 FROM guilds WHERE tag = ?').get(tag)) bad('That tag is taken.');
-    if ((s.items.scrap || 0) < G.GUILD_COST) bad(`Founding a guild costs ${G.GUILD_COST} scrap.`);
-    game.addItems(s.items, { scrap: G.GUILD_COST }, -1);
+    if ((s.items.gold || 0) < G.GUILD_COST) bad(`Founding a guild costs ${G.GUILD_COST} gold.`);
+    game.addItems(s.items, { gold: G.GUILD_COST }, -1);
     const now = Date.now();
     const id = Number(q('INSERT INTO guilds (name, name_key, tag, leader_id, created) VALUES (?, ?, ?, ?, ?)').run(name, name.toLowerCase(), tag, ctx.me, now).lastInsertRowid);
     q('UPDATE players SET guild_id = ?, guild_joined = ? WHERE id = ?').run(id, now, ctx.me);
@@ -574,13 +614,14 @@ route('POST', '/api/guild/join', ctx => tx(() => {
 }));
 
 function removeFromGuild(playerId, guildId) {
-  q('UPDATE players SET guild_id = NULL, guild_joined = NULL WHERE id = ?').run(playerId);
+  q('UPDATE players SET guild_id = NULL, guild_joined = NULL, guild_rank = NULL WHERE id = ?').run(playerId);
   const g = q('SELECT leader_id FROM guilds WHERE id = ?').get(guildId);
   if (!g || g.leader_id !== playerId) return;
   // The longest-serving member takes over, or the guild closes if nobody is left.
-  const next = q('SELECT id FROM players WHERE guild_id = ? ORDER BY guild_joined LIMIT 1').get(guildId);
+  const next = q(`SELECT id FROM players WHERE guild_id = ? ORDER BY CASE guild_rank WHEN 'officer' THEN 0 ELSE 1 END, guild_joined LIMIT 1`).get(guildId);
   if (next) {
     q('UPDATE guilds SET leader_id = ? WHERE id = ?').run(next.id, guildId);
+    q('UPDATE players SET guild_rank = NULL WHERE id = ?').run(next.id);
   } else {
     q('DELETE FROM guild_chat WHERE guild_id = ?').run(guildId);
     q('DELETE FROM guilds WHERE id = ?').run(guildId);
@@ -592,13 +633,34 @@ route('POST', '/api/guild/leave', ctx => tx(() => {
   if (me.guild_id) removeFromGuild(ctx.me, me.guild_id);
 }));
 
+function myGuild(me) {
+  const row = q('SELECT guild_id, guild_rank FROM players WHERE id = ?').get(me);
+  const g = row.guild_id && q('SELECT * FROM guilds WHERE id = ?').get(row.guild_id);
+  if (!g) bad('You’re not in a guild.');
+  return { g, rank: g.leader_id === me ? 'leader' : row.guild_rank === 'officer' ? 'officer' : 'member' };
+}
+
 route('POST', '/api/guild/kick', ctx => tx(() => {
-  const me = q('SELECT guild_id FROM players WHERE id = ?').get(ctx.me);
-  const g = me.guild_id && q('SELECT * FROM guilds WHERE id = ?').get(me.guild_id);
-  if (!g || g.leader_id !== ctx.me) bad('Only the guild leader can remove members.');
-  const target = q('SELECT id, guild_id FROM players WHERE id = ?').get(int(ctx.body.id));
-  if (!target || target.guild_id !== g.id || target.id === ctx.me) bad('That pilot isn’t someone you can remove.');
+  const { g, rank } = myGuild(ctx.me);
+  const target = q('SELECT id, guild_id, guild_rank FROM players WHERE id = ?').get(int(ctx.body.id));
+  if (!target || target.guild_id !== g.id || target.id === ctx.me || target.id === g.leader_id) bad('That pilot isn’t someone you can remove.');
+  if (rank === 'member' || (rank === 'officer' && target.guild_rank === 'officer')) bad('Officers can remove members; only the leader can remove officers.');
   removeFromGuild(target.id, g.id);
+}));
+
+route('POST', '/api/guild/rank', ctx => tx(() => {
+  const { g, rank } = myGuild(ctx.me);
+  if (rank !== 'leader') bad('Only the guild leader can change ranks.');
+  const target = q('SELECT id, guild_id FROM players WHERE id = ?').get(int(ctx.body.id));
+  if (!target || target.guild_id !== g.id || target.id === ctx.me) bad('That pilot isn’t in your guild.');
+  const next = str(ctx.body.rank);
+  if (next === 'leader') {
+    q('UPDATE guilds SET leader_id = ? WHERE id = ?').run(target.id, g.id);
+    q("UPDATE players SET guild_rank = 'officer' WHERE id = ?").run(ctx.me);
+    q('UPDATE players SET guild_rank = NULL WHERE id = ?').run(target.id);
+  } else if (next === 'officer' || next === 'member') {
+    q('UPDATE players SET guild_rank = ? WHERE id = ?').run(next === 'officer' ? 'officer' : null, target.id);
+  } else bad('Unknown rank.');
 }));
 
 route('POST', '/api/guild/chat', ctx => {
@@ -723,4 +785,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, '0.0.0.0', () => console.log(`MekaIdle listening on port ${PORT}, data in ${DATA_DIR}`));
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`MekaIdle listening on port ${PORT}, data in ${DATA_DIR}`);
+  if (!persistent) console.warn('WARNING: no Railway volume attached. The database will be wiped on the next deploy. Attach a volume to this service.');
+});
