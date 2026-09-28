@@ -58,7 +58,13 @@ const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 async function loadPlayer(id) {
   const row = await db.get('SELECT * FROM players WHERE id = ?', id);
   if (!row) return null;
-  row.state = game.migrate(JSON.parse(row.state), Date.now());
+  const raw = JSON.parse(row.state);
+  // A save from an older version of the game is copied, untouched, before it's upgraded.
+  const v = raw.v || 1;
+  if (v < game.STATE_VERSION && !(await db.get('SELECT 1 AS x FROM save_backups WHERE player_id = ? AND version = ?', row.id, v))) {
+    await db.backupSave(row.id, v, `before update to save version ${game.STATE_VERSION}`, row.state);
+  }
+  row.state = game.migrate(raw, Date.now());
   return row;
 }
 

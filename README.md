@@ -43,6 +43,13 @@ Saves are stored in PostgreSQL:
 3. Redeploy. The server creates its tables on start-up.
 4. Check `/api/health` on the live site: it should show `"database": "postgres"` and `"persistentStorage": true`.
 
+How saves survive updates:
+
+- **Schema steps.** The database layout only changes through numbered steps in , each run once and recorded in . Steps only add tables and columns; they never remove data.
+- **Save upgrades.** Each pilot's save is versioned. When a patch changes the game,  in  upgrades old saves the first time they load, and the untouched original is kept in  (the last 5 per pilot).
+- **Nothing is deleted.** Items, skills or gear a new version no longer recognises go into the save's vault and come back automatically if a later version knows them again.
+- **Moving to Postgres.** The first time the server starts with an empty Postgres database, it copies in everything from an existing SQLite database ( in  or the Railway volume), so switching keeps everyone's progress.
+
 Without `DATABASE_URL` the server falls back to SQLite, which Railway wipes on every deploy unless a volume is attached.
 
 ## Files
