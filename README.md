@@ -23,23 +23,32 @@ An online idle game about building a mech and raiding, solo or with your guild. 
 
 ## Running locally
 
-Needs Node.js 24 (it uses the built-in `node:sqlite`, so there's nothing to install).
+Needs Node.js 24.
 
 ```
+npm install
 npm start
 ```
 
-then go to http://localhost:3000. Data is stored in `data/mekaidle.db`.
+then go to http://localhost:3000. Without `DATABASE_URL`, data is stored in a local SQLite file, `data/mekaidle.db`, so there's no database to set up. Set `DATABASE_URL` to a PostgreSQL connection string to use Postgres instead.
 
 ## Deploying on Railway
 
-Railway runs `npm start` on the `PORT` it provides and redeploys on every push to `main`.
+Railway runs `npm install` and `npm start` on the `PORT` it provides, and redeploys on every push to `main`.
 
-**Attach a volume** to the service (right-click the service on the project canvas, or use + New → Volume, and mount it at `/data`). Without one, every deploy starts with an empty database, so all accounts and progress reset. The server finds the volume through `RAILWAY_VOLUME_MOUNT_PATH`; you can also set `DATA_DIR` to choose the folder yourself. Visit `/api/health` on the live site to check: `persistentStorage` should be `true`.
+Saves are stored in PostgreSQL:
+
+1. In the Railway project, add a database: **+ New → Database → PostgreSQL**.
+2. Open the game service → **Variables** → **New variable**, name it `DATABASE_URL` and set the value to `${{Postgres.DATABASE_URL}}` (a reference to the Postgres service; pick it from the suggestions).
+3. Redeploy. The server creates its tables on start-up.
+4. Check `/api/health` on the live site: it should show `"database": "postgres"` and `"persistentStorage": true`.
+
+Without `DATABASE_URL` the server falls back to SQLite, which Railway wipes on every deploy unless a volume is attached.
 
 ## Files
 
-- `server.js` – HTTP server, accounts and sessions, the JSON API, and the SQLite schema
+- `server.js` – HTTP server, accounts and sessions, and the JSON API
+- `lib/db.js` – database access: PostgreSQL when `DATABASE_URL` is set, otherwise SQLite; the schema
 - `lib/game.js` – server-side rules: offline progress, the action queue, equipment, abilities, subclasses, repeating raid sessions, the wave combat timeline, loot, and save migrations
 - `public/data.js` – game content (skills, items, recipes, abilities, raids, patch notes) and formulas, shared by server and browser
 - `public/app.js` – the browser client
