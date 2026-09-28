@@ -735,7 +735,7 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 /* Guild members table. */
 .guild-table { display: grid; gap: 4px; }
 .guild-row {
-  display: grid; grid-template-columns: minmax(140px, 1.3fr) 110px 90px minmax(160px, 2fr) auto; gap: 12px; align-items: center;
+  display: grid; grid-template-columns: minmax(140px, 220px) 110px 90px minmax(160px, 1fr) 290px; gap: 12px; align-items: center;
   padding: 10px 12px; background: var(--card); border-radius: 6px; font-size: 13px;
 }
 .guild-row.head { background: none; padding-top: 0; padding-bottom: 0; color: var(--faint); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
