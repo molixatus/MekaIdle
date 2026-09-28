@@ -42,8 +42,8 @@
     ['starmetal', 80, 'Starmetal', 'Starmetal ore', 'Behemoth', 'Behemoth hide', 'Behemoth tusk', 'Behemoth', 'Dreamwood', 'Dreamweave', 'Dreamweave', 'Dreambloom', 'Seraph’s'],
     ['void', 90, 'Voidsteel', 'Void crystal', 'Void beast', 'Void hide', 'Void horn', 'Void', 'Voidwood', 'Voidsilk', 'Voidsilk', 'Voidroot', 'Ascendant’s'],
   ];
-  // Item names are coloured by tier, like rarity colours: grey, white, green, teal, blue, purple, pink, orange, gold, red.
-  const TIER_COLOURS = ['#a3abb5', '#eef2f6', '#5fd068', '#3fc1c9', '#4f8ff0', '#a86bff', '#ff6fb1', '#ff9a3c', '#ffd24a', '#ff4d4d'];
+  // Items are coloured by tier, like rarity colours: copper, steel, green, teal, blue, purple, pink, orange, gold, red.
+  const TIER_COLOURS = ['#d08d5b', '#a9c1dd', '#5fd068', '#3fc1c9', '#4f8ff0', '#a86bff', '#ff6fb1', '#ff9a3c', '#ffd24a', '#ff4d4d'];
   const TIERS = TIER_ROWS.map(([id, level, metal, ore, beast, hide, bone, bow, wood, fibre, cloth, herb, order], i) => ({
     n: i + 1, id, level, mult: Math.pow(1.5, i), colour: TIER_COLOURS[i],
     metal, ore, vein: `${metal} vein`, beast, hide, bone, venom: `${beast} venom`, leather: `${hide.split(' ')[0]}hide`.replace('Wolfhide', 'Wolfhide'),

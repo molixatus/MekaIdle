@@ -124,6 +124,53 @@
     return det;
   }
 
+  // Hover tooltips. One delegated listener, so tooltips keep working when a live page re-renders
+  // under a still mouse, and never get stuck on an element that has been replaced.
+  const tips = new WeakMap();
+  function tip(el, build) {
+    tips.set(el, build);
+    el.classList.add('has-tip');
+    return el;
+  }
+  let tipFor = null;
+  function placeTip(e) {
+    const t = $('tooltip');
+    const pad = 14;
+    const r = t.getBoundingClientRect();
+    let x = e.clientX + pad, y = e.clientY + pad;
+    if (x + r.width > window.innerWidth - 8) x = Math.max(8, e.clientX - r.width - pad);
+    if (y + r.height > window.innerHeight - 8) y = Math.max(8, e.clientY - r.height - pad);
+    t.style.left = x + 'px';
+    t.style.top = y + 'px';
+  }
+  document.addEventListener('mousemove', e => {
+    const el = e.target.closest && e.target.closest('.has-tip');
+    const t = $('tooltip');
+    if (!el || !tips.has(el)) { if (!t.hidden) t.hidden = true; tipFor = null; return; }
+    if (tipFor !== el) {
+      tipFor = el;
+      t.replaceChildren(...[].concat(tips.get(el)()).filter(Boolean));
+      t.hidden = false;
+    }
+    placeTip(e);
+  });
+  document.addEventListener('scroll', () => { $('tooltip').hidden = true; tipFor = null; }, true);
+  // What an item is, for tooltips: name, kind, stats and description.
+  function itemTip(id, extra) {
+    const it = G.ITEMS[id];
+    if (!it) return [];
+    const kind = it.slot ? (G.SLOTS.find(s => s.id === it.slot) || {}).name : { resource: 'Resource', material: 'Raid material', consumable: 'Consumable' }[it.type];
+    return [
+      h('div', { class: 'tip-head' }, itemIco(id, 'md'), h('div', {}, itemName(id, 'b'), h('small', {}, `${it.rare ? 'Rare ' : ''}${kind}${it.tier ? ` · tier ${it.tier}` : ''} · ${num(have(id))} owned`))),
+      it.type === 'gear' ? statsLine(it) : null,
+      it.boost || it.potion ? h('div', { class: 'stats-line left' }, it.cls ? classChip(it.cls) : null,
+        h('span', { class: it.potion ? 'stat-hp' : 'stat-atk' }, it.boost ? G.describe(it.boost) : it.potion === 'hp' ? `Restores ${Math.round(it.heal * 100)}% HP` : `Restores ${it.mana} mana`)) : null,
+      it.passives ? h('ul', { class: 'passive-list' }, passiveText(it.passives).map(p => h('li', {}, p))) : null,
+      h('p', { class: 'tip-desc' }, it.desc),
+      extra || null,
+    ];
+  }
+
   // ---------- Session state ----------
   let me = null;      // latest /api/me payload
   let offset = 0;     // server clock minus local clock
@@ -586,28 +633,31 @@
       h('span', { class: 'chain-group' }, chain.filter(s => s.group === 'artisan').map(link)), arrow(), chain.filter(s => s.group === 'combat').map(link));
   }
 
-  let tierFilter = {};
   function skillPage(id) {
     const sk = G.SKILL_BY_ID[id];
     const head = pageHead(id, 'skill-' + id, sk.name, sk.desc, levelBox(id));
     if (sk.group === 'combat') return [head, chainBar(id), ...combatSkillBody(sk)];
-    const all = G.ACTIONS.filter(a => a.skill === id);
-    const tiers = [...new Set(all.map(a => (G.ITEMS[a.item] || {}).tier || 1))].sort((a, b) => a - b);
-    // Big crafting lists are split by tier; default to the highest tier you can make.
-    let shown = all;
-    let tierTabs = null;
-    if (all.length > 20) {
-      const best = Math.max(1, ...all.filter(a => lvl(id) >= a.level).map(a => G.ITEMS[a.item].tier || 1));
-      const cur = tierFilter[id] || best;
-      shown = all.filter(a => (G.ITEMS[a.item].tier || 1) === cur);
-      tierTabs = h('div', { class: 'chips', role: 'group', 'aria-label': 'Tier' }, tiers.map(tn => {
-        const b = h('button', { type: 'button', class: 'chip', 'aria-pressed': String(tn === cur), onclick: () => { tierFilter[id] = tn; renderPage(); } }, `T${tn} ${G.TIERS[tn - 1].metal}`);
-        b.style.setProperty('--chip', G.TIERS[tn - 1].colour);
-        return b;
-      }));
-    }
-    return [head, chainBar(id), section(SKILL_SECTION[id] || 'Actions', 'Click a card to start, or set a count and start or queue it.', tierTabs, h('div', { class: 'grid' }, shown.map(actionCard)))];
+    // Every tier on one screen, lowest level first, with a divider where each tier starts.
+    const tierOf = a => (G.ITEMS[a.item] || {}).tier || 1;
+    const all = G.ACTIONS.filter(a => a.skill === id).sort((x, y) => x.level - y.level || tierOf(x) - tierOf(y));
+    const cards = [];
+    let lastTier = 0;
+    all.forEach(a => {
+      const tn = tierOf(a);
+      if (all.length > 12 && tn !== lastTier) {
+        const t = G.TIERS[tn - 1];
+        const div = h('div', { class: 'tier-divider' }, h('span', {}, `Tier ${tn} · ${t.metal}`), h('small', {}, `from level ${a.level}`));
+        div.style.setProperty('--tier', t.colour);
+        cards.push(div);
+      }
+      lastTier = tn;
+      cards.push(actionCard(a));
+    });
+    return [head, chainBar(id), section(SKILL_SECTION[id] || 'Actions', 'Hover a card for details. Click it to start, or set a count and start or queue it.', h('div', { class: 'grid' }, cards))];
   }
+
+  // A small item badge (icon and a number) with the item's details on hover.
+  const needChip = (id, main, sub, cls = '') => tip(h('span', { class: `need ${cls}` }, itemIco(id, 'sm'), main, sub ? h('small', {}, sub) : null), () => itemTip(id));
 
   function actionCard(a) {
     const locked = lvl(a.skill) < a.level;
@@ -625,19 +675,22 @@
       if (q.length > G.QUEUE_MAX) { toast(`The queue holds ${G.QUEUE_MAX} actions.`, 'error'); return; }
       await act('/api/queue', { queue: q }, `Queued ${n() || 1} × ${a.name}.`);
     };
-    const main = h('button', { type: 'button', class: 'card-main', disabled: locked, 'aria-pressed': String(active),
+    const art = h('div', { class: 'card-art' }, itemIco(a.item, 'xl'));
+    if (out) art.style.setProperty('--ic', out.colour);
+    const tierBadge = out && out.tier ? h('span', { class: 'tier-badge' }, `T${out.tier}`) : null;
+    if (tierBadge) tierBadge.style.setProperty('--tier', out.colour);
+    const recipe = h('p', { class: 'tip-desc muted' }, `${a.name}: ${secs(a.time)}, ${a.xp} ${G.SKILL_BY_ID[a.skill].name} XP, level ${a.level}.`);
+    const main = tip(h('button', { type: 'button', class: 'card-main', disabled: locked, 'aria-pressed': String(active),
       onclick: () => (active ? act('/api/action/stop', {}) : start()) },
-    h('div', { class: 'card-top' }, out ? itemName(a.item) : h('span', {}, a.name), h('span', { class: 'card-time' }, secs(a.time))),
-    h('div', { class: 'card-art' }, itemIco(a.item, 'xl')),
+    h('div', { class: 'card-top' }, tierBadge, out && out.type !== 'resource' ? itemName(a.item) : h('span', {}, a.name), h('span', { class: 'card-time' }, secs(a.time))),
+    art,
     locked ? h('div', { class: 'card-xp' }, ui('lock', 'sm'), `Level ${a.level}`) : h('div', { class: 'card-xp' }, `${a.xp} XP`),
-    out && out.type === 'gear' ? statsLine(out) : out && (out.boost || out.potion) ? h('div', { class: 'stats-line' }, out.cls ? classChip(out.cls) : null,
-      h('span', { class: out.potion ? 'stat-hp' : 'stat-atk' }, out.boost ? G.describe(out.boost) : out.potion === 'hp' ? `Restores ${Math.round(out.heal * 100)}% HP` : `Restores ${out.mana} mana`)) : null,
-    inputs.length ? h('div', { class: 'needs' }, inputs.map(([id, q]) =>
-      h('span', { class: `need${have(id) < q ? ' short' : ''}`, title: G.ITEMS[id].name }, itemIco(id, 'sm'), String(q), h('small', {}, `/${fmt(have(id))}`)))) : null,
-    !inputs.length ? h('div', { class: 'needs' }, outputs.map(([id, q]) =>
-      h('span', { class: 'need', title: G.ITEMS[id].name }, itemIco(id, 'sm'), q[0] === q[1] ? `+${q[0]}` : `+${q[0]}–${q[1]}`, h('small', {}, ` ${fmt(have(id))}`))),
-    a.chance.map(c => h('span', { class: 'need', title: G.ITEMS[c.item].name }, itemIco(c.item, 'sm'), `${Math.round(c.p * 100)}%`))) : null,
-    h('div', { class: 'card-foot' }, h('span', {}, `Owned: ${fmt(have(a.item))}`), active ? h('span', { class: 'ok' }, me.state.activity.left ? `${num(me.state.activity.left)} left` : 'Running') : null));
+    inputs.length
+      ? h('div', { class: 'needs' }, inputs.map(([id, q]) => needChip(id, String(q), `/${fmt(have(id))}`, have(id) < q ? 'short' : '')))
+      : h('div', { class: 'needs' }, outputs.map(([id, q]) => needChip(id, q[0] === q[1] ? `+${q[0]}` : `+${q[0]}–${q[1]}`)),
+        a.chance.map(c => needChip(c.item, `${Math.round(c.p * 100)}%`))),
+    h('div', { class: 'card-foot' }, h('span', {}, `Owned: ${fmt(have(a.item))}`), active ? h('span', { class: 'ok' }, me.state.activity.left ? `${num(me.state.activity.left)} left` : 'Running') : null)),
+    () => itemTip(a.item, recipe));
     return h('div', { class: `card action${active ? ' active' : ''}${locked ? ' locked' : ''}` }, main,
       h('div', { class: 'card-controls' }, count,
         h('button', { type: 'button', class: 'btn small', disabled: locked, onclick: start }, 'Start'),
@@ -938,6 +991,21 @@
       h('small', {}, `Power ${num(m.power)}`));
   }
 
+  // What a win drops at a difficulty: amounts for guaranteed drops, chances for rare ones.
+  function dropText(x, diff) {
+    const d = G.DIFF_BY_ID[diff || 'normal'];
+    if (x.p) return `${(Math.min(1, x.p * d.drop) * 100).toFixed(1).replace('.0', '')}%`;
+    const lo = Math.round(x.qty[0] * d.mats), hi = Math.round(x.qty[1] * d.mats);
+    return lo === hi ? `${lo}` : `${lo}–${hi}`;
+  }
+  function lootIcons(r, diff) {
+    return h('div', { class: 'loot-icons', 'aria-label': 'Drops on a win' }, r.drops.map(x => {
+      const text = dropText(x, diff);
+      const chip = h('span', { class: `loot-ico${x.rare ? ' rare' : ''}` }, itemIco(x.item, 'sm'), h('small', {}, text));
+      return tip(chip, () => itemTip(x.item, h('p', { class: x.rare ? 'rare-loot' : 'ok' }, x.p ? `${text} chance per win` : `${text} per win`)));
+    }));
+  }
+
   function raidRow(r, diff, ctx) {
     const d = G.DIFF_BY_ID[diff];
     const open = raidOpen(r, diff);
@@ -945,7 +1013,6 @@
     const rec = Math.round(r.recommended * diffScale(diff));
     const ratio = ctx.power / rec;
     const pClass = ratio >= 1 ? 'ok' : ratio >= 0.8 ? 'warn' : 'bad';
-    const rare = r.drops.filter(x => x.rare).reduce((a, x) => a + x.p, 0) * d.drop;
     const pips = h('span', { class: 'clears', title: 'Cleared on Normal, Heroic, Mythic' }, G.DIFFICULTIES.map((x, i) => {
       const s = h('span', { class: `clear-pip${clearsOf(r.id) > i ? ' on' : ''}` });
       s.style.setProperty('--diff', x.colour);
@@ -963,7 +1030,7 @@
       h('span', { class: 'boss-ico' }, bossIcon(r)),
       h('div', { class: 'raid-info' }, h('b', {}, r.name, r.finale ? h('span', { class: 'finale-tag' }, 'Finale') : null), weakChips(r)),
       h('div', { class: 'raid-power', title: 'Your power / recommended' }, h('small', {}, 'Power'), h('b', { class: pClass }, `${fmt(ctx.power)} / ${fmt(rec)}`)),
-      h('div', { class: 'raid-drops', title: `${G.ITEMS[`mat_${r.tier}`].name}, gold and ${r.regionName} set pieces` }, itemIco(`mat_${r.tier}`, 'sm'), h('small', {}, `${(rare * 100).toFixed(1)}% rare`)),
+      lootIcons(r, diff),
       pips,
       h('div', { class: 'raid-btns' }, buttons));
   }
@@ -1335,12 +1402,13 @@
           h('div', { class: 'battle-meta' }, statusEl, clockEl),
           h('div', { class: 'battle-actions' }, vis, h('button', { type: 'button', class: 'btn small danger', onclick: () => self.onStop && self.onStop() }, stopLabel))),
         waveEl,
+        h('div', { class: 'battle-loot' }, h('small', {}, 'Drops on a win'), lootIcons(raid, c.diff)),
         h('div', { class: 'battle-stage' },
           h('div', { class: 'side pilots' }, party.map(u => u.el)),
           h('div', { class: 'side foes' }, foeBox)),
-        h('div', { class: 'battle-stats' },
+        collapsible('battle-meter', 'Damage meter and graph', 'click to show or hide', h('div', { class: 'battle-stats' },
           h('div', { class: 'battle-cell' }, h('div', { class: 'cell-head' }, h('h3', {}, 'Meter'), modeTabs), h('small', { class: 'muted' }, 'Click a pilot for a breakdown.'), meterList),
-          h('div', { class: 'battle-cell' }, collapsible('battle-graph', 'Over time', '5-second average · hover for numbers', graphBox, true))),
+          h('div', { class: 'battle-cell' }, h('div', { class: 'cell-head' }, h('h3', {}, 'Over time'), h('small', { class: 'muted' }, '5-second average · hover for numbers')), graphBox)), false),
         logPanel());
 
       addLog(c.start, 'kills', [`Fight ${c.n}: `, h('b', {}, raid.name), ` (${G.DIFF_BY_ID[c.diff || 'normal'].name})`], 'fight');
