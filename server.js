@@ -18,6 +18,7 @@ const GUILD_MAX = 30;
 const FRIENDS_MAX = 100;
 const OPEN_TRADES_MAX = 10;
 const BODY_LIMIT = 16 * 1024;
+const RUN_TTL = 48 * 3600 * 1000; // how long raid replays are kept
 
 // ---------- Database ----------
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -39,6 +40,7 @@ db.exec(`
     give TEXT NOT NULL, want TEXT NOT NULL, status TEXT NOT NULL, created INTEGER NOT NULL, updated INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS parties (id INTEGER PRIMARY KEY, leader_id INTEGER NOT NULL, raid TEXT NOT NULL, created INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS party_members (party_id INTEGER NOT NULL, player_id INTEGER NOT NULL UNIQUE, joined INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS raid_runs (id INTEGER PRIMARY KEY, created INTEGER NOT NULL, players TEXT NOT NULL, data TEXT NOT NULL);
   CREATE INDEX IF NOT EXISTS guild_chat_guild ON guild_chat (guild_id, id);
   CREATE INDEX IF NOT EXISTS trades_to ON trades (to_id, status);
   CREATE INDEX IF NOT EXISTS trades_from ON trades (from_id, status);
@@ -82,6 +84,7 @@ setInterval(() => {
   const now = Date.now();
   for (const [k, list] of hits) if (!list.some(t => now - t < 3600e3)) hits.delete(k);
   q('DELETE FROM sessions WHERE expires < ?').run(now);
+  q('DELETE FROM raid_runs WHERE created < ?').run(now - RUN_TTL);
 }, 600e3).unref();
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
@@ -267,6 +270,7 @@ route('POST', '/api/action/start', ctx => withPlayer(ctx.me, s => game.startActi
 route('POST', '/api/action/stop', ctx => withPlayer(ctx.me, s => game.stopAction(s)));
 route('POST', '/api/equip', ctx => withPlayer(ctx.me, s => game.equip(s, str(ctx.body.item))));
 route('POST', '/api/unequip', ctx => withPlayer(ctx.me, s => game.unequip(s, str(ctx.body.slot))));
+route('POST', '/api/supplies', ctx => withPlayer(ctx.me, s => game.setSupply(s, str(ctx.body.item), ctx.body.on === true)));
 
 // ---------- Raids and parties ----------
 function purgeParties() {
@@ -299,13 +303,28 @@ route('GET', '/api/raids', ctx => {
   return { party: mine ? partyView(q('SELECT * FROM parties WHERE id = ?').get(mine.party_id)) : null, open };
 });
 
+// Runs a raid, stores the fight so every pilot in it can replay it, and saves them all.
+function launch(raidId, players) {
+  const result = game.runRaid(raidId, players, Date.now());
+  const { perPlayer, ...replay } = result;
+  const runId = Number(q('INSERT INTO raid_runs (created, players, data) VALUES (?, ?, ?)')
+    .run(Date.now(), JSON.stringify(players.map(p => p.id)), JSON.stringify(replay)).lastInsertRowid);
+  players.forEach(p => { p.state.raidLog[0].runId = runId; savePlayer(p); });
+  return { ...result, runId };
+}
+
+route('GET', '/api/raid/replay', ctx => {
+  const run = q('SELECT * FROM raid_runs WHERE id = ?').get(Number(ctx.url.searchParams.get('id')));
+  if (!run || !JSON.parse(run.players).includes(ctx.me)) bad('That replay is no longer available.');
+  return { result: { ...JSON.parse(run.data), runId: run.id } };
+});
+
 route('POST', '/api/raid/solo', ctx => {
   const raid = G.RAID_BY_ID[str(ctx.body.raid)];
   if (!raid) bad('Unknown raid.');
   return tx(() => {
     const p = fresh(ctx.me);
-    const result = game.runRaid(raid.id, [p], Date.now());
-    savePlayer(p);
+    const result = launch(raid.id, [p]);
     return { result, state: p.state };
   });
 });
@@ -349,8 +368,7 @@ route('POST', '/api/party/start', ctx => tx(() => {
   if (party.leader_id !== ctx.me) bad('Only the party leader can launch the raid.');
   const ids = q('SELECT player_id FROM party_members WHERE party_id = ? ORDER BY joined').all(party.id).map(r => r.player_id);
   const players = ids.map(fresh);
-  const result = game.runRaid(party.raid, players, Date.now());
-  players.forEach(savePlayer);
+  const result = launch(party.raid, players);
   q('DELETE FROM party_members WHERE party_id = ?').run(party.id);
   q('DELETE FROM parties WHERE id = ?').run(party.id);
   return { result, state: players[0].state };

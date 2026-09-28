@@ -5,10 +5,12 @@ An online idle game about building a mech and raiding bosses, solo or with your 
 ## How it plays
 
 - **Characters:** create a pilot (name, password, mech name and paint), then log in from any device. Progress is saved on the server.
-- **Gathering:** Scrapping (scrap and rare circuits) and Mining (five tiers of ore).
-- **Processing:** Smelting (ore + scrap → plate), Engineering (power cells, repair kits, core modules), Fabrication (weapon, armour, reactor and legs for each tier).
-- **Raids:** five bosses, one per tier. Each attempt costs power cells. A win gives Piloting XP, scrap, ore and the boss's material, which is needed for the next tier of parts and for core modules. Solo is about a coin flip in a full set of the matching tier without repair kits. Parties of up to four friends or guildmates share the boss's hits, and the boss's hull grows with each pilot.
-- **Hangar and inventory:** fit parts to your mech and see where every item comes from and what it's used in.
+- **Gathering:** Scrapping (scrap and rare circuits), Mining (five tiers of ore), Siphoning (gases).
+- **Artisan:** Smelting (ore + scrap into plate), Chemistry (raid boosts), Engineering (power cells, repair kits, core modules), Weaponsmithing (weapons) and Fabrication (armour, reactors, legs).
+- **Combat skills** only train in raids: Kinetic, Energy, Thermal and Missile (by fighting with that weapon type), Shielding (every raid), Repair (Mechanics) and Electronics (Tacticians). Each level adds 1% to what the skill governs.
+- **Roles come from your weapon:** autocannon, laser, flamer or missile pod make you a Striker; a repair arm makes you a Mechanic (healer); an EMP projector makes you a Tactician (target locks raise the boss's damage taken, jamming lowers its damage).
+- **Raids:** five bosses, one per tier, each weak to some damage types and resistant to others. A win drops the material needed for the next tier of gear and core modules. Fights are simulated on the server and replayed live, with cast bars, damage numbers, a DPS meter and a DPS graph. Party members can rewatch a fight for 48 hours.
+- **Balance** (from simulation): a Striker in a full set of the matching tier wins roughly 40–70% solo with no supplies, and reliably with repair kits or with the damage type the boss is weak to. Mechanics and Tacticians can't solo but make parties safe. A party in last tier's gear can't beat the 90-second limit.
 - **Social:** friends, guilds (500 scrap to found, up to 30 pilots, with chat), and trades where offered items are held until the offer is accepted, declined or cancelled.
 
 ## Running locally
@@ -30,7 +32,7 @@ Railway runs `npm start` on the `PORT` it provides and redeploys on every push t
 ## Files
 
 - `server.js` – HTTP server, accounts and sessions, the JSON API, and the SQLite schema
-- `lib/game.js` – server-side rules: offline progress, actions, equipment, raid combat and loot
+- `lib/game.js` – server-side rules: offline progress, actions, equipment, supplies, the raid combat timeline and loot
 - `public/data.js` – game content (skills, items, recipes, raids) and formulas, shared by server and browser
 - `public/app.js` – the browser client
 - `public/icons.js` – inline SVG icons

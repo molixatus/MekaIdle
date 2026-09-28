@@ -89,10 +89,11 @@
     }
   }
 
-  function toast(text, kind = '') {
-    const t = h('div', { class: `toast ${kind}` }, text);
+  function toast(text, kind = '', button) {
+    const t = h('div', { class: `toast ${kind}` }, h('span', {}, text),
+      button ? h('button', { type: 'button', class: 'btn small', onclick: () => { t.remove(); button.onclick(); } }, button.label) : null);
     $('toasts').append(t);
-    setTimeout(() => t.remove(), kind === 'error' ? 5000 : 3500);
+    setTimeout(() => t.remove(), button ? 12000 : kind === 'error' ? 5000 : 3500);
   }
 
   // ---------- Session state ----------
@@ -108,7 +109,17 @@
   const lvl = skill => G.levelFromXp(me.state.skills[skill].xp);
   const have = id => me.state.items[id] || 0;
   const hasAll = need => Object.entries(need).every(([id, n]) => have(id) >= n);
-  const myStats = () => G.mechStats(me.state.equipment, lvl('piloting'));
+  const myLevels = () => Object.fromEntries(G.SKILLS.map(s => [s.id, lvl(s.id)]));
+  const myStats = () => G.mechStats(me.state.equipment, myLevels());
+
+  // Level, progress through the level, and XP still needed, for one skill.
+  function xpInfo(skill) {
+    const xp = me.state.skills[skill].xp;
+    const level = G.levelFromXp(xp);
+    const max = level >= G.MAX_LEVEL;
+    const from = G.xpForLevel(level), to = G.xpForLevel(level + 1);
+    return { xp, level, max, from, to, toGo: max ? 0 : to - xp, pct: max ? 100 : ((xp - from) / (to - from)) * 100 };
+  }
 
   function setState(state) {
     me.state = state;
@@ -139,7 +150,7 @@
     svg.style.setProperty('--paint', colour);
     G.SLOTS.forEach(s => {
       const g = svg.querySelector('.m-' + s.id);
-      const id = equipment[s.id];
+      const id = G.ITEMS[equipment[s.id]] ? equipment[s.id] : null;
       if (id) g.style.setProperty('--part', G.ITEMS[id].colour);
       g.classList.toggle('empty', !id);
     });
@@ -221,7 +232,8 @@
       if (latest && latest.at > lastRaidAt) {
         lastRaidAt = latest.at;
         const raid = G.RAID_BY_ID[latest.raid];
-        toast(`${latest.win ? 'Victory' : 'Defeat'}: your party ${latest.win ? 'beat' : 'fell to'} the ${raid.name}.`, latest.win ? '' : 'error');
+        toast(`${latest.win ? 'Victory' : 'Defeat'}: your party ${latest.win ? 'beat' : 'fell to'} the ${raid.name}.`, latest.win ? '' : 'error',
+          latest.runId ? { label: 'Watch', onclick: () => watchReplay(latest.runId) } : null);
       }
       renderChrome();
       if (isLivePage()) renderPage();
@@ -261,9 +273,12 @@
   }
 
   // ---------- Chrome: sidebar and top bar ----------
+  const skillNav = group => G.SKILLS.filter(s => s.group === group).map(s => ({ id: 'skill:' + s.id, name: s.name, icon: s.id, skill: s.id }));
   const NAV = [
     { title: 'Combat', items: [{ id: 'raids', name: 'Raids', icon: 'raids' }, { id: 'hangar', name: 'Hangar', icon: 'hangar' }] },
-    { title: 'Skills', items: G.SKILLS.map(s => ({ id: 'skill:' + s.id, name: s.name, icon: s.id, skill: s.id })) },
+    { title: 'Combat skills', items: skillNav('combat') },
+    { title: 'Gathering', items: skillNav('gathering') },
+    { title: 'Artisan', items: skillNav('artisan') },
     { title: 'Pilot', items: [
       { id: 'inventory', name: 'Inventory', icon: 'inventory' },
       { id: 'trade', name: 'Trade', icon: 'trade', alert: 'trades' },
@@ -281,11 +296,13 @@
       group.items.forEach(item => {
         const right = h('span', { class: 'lvl' });
         const spin = h('span', { class: 'spinner', hidden: true, 'aria-label': 'Training' });
-        const btn = h('button', { type: 'button', class: 'nav-item', onclick: () => { go(item.id); closeMenu(); } },
+        const fill = item.skill ? h('span') : null;
+        const btn = h('button', { type: 'button', class: `nav-item${item.skill ? ' has-bar' : ''}`, onclick: () => { go(item.id); closeMenu(); } },
           ui(item.icon, item.skill ? 'skill-' + item.skill : ''),
           h('span', { class: 'label' }, item.name, spin),
-          right);
-        navRefs[item.id] = { btn, right, spin, item };
+          right,
+          item.skill ? h('span', { class: 'nav-bar', 'aria-hidden': 'true' }, fill) : null);
+        navRefs[item.id] = { btn, right, spin, item, fill };
         g.append(btn);
       });
       nav.append(g);
@@ -298,11 +315,14 @@
   function renderChrome() {
     if (!me) return;
     const activeSkill = me.state.activity && G.ACTION_BY_ID[me.state.activity.id].skill;
-    Object.values(navRefs).forEach(({ btn, right, spin, item }) => {
+    Object.values(navRefs).forEach(({ btn, right, spin, item, fill }) => {
       btn.toggleAttribute('aria-current', false);
-      if (item.id === page || (page.startsWith('skill:') && item.id === page)) btn.setAttribute('aria-current', 'page');
+      if (item.id === page) btn.setAttribute('aria-current', 'page');
       if (item.skill) {
-        right.textContent = String(lvl(item.skill)).padStart(2, '0');
+        const x = xpInfo(item.skill);
+        right.textContent = String(x.level).padStart(2, '0');
+        fill.style.width = x.pct + '%';
+        btn.title = x.max ? `${item.name}: ${num(x.xp)} XP (max level)` : `${item.name}: ${num(x.xp)} XP, ${num(x.toGo)} to level ${x.level + 1}`;
         spin.hidden = item.skill !== activeSkill;
       } else if (item.alert) {
         const n = me.alerts[item.alert];
@@ -386,8 +406,16 @@
   function statsLine(it) {
     if (!it) return null;
     const bits = [];
+    const w = it.weapon && G.WEAPON_BY_ID[it.weapon];
+    if (w) {
+      const role = G.ROLES[w.role];
+      const chip = h('span', { class: 'role-chip' }, role.name);
+      chip.style.setProperty('--role', role.colour);
+      bits.push(chip);
+      if (w.role === 'striker') bits.push(h('span', { class: 'dtype-' + w.dtype }, G.DTYPE_BY_ID[w.dtype].name));
+    }
     if (it.stats) {
-      if (it.stats.atk) bits.push(h('span', { class: 'stat-atk' }, `+${it.stats.atk} ATK`));
+      if (it.stats.atk) bits.push(h('span', { class: 'stat-atk' }, `+${it.stats.atk} ${w && w.role === 'mechanic' ? 'HEAL/S' : 'DMG/S'}`));
       if (it.stats.def) bits.push(h('span', { class: 'stat-def' }, `+${it.stats.def} DEF`));
       if (it.stats.hp) bits.push(h('span', { class: 'stat-hp' }, `+${it.stats.hp} HULL`));
     }
@@ -396,30 +424,80 @@
   }
 
   // Skill page
-  const SKILL_SECTION = { scrapping: 'Scrap sites', mining: 'Veins', smelting: 'Furnace', engineering: 'Blueprints', fabrication: 'Mech parts' };
+  const SKILL_SECTION = {
+    scrapping: 'Scrap sites', mining: 'Veins', siphoning: 'Gas clouds', smelting: 'Furnace', chemistry: 'Recipes',
+    engineering: 'Blueprints', weaponsmithing: 'Weapons', fabrication: 'Mech parts',
+  };
+
+  function levelBox(id) {
+    const x = xpInfo(id);
+    const fill = h('span');
+    fill.style.width = x.pct + '%';
+    return h('div', { class: 'level-box' },
+      h('div', { class: 'level-row' }, h('span', {}, `Level ${x.level}`), h('span', {}, `${Math.floor(x.pct)}%`)),
+      h('div', { class: 'bar' }, fill),
+      h('div', { class: 'xp-row' },
+        h('span', {}, h('b', {}, num(x.xp)), ' XP'),
+        x.max ? h('span', {}, 'Maximum level') : h('span', {}, h('b', {}, num(x.toGo)), ` to level ${x.level + 1}`)));
+  }
 
   function skillPage(id) {
-    const sk = G.SKILLS.find(s => s.id === id);
-    const xp = me.state.skills[id].xp;
-    const L = lvl(id);
-    const cur = G.xpForLevel(L), next = G.xpForLevel(L + 1);
-    const pct = L >= G.MAX_LEVEL ? 100 : ((xp - cur) / (next - cur)) * 100;
-    const fill = h('span');
-    fill.style.width = pct + '%';
-    const head = pageHead(id, 'skill-' + id, sk.name, sk.desc,
-      h('div', { class: 'level-box' },
-        h('div', { class: 'level-row' }, h('span', {}, `Level ${L}`), h('span', {}, `${Math.floor(pct)}%`)),
-        h('div', { class: 'bar' }, fill),
-        h('small', {}, L >= G.MAX_LEVEL ? `${num(xp)} XP. Maximum level.` : `${num(xp)} / ${num(next)} XP`)));
-
-    if (sk.raidOnly) {
-      return [head, h('div', { class: 'panel' },
-        h('p', {}, `Your mech currently gets +${L - 1}% attack, defence and hull from Piloting. Win a raid for the full Piloting XP; losing still earns a quarter.`),
-        h('p', { class: 'actions' }, h('button', { type: 'button', class: 'btn primary', onclick: () => go('raids') }, 'Go to raids')))];
-    }
-
+    const sk = G.SKILL_BY_ID[id];
+    const head = pageHead(id, 'skill-' + id, sk.name, sk.desc, levelBox(id));
+    if (sk.group === 'combat') return [head, ...combatSkillBody(sk)];
     const actions = G.ACTIONS.filter(a => a.skill === id);
     return [head, section(SKILL_SECTION[id] || 'Actions', 'Click a card to start. Only one action runs at a time.', h('div', { class: 'grid' }, actions.map(actionCard)))];
+  }
+
+  function combatSkillBody(sk) {
+    const L = lvl(sk.id);
+    const s = myStats();
+    const weapons = G.WEAPON_KINDS.filter(w => w.skill === sk.id);
+    const fitted = me.state.equipment.weapon && G.ITEMS[me.state.equipment.weapon];
+    const trains = sk.id === 'shielding' || s.skill === sk.id;
+    const bonus = {
+      shielding: `+${L - 1}% defence and hull`,
+      repair: `+${L - 1}% healing`,
+      electronics: `+${L - 1}% to target locks, jamming and ion pulses`,
+    }[sk.id] || `+${L - 1}% ${sk.name.toLowerCase()} damage`;
+    const earned = me.state.raidLog.reduce((a, e) => a + ((e.xp && e.xp[sk.id]) || 0), 0);
+    const body = [
+      h('div', { class: 'two-col' },
+        h('div', { class: 'panel stack' },
+          h('h2', {}, 'How it trains'),
+          h('p', {}, sk.id === 'shielding'
+            ? 'Every raid trains Shielding, whatever you’re carrying: 40% of the raid’s combat XP goes here.'
+            : `Fight in raids with ${weapons.map(w => `${/^[aeiou]|^EMP/i.test(w.noun) ? 'an' : 'a'} ${w.noun}`).join(' or ')} fitted. A win gives the raid’s full XP, a loss a quarter. It can’t be trained any other way.`),
+          h('p', { class: trains ? 'ok' : 'warn' }, trains
+            ? `Your mech is training ${sk.name} right now.`
+            : fitted ? `Your ${fitted.name.toLowerCase()} trains ${G.SKILL_BY_ID[s.skill].name} instead.` : 'Fit a weapon in the Hangar to start training.'),
+          h('p', { class: 'actions' }, h('button', { type: 'button', class: 'btn primary', onclick: () => go('raids') }, 'Go to raids'),
+            h('button', { type: 'button', class: 'btn', onclick: () => go('hangar') }, 'Open hangar'))),
+        h('div', { class: 'panel stack' },
+          h('h2', {}, 'Current bonus'),
+          h('p', { class: 'big-number' }, bonus),
+          h('p', { class: 'muted' }, `${num(earned)} XP earned in your last ${plural(me.state.raidLog.length, 'raid')}.`))),
+    ];
+    if (weapons.length) {
+      body.push(section('Weapons', `Forged with Weaponsmithing. ${G.ROLES[weapons[0].role].desc}`, h('div', { class: 'slot-list' }, G.TIERS.map(t => {
+        const id = `${t.id}_${weapons[0].id}`;
+        const it = G.ITEMS[id];
+        const recipe = G.ACTION_BY_ID['smith_' + id];
+        const on = me.state.equipment.weapon === id;
+        return h('div', { class: 'slot' }, itemIco(id),
+          h('div', { class: 'slot-info' }, h('small', {}, on ? 'Fitted' : `${num(have(id))} owned · Weaponsmithing ${recipe.level}`), h('b', {}, it.name), statsLine(it)),
+          have(id) && !on ? h('button', { type: 'button', class: 'btn small primary', onclick: () => act('/api/equip', { item: id }, `${it.name} fitted.`) }, 'Fit') : null);
+      }))));
+    }
+    if (sk.dtype) {
+      body.push(section('Against the bosses', 'Bosses take more damage from some types and shrug off others.', h('div', { class: 'list' }, G.RAIDS.map(r => {
+        const m = r.res[sk.dtype] || 1;
+        return h('div', { class: 'row' }, h('span', { class: 'ico lg boss-ico', 'aria-hidden': 'true', html: I.boss(r.id) }),
+          h('div', { class: 'grow' }, h('div', { class: 'name' }, r.name), h('small', {}, `Tier ${r.tier}`)),
+          h('span', { class: m > 1 ? 'ok' : m < 1 ? 'bad' : 'muted' }, m > 1 ? `Weak: +${Math.round((m - 1) * 100)}%` : m < 1 ? `Resists: ${Math.round((m - 1) * 100)}%` : 'Neutral'));
+      }))));
+    }
+    return body;
   }
 
   function actionCard(a) {
@@ -441,7 +519,7 @@
       locked
         ? h('div', { class: 'card-xp' }, ui('lock', 'sm'), `Level ${a.level}`)
         : h('div', { class: 'card-xp' }, `${a.xp} XP`),
-      out.type === 'gear' ? statsLine(out) : null,
+      out.type === 'gear' ? statsLine(out) : out.boost ? h('div', { class: 'stats-line' }, h('span', { class: 'stat-pct' }, out.desc.replace('Raid supply: ', ''))) : null,
       inputs.length ? h('div', { class: 'needs' }, inputs.map(([id, n]) =>
         h('span', { class: `need${have(id) < n ? ' short' : ''}`, title: G.ITEMS[id].name }, itemIco(id, 'sm'), String(n), h('small', {}, `/${fmt(have(id))}`)))) : null,
       h('div', { class: 'card-foot' }, h('span', {}, yieldText || `Owned: ${fmt(have(a.item))}`), active ? h('span', { class: 'ok' }, 'Running') : null),
@@ -454,17 +532,27 @@
   }
 
   // Hangar
+  function roleLine(s) {
+    const role = G.ROLES[s.role];
+    const chip = h('span', { class: 'role-chip' }, role.name);
+    chip.style.setProperty('--role', role.colour);
+    return h('div', { class: 'stats-line left' }, chip,
+      s.role === 'striker' ? h('span', { class: 'dtype-' + s.dtype }, `${G.DTYPE_BY_ID[s.dtype].name} damage`) : null,
+      h('span', { class: 'muted' }, `Trains ${G.SKILL_BY_ID[s.skill].name}`));
+  }
+
   function hangarPage() {
     const s = myStats();
     const eq = me.state.equipment;
     const gear = Object.keys(me.state.items).filter(id => G.ITEMS[id] && G.ITEMS[id].type === 'gear')
       .sort((x, y) => G.ITEMS[y].tier - G.ITEMS[x].tier);
+    const supplies = Object.values(G.ITEMS).filter(it => it.supply);
     return [
-      pageHead('hangar', 'skill-piloting', me.player.mech, `Piloted by ${me.player.name}. Fit parts here; Piloting adds ${lvl('piloting') - 1}% on top.`),
+      pageHead('hangar', 'skill-shielding', me.player.mech, `Piloted by ${me.player.name}. Your weapon decides your role in a raid and which combat skill you train.`),
       h('div', { class: 'hangar' },
-        h('div', { class: 'panel' }, mechSvg(me.player.colour, eq),
+        h('div', { class: 'panel' }, mechSvg(me.player.colour, eq), roleLine(s),
           h('div', { class: 'mech-stats' },
-            h('div', { class: 'mech-stat' }, h('b', { class: 'stat-atk' }, num(s.atk)), h('small', {}, 'Attack')),
+            h('div', { class: 'mech-stat' }, h('b', { class: s.role === 'mechanic' ? 'stat-hp' : 'stat-atk' }, num(s.atk)), h('small', {}, s.role === 'mechanic' ? 'Heal/s' : 'Damage/s')),
             h('div', { class: 'mech-stat' }, h('b', { class: 'stat-def' }, num(s.def)), h('small', {}, 'Defence')),
             h('div', { class: 'mech-stat' }, h('b', { class: 'stat-hp' }, num(s.hp)), h('small', {}, 'Hull')),
             h('div', { class: 'mech-stat' }, h('b', {}, num(G.power(s))), h('small', {}, 'Power')))),
@@ -472,17 +560,24 @@
           section('Fitted parts', null, h('div', { class: 'slot-list' }, G.SLOTS.map(slot => {
             const it = eq[slot.id] && G.ITEMS[eq[slot.id]];
             return h('div', { class: `slot${it ? '' : ' empty-slot'}` },
-              it ? itemIco(it.id) : h('span', { class: 'ico', 'aria-hidden': 'true', html: I.item(slot.id, '#5d6575') }),
+              it ? itemIco(it.id) : h('span', { class: 'ico', 'aria-hidden': 'true', html: I.item(slot.id === 'weapon' ? 'autocannon' : slot.id, '#5d6575') }),
               h('div', { class: 'slot-info' }, h('small', {}, slot.name), h('b', {}, it ? it.name : 'Empty'), statsLine(it)),
               it ? h('button', { type: 'button', class: 'btn small', onclick: () => act('/api/unequip', { slot: slot.id }) }, 'Remove') : null);
           }))),
-          section('Parts in storage', gear.length ? null : 'Fabricate parts, win them in trades, or build core modules in Engineering.',
+          section('Raid supplies', 'Ticked supplies go into every raid while you have them. Kits are only used when needed; boosts are used up each raid.',
+            h('div', { class: 'slot-list' }, supplies.map(it => {
+              const on = me.state.supplies[it.id] !== false;
+              const box = h('input', { type: 'checkbox', checked: on, 'aria-label': `Bring ${it.name}`, onchange: e => act('/api/supplies', { item: it.id, on: e.target.checked }) });
+              return h('label', { class: `slot supply${on ? '' : ' off'}` }, box, itemIco(it.id),
+                h('div', { class: 'slot-info' }, h('small', {}, `${num(have(it.id))} owned`), h('b', {}, it.name), h('span', { class: 'muted small' }, it.desc)));
+            }))),
+          section('Gear in storage', gear.length ? null : 'Forge weapons, fabricate parts, trade for them, or build core modules in Engineering.',
             gear.length ? h('div', { class: 'slot-list' }, gear.map(id => {
               const it = G.ITEMS[id];
               return h('div', { class: 'slot' }, itemIco(id),
                 h('div', { class: 'slot-info' }, h('small', {}, `${G.SLOTS.find(x => x.id === it.slot).name} · ${have(id)} owned`), h('b', {}, it.name), statsLine(it)),
                 h('button', { type: 'button', class: 'btn small primary', onclick: () => act('/api/equip', { item: id }) }, 'Fit'));
-            })) : h('div', { class: 'empty' }, 'No spare parts yet.')))),
+            })) : h('div', { class: 'empty' }, 'No spare gear yet.')))),
     ];
   }
 
@@ -490,14 +585,14 @@
   let invFilter = 'all';
   let invSelected = null;
   const TYPE_ORDER = { resource: 0, material: 1, consumable: 2, gear: 3 };
-  const TYPE_NAME = { resource: 'Resource', material: 'Raid material', consumable: 'Consumable', gear: 'Mech part' };
+  const TYPE_NAME = { resource: 'Resource', material: 'Raid material', consumable: 'Consumable', gear: 'Gear' };
 
   function inventoryPage() {
     const ids = Object.keys(me.state.items).filter(id => G.ITEMS[id])
       .sort((a, b) => TYPE_ORDER[G.ITEMS[a].type] - TYPE_ORDER[G.ITEMS[b].type] || (G.ITEMS[a].tier || 0) - (G.ITEMS[b].tier || 0));
     const shown = ids.filter(id => invFilter === 'all' || G.ITEMS[id].type === invFilter);
     if (invSelected && !me.state.items[invSelected]) invSelected = null;
-    const filters = [['all', 'All'], ['resource', 'Resources'], ['material', 'Raid materials'], ['consumable', 'Consumables'], ['gear', 'Mech parts']];
+    const filters = [['all', 'All'], ['resource', 'Resources'], ['material', 'Raid materials'], ['consumable', 'Consumables'], ['gear', 'Gear']];
     return [
       pageHead('inventory', 'skill-engineering', 'Inventory', `${plural(ids.length, 'kind')} of item in storage. Select one to see what it’s for.`),
       h('div', { class: 'chips', role: 'group', 'aria-label': 'Filter items' }, filters.map(([id, name]) =>
@@ -519,7 +614,7 @@
     const madeBy = G.ACTIONS.filter(a => a.outputs[id] || a.chance.some(c => c.item === id));
     const usedIn = G.ACTIONS.filter(a => a.inputs[id]);
     const raids = G.RAIDS.filter(r => r.drops.some(d => d.item === id));
-    const source = [...madeBy.map(a => `${a.name} (${G.SKILLS.find(s => s.id === a.skill).name} ${a.level})`), ...raids.map(r => `${r.name} raid`)];
+    const source = [...madeBy.map(a => `${a.name} (${G.SKILL_BY_ID[a.skill].name} ${a.level})`), ...raids.map(r => `${r.name} raid`)];
     return h('div', { class: 'panel detail' },
       h('div', { class: 'detail-head' }, itemIco(id), h('div', {}, h('h3', {}, it.name), h('small', {}, `${TYPE_NAME[it.type]}${it.tier ? ` · tier ${it.tier}` : ''} · ${num(have(id))} owned`))),
       h('p', {}, it.desc),
@@ -531,6 +626,13 @@
   }
 
   // Raids
+  const xpText = xp => Object.entries(xp || {}).map(([k, v]) => `+${num(v)} ${G.SKILL_BY_ID[k] ? G.SKILL_BY_ID[k].name : k}`).join(', ');
+
+  function resChips(r) {
+    return h('div', { class: 'res-chips' }, Object.entries(r.res).sort((a, b) => b[1] - a[1]).map(([d, m]) =>
+      h('span', { class: `res-chip ${m > 1 ? 'weak' : 'resist'}` }, `${m > 1 ? 'Weak' : 'Resists'}: ${G.DTYPE_BY_ID[d].name} ${m > 1 ? '+' : ''}${Math.round((m - 1) * 100)}%`)));
+  }
+
   function raidsPage() {
     const partyBox = h('div');
     const openBox = h('div');
@@ -545,16 +647,20 @@
         const tier = G.TIERS[r.tier - 1];
         const ratio = pw / r.recommended;
         const cls = ratio >= 1 ? 'ok' : ratio >= 0.8 ? 'warn' : 'bad';
+        const mult = s.dtype ? r.res[s.dtype] || 1 : 1;
         const card = h('article', { class: 'raid' },
-          h('div', { class: 'raid-head' },
-            h('div', {}, h('span', { class: 'tier' }, `Tier ${r.tier} · ${tier.name}`), h('h3', {}, r.name)),
-            itemIco(r.mat.id, 'lg')),
+          h('div', { class: 'raid-top' },
+            h('span', { class: 'boss-portrait', 'aria-hidden': 'true', html: I.boss(r.id) }),
+            h('div', { class: 'raid-title' }, h('span', { class: 'tier' }, `Tier ${r.tier} · ${tier.name}`), h('h3', {}, r.name),
+              h('small', { class: 'muted' }, `${r.moves.basic} · ${r.moves.sweep} every ${G.BOSS_MOVES.sweepEvery}th attack`))),
           h('p', {}, r.desc),
+          resChips(r),
           h('div', { class: 'kv' },
             h('div', {}, h('b', { class: 'stat-hp' }, num(r.boss.hp)), h('small', {}, 'Hull')),
-            h('div', {}, h('b', { class: 'stat-atk' }, num(r.boss.atk)), h('small', {}, 'Attack')),
+            h('div', {}, h('b', { class: 'stat-atk' }, num(r.boss.dps)), h('small', {}, 'Damage/s')),
             h('div', {}, h('b', { class: 'stat-def' }, num(r.boss.def)), h('small', {}, 'Defence'))),
           h('div', { class: 'power-check' }, h('span', {}, `Recommended power ${num(r.recommended)}`), h('span', { class: cls }, `Yours ${num(pw)}`)),
+          s.role === 'striker' && mult !== 1 ? h('div', { class: 'power-check' }, h('span', { class: 'muted' }, `Your ${G.DTYPE_BY_ID[s.dtype].name.toLowerCase()} weapon`), h('span', { class: mult > 1 ? 'ok' : 'bad' }, `${mult > 1 ? '+' : ''}${Math.round((mult - 1) * 100)}% damage`)) : null,
           h('div', { class: 'power-check' }, h('span', { class: 'muted' }, `Costs ${plural(r.cells, 'power cell')} each`), h('span', { class: have('power_cell') >= r.cells ? 'ok' : 'bad' }, `You have ${num(have('power_cell'))}`)),
           h('div', {}, h('small', { class: 'muted' }, 'Drops'), h('div', { class: 'drops' }, r.drops.map(d =>
             h('span', { class: 'need', title: G.ITEMS[d.item].name }, itemIco(d.item, 'sm'), `${d.qty[0]}–${d.qty[1]}${d.p ? ` (${Math.round(d.p * 100)}%)` : ''}`)))),
@@ -574,9 +680,11 @@
         const leader = p.leader === me.player.id;
         partyBox.replaceChildren(section('Your party', `Breaks up ${fmtTime(p.expires - now())} from now if not launched.`,
           h('div', { class: 'panel party' },
-            h('div', { class: 'raid-head' }, h('div', {}, h('span', { class: 'tier' }, `Tier ${raid.tier}`), h('h3', {}, raid.name)), h('span', { class: 'muted' }, `${p.members.length} / ${G.PARTY_MAX} pilots`)),
+            h('div', { class: 'raid-top' }, h('span', { class: 'boss-portrait small', 'aria-hidden': 'true', html: I.boss(raid.id) }),
+              h('div', { class: 'raid-title' }, h('span', { class: 'tier' }, `Tier ${raid.tier}`), h('h3', {}, raid.name)),
+              h('span', { class: 'muted' }, `${p.members.length} / ${G.PARTY_MAX} pilots`)),
             h('div', { class: 'member-list' }, p.members.map(m => memberRow(m, m.id === p.leader ? 'Leader' : null))),
-            h('p', { class: 'muted' }, `Each pilot needs ${plural(raid.cells, 'power cell')}. Boss hull grows with every pilot, but hits get shared out.`),
+            h('p', { class: 'muted' }, `Each pilot needs ${plural(raid.cells, 'power cell')}. The boss gets tougher with every pilot, but its hits get shared out. Mix in a Mechanic or Tactician.`),
             h('div', { class: 'actions' },
               leader ? h('button', { type: 'button', class: 'btn primary', onclick: startParty }, 'Launch raid') : h('span', { class: 'muted' }, 'Waiting for the leader to launch.'),
               h('button', { type: 'button', class: 'btn danger', onclick: () => partyAct('/api/party/leave', {}, leader ? 'Party disbanded.' : 'You left the party.') }, leader ? 'Disband' : 'Leave')))));
@@ -586,6 +694,7 @@
           const raid = G.RAID_BY_ID[o.raid];
           const lead = o.members.find(m => m.id === o.leader) || o.members[0];
           return h('div', { class: 'row' },
+            h('span', { class: 'ico lg boss-ico', 'aria-hidden': 'true', html: I.boss(raid.id) }),
             h('div', { class: 'grow' }, h('div', { class: 'name' }, `${lead ? lead.name : 'Someone'}’s party`), h('small', {}, `${raid.name} · ${o.members.length}/${G.PARTY_MAX} pilots`)),
             h('button', { type: 'button', class: 'btn small primary', disabled: !!data.party, onclick: () => partyAct('/api/party/join', { id: o.id }, 'Joined the party.') }, 'Join'));
         })) : h('div', { class: 'empty' }, 'No open parties right now. Form one below, or add friends and join a guild to see theirs.')));
@@ -596,10 +705,12 @@
       history.replaceChildren(section('Recent raids', null, log.length ? h('div', { class: 'history' }, log.slice(0, 10).map(e => {
         const raid = G.RAID_BY_ID[e.raid];
         return h('div', { class: 'history-row' },
+          h('span', { class: 'ico lg boss-ico', 'aria-hidden': 'true', html: I.boss(raid.id) }),
           h('span', { class: `result ${e.win ? 'ok' : 'bad'}` }, e.win ? 'Victory' : 'Defeat'),
-          h('div', { class: 'what' }, h('div', {}, raid.name), h('small', {}, `${e.party.length > 1 ? e.party.join(', ') : 'Solo'} · ${e.rounds} rounds · ${ago(e.at)}`)),
-          h('span', { class: 'loot' }, h('span', { class: 'skill-piloting' }, `+${e.xp} XP`), Object.entries(e.loot).map(([id, n]) => h('span', { title: G.ITEMS[id].name }, itemIco(id, 'sm'), num(n)))));
-      })) : h('div', { class: 'empty' }, 'No raids yet. Fabricate a full set of iron parts, build some power cells, then take on the Scrapyard Warden.')));
+          h('div', { class: 'what' }, h('div', {}, raid.name), h('small', {}, `${e.party.length > 1 ? e.party.join(', ') : 'Solo'} · ${e.ms ? fmtTime(e.ms) : `${e.rounds} rounds`} · ${ago(e.at)}`)),
+          h('span', { class: 'loot' }, h('span', { class: 'skill-kinetic' }, xpText(e.xp)), Object.entries(e.loot).map(([id, n]) => h('span', { title: G.ITEMS[id].name }, itemIco(id, 'sm'), num(n)))),
+          e.runId ? h('button', { type: 'button', class: 'btn small', onclick: () => watchReplay(e.runId) }, ui('replay', 'sm'), 'Replay') : null);
+      })) : h('div', { class: 'empty' }, 'No raids yet. Forge an iron weapon, fabricate iron parts, build some power cells, then take on the Scrapyard Warden.')));
     }
 
     async function load() {
@@ -615,11 +726,11 @@
     }
     async function solo(r) {
       const res = await act('/api/raid/solo', { raid: r.id });
-      if (res) { showBattle(res.result); load(); }
+      if (res) { openRaidView(res.result); load(); }
     }
     async function startParty() {
       const res = await act('/api/party/start', {});
-      if (res) { showBattle(res.result); load(); }
+      if (res) { openRaidView(res.result); load(); }
     }
 
     pageRefresh = load;
@@ -628,8 +739,8 @@
     drawHistory();
     load();
     return [
-      pageHead('raids', 'skill-smelting', 'Raids', 'Take your mech into boss fights, alone or with friends and guildmates. Each boss drops the material you need to build the next tier.'),
-      partyBox, openBox, section('Bosses', 'Win or lose, each pilot burns their power cells and earns Piloting XP.', cards), history,
+      pageHead('raids', 'skill-thermal', 'Raids', 'Take your mech into boss fights, alone or with friends and guildmates. Each boss drops the material you need to build the next tier.'),
+      partyBox, openBox, section('Bosses', 'Win or lose, each pilot burns their power cells and earns combat XP for their weapon, plus Shielding.', cards), history,
     ];
   }
 
@@ -641,29 +752,281 @@
       h('small', {}, `Power ${num(m.power)}`));
   }
 
-  function showBattle(result) {
-    const raid = G.RAID_BY_ID[result.raid];
-    const mine = result.perPlayer[me.player.id];
-    lastRaidAt = Math.max(lastRaidAt, mine ? mine.at : 0);
-    const logBox = h('div', { class: 'battle-log', 'aria-live': 'polite' });
-    result.log.forEach((line, i) => {
-      const p = h('p', { class: line.kind }, h('span', { class: 'r' }, line.round ? `R${line.round}` : '—'), line.text);
-      p.style.animationDelay = `${i * 0.18}s`;
-      logBox.append(p);
-    });
-    const loot = mine ? Object.entries(mine.loot) : [];
-    openModal(
-      h('h2', { id: 'modal-title', class: result.win ? 'ok' : 'bad' }, result.win ? 'Victory' : 'Defeat'),
-      h('p', { class: 'muted' }, `${raid.name} · ${result.rounds} rounds`),
-      logBox,
-      h('div', { class: 'gains' },
-        result.fighters.map(f => h('div', { class: 'gain' },
-          h('span', { class: 'grow' }, f.name, h('small', { class: 'muted' }, f.down ? ' · downed' : ` · ${num(f.hp)}/${num(f.max)} hull left`)),
-          h('b', {}, `${num(f.dealt)} damage`))),
-        mine ? h('div', { class: 'gain' }, ui('piloting', 'md skill-piloting'), h('span', { class: 'grow' }, 'Piloting'), h('b', { class: 'plus' }, `+${mine.xp} XP`)) : null,
-        loot.map(([id, n]) => h('div', { class: 'gain' }, itemIco(id, 'md'), h('span', { class: 'grow' }, G.ITEMS[id].name), h('b', { class: 'plus' }, `+${num(n)}`))),
-        result.win ? null : h('p', { class: 'muted' }, 'No loot this time. Better parts, repair kits from Engineering, or a party will help.')));
+  // ---------- Live raid view ----------
+  // Replays a fight's timeline in real time. Each cast bar fills from its cast event to the
+  // moment its hit lands, so bars and damage numbers stay in step.
+  const SERIES = ['#5b9bff', '#f2c14e', '#3ddc84', '#ef5a45'];
+  let raidView = null;
+
+  async function watchReplay(runId) {
+    try {
+      const r = await api('/api/raid/replay?id=' + runId);
+      openRaidView(r.result);
+    } catch (e) { toast(e.message, 'error'); }
   }
+
+  function openRaidView(result) {
+    if (raidView) raidView.close();
+    const raid = G.RAID_BY_ID[result.raid];
+    const events = result.events;
+    const endT = events[events.length - 1].t;
+    const entry = me.state.raidLog.find(e => e.runId === result.runId) || (result.perPlayer && result.perPlayer[me.player.id]);
+    if (entry) lastRaidAt = Math.max(lastRaidAt, entry.at);
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Units: pilots on the left, the boss on the right.
+    function makeUnit(name, sub, art, max, boss) {
+      const floats = h('div', { class: 'floats', 'aria-hidden': 'true' });
+      const artBox = h('div', { class: 'unit-art' }, art, floats);
+      const hpFill = h('span'), hpText = h('b');
+      const castFill = h('span'), castText = h('b', {}, 'Getting ready');
+      const castBar = h('div', { class: 'castbar idle' }, castFill, castText);
+      const statuses = h('div', { class: 'statuses' });
+      const el = h('div', { class: `unit${boss ? ' boss' : ''}` }, artBox,
+        h('div', { class: 'unit-info' }, h('div', { class: 'unit-name' }, h('span', {}, name), sub), h('div', { class: 'hpbar' }, hpFill, hpText), castBar, statuses));
+      const u = { name, el, artBox, floats, hpFill, hpText, castFill, castText, castBar, statuses, hp: max, max, cast: null, down: false, buffs: {} };
+      drawHp(u);
+      return u;
+    }
+    function drawHp(u) {
+      const f = Math.max(0, u.hp) / u.max;
+      u.hpFill.style.width = f * 100 + '%';
+      u.hpFill.parentNode.classList.toggle('low', f < 0.3);
+      u.hpText.textContent = `${num(Math.max(0, u.hp))} / ${num(u.max)}`;
+    }
+
+    const fighters = result.fighters.map((f, i) => {
+      const role = G.ROLES[f.role] || G.ROLES.striker;
+      const chip = h('span', { class: 'role-chip' }, role.name);
+      chip.style.setProperty('--role', role.colour);
+      const sub = h('small', {}, chip, f.role === 'striker' && f.dtype ? h('span', { class: 'dtype-' + f.dtype }, ` ${G.DTYPE_BY_ID[f.dtype].name}`) : null);
+      const art = mechSvg(f.colour || '#8d95a5', f.gear || {});
+      art.setAttribute('aria-label', `${f.name}’s mech`);
+      const u = makeUnit(f.name, sub, art, f.max, false);
+      u.el.style.setProperty('--series', SERIES[i]);
+      return u;
+    });
+    const boss = makeUnit(raid.name, h('small', { class: 'tier' }, `Tier ${raid.tier}`), h('span', { class: 'boss-art', html: I.boss(raid.id) }), result.bossMax, true);
+    const unit = k => (k === 'b' ? boss : fighters[k]);
+
+    // Damage meter and graph.
+    const dealt = fighters.map(() => 0), healed = fighters.map(() => 0);
+    const buckets = fighters.map(() => []);
+    const meterRows = result.fighters.map((f, i) => {
+      const fill = h('span'), val = h('span', { class: 'meter-val' });
+      fill.style.background = SERIES[i];
+      const row = h('div', { class: 'meter-row' }, h('div', { class: 'meter-name' }, h('span', { class: 'swatch-dot' }), f.name, val), h('div', { class: 'meter-bar' }, fill));
+      row.querySelector('.swatch-dot').style.background = SERIES[i];
+      return { row, fill, val, i };
+    });
+    const meter = h('div', { class: 'meter' }, meterRows.map(r => r.row));
+    const graph = h('div', { class: 'graph', role: 'img', 'aria-label': 'Damage per second over time for each pilot' });
+    const legend = h('div', { class: 'legend' }, result.fighters.map((f, i) => {
+      const d = h('span', { class: 'swatch-dot' });
+      d.style.background = SERIES[i];
+      return h('span', {}, d, f.name);
+    }));
+
+    const clockEl = h('span', { class: 'rv-clock' }, '0:00');
+    const speedBtn = h('button', { type: 'button', class: 'btn small', onclick: () => { speed = speed >= 4 ? 1 : speed * 2; speedBtn.textContent = `${speed}× speed`; } }, '1× speed');
+    const skipBtn = h('button', { type: 'button', class: 'btn small', onclick: skip }, ui('skip', 'sm'), 'Skip to end');
+    const resultBox = h('div', { class: 'rv-result', hidden: true, 'aria-live': 'polite' });
+
+    const view = h('div', { class: 'rv', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'rv-title' },
+      h('div', { class: 'rv-inner' },
+        h('header', { class: 'rv-head' },
+          h('div', {}, h('span', { class: 'tier' }, `Raid · tier ${raid.tier}`), h('h2', { id: 'rv-title' }, raid.name)),
+          clockEl,
+          h('div', { class: 'actions' }, speedBtn, skipBtn, h('button', { type: 'button', class: 'btn small', onclick: () => close() }, ui('close', 'sm'), 'Close'))),
+        resultBox,
+        h('div', { class: 'rv-arena' },
+          h('div', { class: `rv-party n${fighters.length}` }, fighters.map(u => u.el)),
+          h('div', { class: 'rv-vs', 'aria-hidden': 'true' }, 'VS'),
+          h('div', { class: 'rv-enemy' }, boss.el)),
+        h('div', { class: 'rv-meters' },
+          h('section', { class: 'panel' }, h('h3', {}, 'Damage meter'), meter),
+          h('section', { class: 'panel' }, h('h3', {}, 'Damage per second'), graph, legend))));
+    document.body.append(view);
+    document.body.classList.add('no-scroll');
+    const lastFocus = document.activeElement;
+    skipBtn.focus();
+
+    let clock = 0, speed = 1, idx = 0, lastFrame = performance.now(), raf = 0, lastMeter = 0, lastSec = -1, finished = false, quiet = false;
+
+    function float(u, text, cls) {
+      if (quiet) return;
+      const s = h('span', { class: `float ${cls}` }, text);
+      s.style.left = `${25 + Math.random() * 50}%`;
+      u.floats.append(s);
+      setTimeout(() => s.remove(), 1100);
+    }
+    function pulse(u, cls) {
+      if (quiet || reduced) return;
+      u.artBox.classList.remove('shake', 'glow');
+      void u.artBox.offsetWidth; // restart the animation
+      u.artBox.classList.add(cls);
+    }
+    function castLabel(e) {
+      if (e.a === 'b') return e.tg === 'all' ? `${e.n} → everyone` : `${e.n} → ${fighters[e.tg].name}`;
+      return typeof e.tg === 'number' ? `${e.n} → ${fighters[e.tg].name}` : e.n;
+    }
+    function drawStatuses(u) {
+      const chips = Object.entries(u.buffs).filter(([, b]) => b.until > clock)
+        .map(([n, b]) => h('span', { class: `status ${b.cls}` }, b.pct ? `${n} ${b.pct}` : n));
+      u.statuses.replaceChildren(...chips);
+    }
+
+    function apply(e) {
+      if (e.e === 'cast') {
+        const u = unit(e.a);
+        u.cast = { start: e.t, d: e.d };
+        u.castText.textContent = castLabel(e);
+        u.castBar.classList.remove('idle');
+        u.castBar.classList.toggle('danger', e.a === 'b' && e.tg === 'all');
+      } else if (e.e === 'hit') {
+        const target = unit(e.tg);
+        if (e.k === 'heal' || e.k === 'kit') {
+          const eff = Math.min(e.v, target.max - target.hp);
+          target.hp += eff;
+          if (e.k === 'heal') healed[e.a] += eff;
+          float(target, e.k === 'kit' ? `+${num(e.v)} kit` : `+${num(e.v)}`, 'heal');
+          pulse(target, 'glow');
+        } else {
+          target.hp = Math.max(0, target.hp - e.v);
+          float(target, e.c ? `${num(e.v)}!` : num(e.v), `${e.a === 'b' ? 'taken' : 'dmg'}${e.c ? ' crit' : ''}${e.k === 'burn' ? ' burn' : ''}`);
+          pulse(target, 'shake');
+          if (e.a !== 'b') {
+            dealt[e.a] += e.v;
+            const sec = Math.floor(e.t / 1000);
+            buckets[e.a][sec] = (buckets[e.a][sec] || 0) + e.v;
+          }
+          if (e.k === 'burn') target.buffs.Burning = { until: e.t + 1100, cls: 'burn' };
+        }
+        drawHp(target);
+        if (e.k !== 'burn' && e.k !== 'kit') {
+          const src = unit(e.a);
+          src.castFill.style.width = '100%';
+        }
+      } else if (e.e === 'buff') {
+        boss.buffs[e.n] = { until: e.until, pct: e.n === 'Jammed' ? `−${e.pct}%` : `+${e.pct}%`, cls: e.n === 'Jammed' ? 'jam' : 'lock' };
+        float(boss, e.n === 'Jammed' ? 'JAMMED' : 'LOCKED', 'tag');
+        const src = unit(e.a);
+        src.castFill.style.width = '100%';
+      } else if (e.e === 'down') {
+        const u = unit(e.tg);
+        u.down = true;
+        u.cast = null;
+        u.el.classList.add('down');
+        u.castBar.classList.add('idle');
+        u.castFill.style.width = '0';
+        u.castText.textContent = 'Downed';
+      }
+    }
+
+    function drawMeter() {
+      const secs = Math.max(1, clock / 1000);
+      const dps = dealt.map(d => d / secs);
+      const top = Math.max(1, ...dps);
+      meterRows.slice().sort((a, b) => dps[b.i] - dps[a.i]).forEach(r => {
+        meter.append(r.row);
+        r.fill.style.width = `${(dps[r.i] / top) * 100}%`;
+        r.val.textContent = `${dps[r.i].toFixed(1)} DPS · ${num(dealt[r.i])}${healed[r.i] ? ` · ${(healed[r.i] / secs).toFixed(1)} HPS` : ''}`;
+      });
+    }
+
+    function drawGraph() {
+      const sec = Math.floor(clock / 1000);
+      const span = Math.max(20, sec + 4);
+      const series = buckets.map(b => {
+        const pts = [];
+        for (let s = 0; s <= sec; s++) {
+          let sum = 0;
+          for (let k = Math.max(0, s - 4); k <= s; k++) sum += b[k] || 0;
+          pts.push(sum / Math.min(5, s + 1));
+        }
+        return pts;
+      });
+      const top = Math.max(10, ...series.flat()) * 1.1;
+      const W = 400, H = 150;
+      const x = s => (s / span) * W, y = v => H - (v / top) * H;
+      const grid = [0.25, 0.5, 0.75].map(f => `<line x1="0" x2="${W}" y1="${H * f}" y2="${H * f}" class="gl"/><text x="4" y="${H * f - 3}" class="gt">${Math.round(top * (1 - f))}</text>`).join('');
+      const lines = series.map((pts, i) => `<polyline fill="none" stroke="${SERIES[i]}" stroke-width="2" stroke-linejoin="round" points="${pts.map((v, s) => `${x(s).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}"/>`).join('');
+      graph.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}${lines}</svg>`;
+    }
+
+    function tick(t) {
+      const dt = Math.min(100, t - lastFrame);
+      lastFrame = t;
+      clock = Math.min(endT, clock + dt * speed);
+      while (idx < events.length && events[idx].t <= clock) apply(events[idx++]);
+      for (const u of [...fighters, boss]) {
+        if (u.cast && !u.down) u.castFill.style.width = `${Math.min(1, (clock - u.cast.start) / u.cast.d) * 100}%`;
+      }
+      clockEl.textContent = fmtClock(clock);
+      if (t - lastMeter > 200) {
+        lastMeter = t;
+        drawMeter();
+        [...fighters, boss].forEach(drawStatuses);
+      }
+      const sec = Math.floor(clock / 1000);
+      if (sec !== lastSec) { lastSec = sec; drawGraph(); }
+      if (idx >= events.length) finish();
+      else raf = requestAnimationFrame(tick);
+    }
+
+    function skip() {
+      quiet = true;
+      clock = endT;
+      while (idx < events.length) apply(events[idx++]);
+      quiet = false;
+      finish();
+    }
+
+    function finish() {
+      if (finished) return;
+      finished = true;
+      cancelAnimationFrame(raf);
+      clock = endT;
+      clockEl.textContent = fmtClock(clock);
+      drawMeter();
+      drawGraph();
+      [...fighters, boss].forEach(u => { if (!u.down) { u.castBar.classList.add('idle'); u.castText.textContent = u === boss && result.win ? 'Destroyed' : 'Standing'; } drawStatuses(u); });
+      if (result.win) boss.el.classList.add('down');
+      skipBtn.hidden = true;
+      speedBtn.hidden = true;
+      const loot = entry ? Object.entries(entry.loot || {}) : [];
+      resultBox.replaceChildren(
+        h('div', { class: `rv-banner ${result.win ? 'ok' : 'bad'}` }, result.win ? 'Victory' : result.timeout ? 'Out of time' : 'Defeat'),
+        h('div', { class: 'rv-rewards' },
+          h('span', { class: 'muted' }, fmtTime(endT)),
+          entry ? h('span', { class: 'skill-kinetic' }, xpText(entry.xp)) : null,
+          loot.map(([id, n]) => h('span', { class: 'pill', title: G.ITEMS[id].name }, itemIco(id, 'sm'), `+${num(n)} ${G.ITEMS[id].name}`)),
+          !result.win ? h('span', { class: 'muted' }, 'No loot this time. Try a weapon the boss is weak to, bring repair kits and boosts, or bring a party.') : null));
+      resultBox.hidden = false;
+    }
+
+    function close() {
+      cancelAnimationFrame(raf);
+      view.remove();
+      document.body.classList.remove('no-scroll');
+      document.removeEventListener('keydown', onKey);
+      raidView = null;
+      if (lastFocus && lastFocus.focus) lastFocus.focus();
+      if (page === 'raids') renderPage();
+    }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    document.addEventListener('keydown', onKey);
+
+    drawGraph();
+    drawMeter();
+    raidView = { close };
+    raf = requestAnimationFrame(t => { lastFrame = t; tick(t); });
+  }
+
+  const fmtClock = ms => {
+    const s = Math.floor(ms / 1000);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  };
 
   // Trade
   let tradePrefill = null;
