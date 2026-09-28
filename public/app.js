@@ -592,7 +592,7 @@
     } else if (it.cls && it.slot === 'offhand') bits.push(classChip(it.cls, 'Off-hand'));
     else if (it.cls) bits.push(classChip(it.cls, 'Buff'));
     if (it.armour) bits.push(h('span', { class: 'type-chip' }, G.ARMOUR_TYPES[it.armour].name));
-    if (it.set) bits.push(h('span', { class: 'set-chip' }, `${G.REGIONS[it.set - 1].set.name} set`));
+    if (it.set) bits.push(h('span', { class: 'set-chip' }, `${G.SET_BY_ID[it.set].name} set`));
     const st = it.stats || {};
     STAT_ORDER.forEach(k => {
       if (!st[k]) return;
@@ -833,7 +833,7 @@
     const raids = G.RAIDS.filter(r => r.drops.some(d => d.item === id));
     const source = [...madeBy.map(a => `${a.name} (${G.SKILL_BY_ID[a.skill].name} ${a.level})`)];
     if (raids.length) source.push(`${raids.length} raid${raids.length > 1 ? 's' : ''} in ${[...new Set(raids.map(r => r.regionName))].join(', ')}`);
-    const set = it.set ? G.REGIONS[it.set - 1].set : null;
+    const set = it.set ? G.SET_BY_ID[it.set] : null;
     return h('div', { class: 'panel detail' },
       h('div', { class: 'detail-head' }, itemIco(id, 'xl'), h('div', {}, itemName(id, 'h3'), h('small', {}, `${it.rare ? 'Rare ' : ''}${TYPE_NAME[it.type]}${it.tier ? ` · tier ${it.tier}` : ''} · ${num(have(id))} owned`))),
       h('p', {}, it.desc),
@@ -972,6 +972,9 @@
     e.style.setProperty('--diff', x.colour);
     return e;
   }
+  function mechChips(mechs) {
+    return h('span', { class: 'mech-chips' }, mechs.map(m => tip(h('span', { class: 'mech-chip' }, G.MECHANICS[m].name), () => [h('b', {}, G.MECHANICS[m].name), h('p', { class: 'tip-desc' }, G.MECHANICS[m].desc)])));
+  }
   function weakChips(r) {
     const weak = Object.keys(r.res).find(k => r.res[k] > 1);
     const resist = Object.keys(r.res).find(k => r.res[k] < 1);
@@ -1028,7 +1031,7 @@
     return h('div', { class: `raid-row${here ? ' fighting' : ''}${open ? '' : ' locked'}${r.finale ? ' finale' : ''}` },
       h('span', { class: 'raid-n' }, `#${r.n}`),
       h('span', { class: 'boss-ico' }, bossIcon(r)),
-      h('div', { class: 'raid-info' }, h('b', {}, r.name, r.finale ? h('span', { class: 'finale-tag' }, 'Finale') : null), weakChips(r)),
+      h('div', { class: 'raid-info' }, h('b', {}, r.name, r.finale ? h('span', { class: 'finale-tag' }, 'Finale') : null), h('div', { class: 'raid-chips' }, weakChips(r), mechChips(r.boss.mechs))),
       h('div', { class: 'raid-power', title: 'Your power / recommended' }, h('small', {}, 'Power'), h('b', { class: pClass }, `${fmt(ctx.power)} / ${fmt(rec)}`)),
       lootIcons(r, diff),
       pips,
@@ -1105,7 +1108,7 @@
               leader && !p.running ? h('button', { type: 'button', class: 'btn primary', onclick: () => partyAct('/api/party/start', {}, 'Party raid started.') }, 'Start raiding') : null,
               leader && p.running ? h('button', { type: 'button', class: 'btn', onclick: () => partyAct('/api/party/stop', {}, 'Party raid stopped.') }, 'Stop raiding') : null,
               !leader ? h('span', { class: 'muted' }, p.running ? 'Fighting with the party.' : 'Waiting for the leader to start.') : null,
-              h('button', { type: 'button', class: 'btn danger', onclick: () => partyAct('/api/party/leave', {}, leader ? 'Party disbanded.' : 'You left the party.') }, leader ? 'Disband' : 'Leave')))));
+              h('button', { type: 'button', class: 'btn danger', onclick: () => partyAct('/api/party/leave', {}, p.members.length > 1 && leader ? 'You left the party. The next pilot now leads it.' : p.members.length > 1 ? 'You left the party.' : 'Party disbanded.') }, p.members.length > 1 ? 'Leave party' : 'Disband')))));
       }
       openBox.replaceChildren(collapsible('open-parties', 'Open parties', data.open.length ? `${data.open.length} open` : 'none right now',
         data.open.length ? h('div', { class: 'list' }, data.open.map(o => {
@@ -1433,15 +1436,19 @@
     }
 
     // ----- Applying events -----
+    function foeUnit(x) {
+      const sub = x.boss ? (x.mechs && x.mechs.length ? mechChips(x.mechs) : null)
+        : x.role && x.role !== 'grunt' ? h('small', { class: `unit-sub role-${x.role}` }, G.TRASH_ROLES[x.role].name) : null;
+      const u = makeUnit({ name: x.name, enemy: true, boss: x.boss, max: x.max, art: foeArt(x.foe, x.boss, '', x.boss ? 48 : 32), sub });
+      foes[x.id] = u;
+      return u;
+    }
+
     function apply(e) {
       const at = cur.start + e.t;
       if (e.e === 'wave') {
         foes = {};
-        const units = e.foes.map(x => {
-          const u = makeUnit({ name: x.name, enemy: true, boss: x.boss, max: x.max, art: foeArt(x.foe, x.boss, '', x.boss ? 48 : 32) });
-          foes[x.id] = u;
-          return u;
-        });
+        const units = e.foes.map(foeUnit);
         foeBox.replaceChildren(...units.map(u => u.el));
         drawWave(e.w, e.of);
         addLog(at, 'kills', [e.boss ? h('b', {}, `Boss: ${e.foes[0].name}`) : `Wave ${e.w + 1} of ${e.of}: `, e.boss ? '' : e.foes.map(x => x.name).join(', ')], 'wave');
@@ -1455,7 +1462,14 @@
         if (typeof e.a === 'number' && ABILITY_NAMES.has(e.n)) addLog(at, 'abilities', [who(e.a), ` casts ${e.n}`], 'ability');
         else if (e.k === 'danger') addLog(at, 'abilities', [foeName(e.a), ` begins ${e.n}!`], 'danger');
       } else if (e.e === 'hit') hit(e);
-      else if (e.e === 'buff') {
+      else if (e.e === 'spawn') {
+        foeBox.append(...e.foes.map(foeUnit).map(u => u.el));
+        addLog(at, 'abilities', [foeName(e.a), ` uses ${e.n}: ${e.foes.map(x => x.name).join(', ')} join the fight!`], 'danger');
+      } else if (e.e === 'mana') {
+        const u = party[e.tg];
+        if (u && u.maxMana) { u.mana = e.m; drawMana(u); }
+      } else if (e.e === 'buff') {
+        if (e.danger) addLog(at, 'abilities', [foeName(e.tg), e.n === 'Frenzy' ? ' goes into a frenzy!' : e.n === 'Enraged' ? ' is enraged!' : ` uses ${e.n}!`], 'danger');
         const targets = e.tg === 'all' ? party.filter(u => !u.down) : [unitOf(e.tg)].filter(Boolean);
         targets.forEach(u => {
           if (e.until) u.buffs[e.n] = { until: e.until, cls: typeof e.tg === 'string' ? 'debuff' : 'buff' };
@@ -1469,7 +1483,7 @@
         u.castFill.style.width = '0';
         u.castText.textContent = 'Downed';
         drawHp(u);
-        addLog(at, 'kills', [who(e.tg), ' was downed. Respawning in 25s.'], 'death');
+        addLog(at, 'kills', [who(e.tg), e.at ? ' was downed. Respawning in 25s.' : ' was downed.'], 'death');
       } else if (e.e === 'respawn') {
         const u = party[e.tg];
         u.down = false;
@@ -1493,7 +1507,7 @@
         party.forEach(u => { if (!u.down) { u.cast = null; u.castBar.className = 'castbar idle'; u.castText.textContent = 'Next wave…'; } });
       } else if (e.e === 'end') {
         [...party, ...Object.values(foes)].forEach(u => { if (!u.down) { u.castBar.className = 'castbar idle'; u.cast = null; u.castText.textContent = ''; } });
-        addLog(at, 'kills', [h('b', { class: e.win ? 'ok' : 'bad' }, e.win ? 'Victory' : 'Stopped'), ` in ${fmtClock(e.t)}`], e.win ? 'win' : 'death');
+        addLog(at, 'kills', [h('b', { class: e.win ? 'ok' : 'bad' }, e.win ? 'Victory' : 'Defeat'), e.win ? ` in ${fmtClock(e.t)}` : e.wipe ? ' \u2013 every pilot was down at once. Better gear, potions or a party will help.' : ` after ${fmtClock(e.t)}`], e.win ? 'win' : 'death');
       }
     }
 
@@ -1524,9 +1538,16 @@
         bump('mit', e.tg, src, Math.max(0, (e.raw || e.v) - e.v) + (e.ab || 0));
         float(target, `${num(e.v)}${e.c ? '!' : ''}`, e.ab ? `${e.ty} · ${num(e.ab)} absorbed` : e.ty, '#ff6b5b', e.c, 'taken');
         pulse(target, 'shake');
+      } else if (e.k === 'eheal') {
+        // An enemy healing itself or an ally.
+        target.hp = Math.min(target.max, target.hp + e.v);
+        float(target, `+${num(e.v)}`, e.sr, '#4ee08f', false, 'heal');
+        pulse(target, 'glow');
+        addLog(cur.start + e.t, 'abilities', [foeName(e.a), ` ${e.a === e.tg ? 'regenerates' : `mends ${target.name}`} for ${num(e.v)}`], 'danger');
       } else {
-        // A pilot hitting an enemy.
-        target.hp = Math.max(0, target.hp - e.v);
+        // A pilot hitting an enemy (an enemy shield soaks some of it).
+        if (e.ab) target.barrier = e.b || 0;
+        target.hp = Math.max(0, target.hp - (e.v - (e.ab || 0)));
         bump('dps', e.a, e.sr, e.v);
         const from = party[e.a];
         float(target, `${num(e.v)}${e.c ? '!' : ''}`, e.ty, from ? from.colour : '#fff', e.c, e.k === 'dot' ? 'dot' : 'dmg');
@@ -1636,7 +1657,7 @@
       if (now() - cur.start >= f.ms) {
         const next = cur.start + f.ms + G.FIGHT.gapMs - now();
         statusEl.className = `battle-status ${f.win ? 'ok' : 'bad'}`;
-        statusEl.textContent = `${f.win ? 'Victory' : 'Stopped'} · next fight ${next > 0 ? `in ${Math.ceil(next / 1000)}s` : 'starting'}`;
+        statusEl.textContent = `${f.win ? 'Victory' : 'Defeat'} · next fight ${next > 0 ? `in ${Math.ceil(next / 1000)}s` : 'starting'}`;
         // Ask the server to move on once the gap is over.
         if (next < -300 && !asked) { asked = true; poll(); }
       } else {
@@ -1762,24 +1783,28 @@
       } catch (e) { /* shown on next action */ }
     }
 
+    // The founding form is built once, so a refresh of the guild list never clears it.
+    const name = h('input', { name: 'name', required: true, maxlength: '24', autocomplete: 'off' });
+    const tag = h('input', { name: 'tag', required: true, maxlength: '4', spellcheck: 'false', autocomplete: 'off' });
+    const foundForm = section('Found a guild', 'Free. Pick a name and a 2\u20134 character tag.',
+      h('form', { class: 'panel', onsubmit: async e => {
+        e.preventDefault();
+        if (await act('/api/guild/create', { name: name.value, tag: tag.value }, 'Guild founded.')) { name.value = ''; tag.value = ''; await poll(); load(); }
+      } },
+        h('div', { class: 'form-row' }, h('label', { class: 'field' }, 'Guild name', name), h('label', { class: 'field' }, 'Tag (2\u20134)', tag)),
+        h('p', { class: 'actions section' }, h('button', { type: 'submit', class: 'btn primary' }, 'Found guild'))));
+    const guildList = h('div');
+
     function drawNoGuild(data) {
       lastChatId = 0;
-      const name = h('input', { name: 'name', required: true, maxlength: '24' });
-      const tag = h('input', { name: 'tag', required: true, maxlength: '4', spellcheck: 'false' });
-      const enough = have('gold') >= G.GUILD_COST;
-      body.replaceChildren(h('div', { class: 'two-col' },
-        section('Found a guild', `Costs ${num(G.GUILD_COST)} gold. You have ${num(have('gold'))}.`,
-          h('form', { class: 'panel', onsubmit: async e => {
-            e.preventDefault();
-            if (await act('/api/guild/create', { name: name.value, tag: tag.value }, 'Guild founded.')) { await poll(); load(); }
-          } },
-            h('div', { class: 'form-row' }, h('label', { class: 'field' }, 'Guild name', name), h('label', { class: 'field' }, 'Tag (2–4)', tag)),
-            h('p', { class: 'actions section' }, h('button', { type: 'submit', class: 'btn primary', disabled: !enough }, enough ? 'Found guild' : 'Not enough gold')))),
+      delete body.dataset.guild;
+      if (!body.contains(foundForm)) body.replaceChildren(h('div', { class: 'two-col' }, foundForm, guildList));
+      guildList.replaceChildren(
         section('Guilds', 'Open to join. Up to 30 pilots each.',
           data.guilds.length ? h('div', { class: 'list' }, data.guilds.map(g => h('div', { class: 'row' },
             h('div', { class: 'grow' }, h('div', { class: 'name' }, g.name, h('span', { class: 'tag' }, ` [${g.tag}]`)), h('small', {}, `${plural(g.members, 'pilot')} · total level ${num(g.level)}`)),
             h('button', { type: 'button', class: 'btn small primary', disabled: g.members >= 30, onclick: async () => { if (await act('/api/guild/join', { id: g.id }, `Welcome to ${g.name}.`)) { await poll(); load(); } } }, g.members >= 30 ? 'Full' : 'Join'))))
-            : h('div', { class: 'empty' }, 'No guilds yet. Be the first to found one.'))));
+            : h('div', { class: 'empty' }, 'No guilds yet. Be the first to found one.')));
     }
 
     function drawGuild(data) {

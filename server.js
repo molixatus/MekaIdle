@@ -326,21 +326,25 @@ async function stopPartyRaid(party, self, disband) {
   }
 }
 
-// Takes a freshly loaded player out of any raid: solo raids stop, party members leave,
-// and a party leader stops the party's raid.
+// Takes a freshly loaded player out of any raid: solo raids stop and party members leave
+// (a leaving leader hands the party to the next pilot).
 async function leaveRaid(p) {
   const a = p.state.activity;
   if (a && a.type === 'raid') { p.state.activity = null; return; }
   const party = await partyOf(p.id);
-  if (party && party.session) {
-    if (party.leader_id === p.id) await stopPartyRaid(party, p, false);
-    else await leaveParty(p, party);
-  }
+  if (party && party.session) await leaveParty(p, party);
   if (p.state.activity && p.state.activity.type) p.state.activity = null;
 }
 
+// Leaving a party. When the leader leaves, the longest-standing member takes over; the party
+// only breaks up when nobody is left.
 async function leaveParty(p, party) {
-  if (party.leader_id === p.id) return stopPartyRaid(party, p, true);
+  const others = (await memberIds(party.id)).filter(id => id !== p.id);
+  if (!others.length) return stopPartyRaid(party, p, true);
+  if (party.leader_id === p.id) {
+    await db.run('UPDATE parties SET leader_id = ? WHERE id = ?', others[0], party.id);
+    party.leader_id = others[0];
+  }
   await db.run('DELETE FROM party_members WHERE player_id = ?', p.id);
   if (p.state.activity && p.state.activity.type === 'party') p.state.activity = null;
   if (party.session) await restartParty(party);
@@ -610,8 +614,6 @@ route('POST', '/api/guild/create', ctx => {
     if (p.guild_id) bad('Leave your current guild first.');
     if (await db.get('SELECT 1 AS x FROM guilds WHERE name_key = ?', name.toLowerCase())) bad('A guild with that name already exists.');
     if (await db.get('SELECT 1 AS x FROM guilds WHERE tag = ?', tag)) bad('That tag is taken.');
-    if ((s.items.gold || 0) < G.GUILD_COST) bad(`Founding a guild costs ${G.GUILD_COST} gold.`);
-    game.addItems(s.items, { gold: G.GUILD_COST }, -1);
     const now = Date.now();
     const id = await db.insert('INSERT INTO guilds (name, name_key, tag, leader_id, created) VALUES (?, ?, ?, ?, ?)', name, name.toLowerCase(), tag, ctx.me, now);
     await db.run('UPDATE players SET guild_id = ?, guild_joined = ? WHERE id = ?', id, now, ctx.me);

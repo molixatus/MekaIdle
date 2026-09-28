@@ -294,27 +294,78 @@
   const FOE_DAMAGE = { 6: 'magic', 7: 'magic', 21: 'fire', 33: 'magic', 34: 'magic', 35: 'magic', 41: 'magic', 42: 'magic', 43: 'magic', 47: 'magic', 48: 'magic',
     58: 'magic', 59: 'magic', 61: 'magic', 62: 'fire', 14: 'fire', 15: 'fire', 16: 'shock', 18: 'frost', 46: 'shock', 67: 'fire', 25: 'frost', 63: 'frost', 23: 'poison', 24: 'poison', 10: 'poison', 50: 'poison' };
   const REGIONS = [
-    { id: 'scrapyard', name: 'Rustwood Scrapyard', trash: [0, 1, 23, 22, 53, 45], bosses: [2, 40, 66, 68, 36], finale: 'The Scrap King', mat: 'Scrap core',
-      set: { name: 'Scrapguard', type: 'plate', two: { hpPct: 10 }, three: { passives: { thorns: 20 } } }, trinket: { name: 'Rusted cog', stats: { defPct: 6, hpPct: 6 } } },
-    { id: 'warrens', name: 'Goblin Warrens', trash: [0, 1, 2, 8, 24, 51], bosses: [3, 40, 9, 52, 21], finale: 'Warchief Grukk', mat: 'Warband totem',
-      set: { name: 'Warband', type: 'leather', two: { crit: 5 }, three: { passives: { multishot: 15 } } }, trinket: { name: 'Goblin fang', stats: { crit: 4 }, passives: { bleed: 10 } } },
-    { id: 'crypts', name: 'Sunken Crypts', trash: [4, 5, 6, 7, 22, 43], bosses: [41, 33, 42, 48, 62], finale: 'The Lich Queen', mat: 'Grave dust',
-      set: { name: 'Gravewalker', type: 'cloth', two: { power: 8 }, three: { passives: { lifesteal: 8 } } }, trinket: { name: 'Lich phylactery', stats: { power: 8, mana: 30 } } },
-    { id: 'steppes', name: 'Howling Steppes', trash: [11, 53, 54, 29, 50, 39], bosses: [12, 13, 30, 38, 16], finale: 'Alpha of the Steppes', mat: 'Moon fang',
-      set: { name: 'Moonhide', type: 'leather', two: { haste: 8 }, three: { passives: { bleed: 15 } } }, trinket: { name: 'Alpha’s claw', stats: { haste: 6, crit: 3 } } },
-    { id: 'caverns', name: 'Crystal Caverns', trash: [23, 27, 26, 8, 65, 56], bosses: [17, 19, 61, 9, 28], finale: 'The Crystal Heart', mat: 'Prism shard',
-      set: { name: 'Prismweave', type: 'cloth', two: { power: 8 }, three: { passives: { prismatic: 40 } } }, trinket: { name: 'Prism heart', stats: { power: 10 } } },
-    { id: 'wastes', name: 'Ember Wastes', trash: [21, 10, 52, 24, 39, 57], bosses: [14, 62, 38, 31, 15], finale: 'Ashmaw the Undying', mat: 'Ember heart',
-      set: { name: 'Emberforged', type: 'plate', two: { defPct: 10 }, three: { passives: { burn: 20 } } }, trinket: { name: 'Ember core', stats: { fire: 12, eres: 20 } } },
-    { id: 'spire', name: 'Stormspire', trash: [45, 46, 50, 67, 66, 58], bosses: [20, 34, 68, 58, 16], finale: 'The Storm Engine', mat: 'Storm core',
-      set: { name: 'Stormvestment', type: 'vestment', two: { heal: 12 }, three: { passives: { overflow: 30 } } }, trinket: { name: 'Storm eye', stats: { heal: 10 }, passives: { surge: 10 } } },
-    { id: 'citadel', name: 'Frozen Citadel', trash: [44, 41, 37, 33, 4, 18], bosses: [18, 33, 44, 37, 48], finale: 'The Frost Tyrant', mat: 'Frost crystal',
-      set: { name: 'Frostguard', type: 'plate', two: { hpPct: 12 }, three: { passives: { thorns: 30 } } }, trinket: { name: 'Frozen heart', stats: { hpPct: 8, mres: 30 } } },
-    { id: 'ruins', name: 'Starfall Ruins', trash: [64, 47, 43, 34, 59, 49], bosses: [35, 59, 58, 31, 61], finale: 'The Fallen Star', mat: 'Star shard',
-      set: { name: 'Starweave', type: 'vestment', two: { regen: 3 }, three: { passives: { surge: 15 } } }, trinket: { name: 'Fallen star', stats: { power: 8, regen: 2 } } },
-    { id: 'rift', name: 'The Void Rift', trash: [64, 28, 62, 48, 25, 35], bosses: [63, 60, 32, 15, 48], finale: 'The Void Titan', mat: 'Void shard',
-      set: { name: 'Voidforged', type: 'plate', two: { power: 8, hpPct: 8 }, three: { passives: { lifesteal: 10 } } }, trinket: { name: 'Void heart', stats: { power: 6, defPct: 6, hpPct: 6 }, passives: { lifesteal: 5 } } },
+    { id: 'scrapyard', name: 'Rustwood Scrapyard', trash: [0, 1, 23, 22, 53, 45, 46, 66, 27, 11], bosses: [2, 40, 66, 68, 36, 3, 20, 67], finale: 'The Scrap King', mat: 'Scrap core',
+      trinket: { name: 'Rusted cog', stats: { defPct: 6, hpPct: 6 } } },
+    { id: 'warrens', name: 'Goblin Warrens', trash: [0, 1, 2, 8, 24, 51, 52, 40, 21, 3], bosses: [3, 40, 9, 52, 21, 2, 30, 12], finale: 'Warchief Grukk', mat: 'Warband totem',
+      trinket: { name: 'Goblin fang', stats: { crit: 4 }, passives: { bleed: 10 } } },
+    { id: 'crypts', name: 'Sunken Crypts', trash: [4, 5, 6, 7, 22, 43, 41, 48, 42, 37], bosses: [41, 33, 42, 48, 62, 5, 7, 37], finale: 'The Lich Queen', mat: 'Grave dust',
+      trinket: { name: 'Lich phylactery', stats: { power: 8, mana: 30 } } },
+    { id: 'steppes', name: 'Howling Steppes', trash: [11, 53, 54, 29, 50, 39, 12, 49, 13, 30], bosses: [12, 13, 30, 38, 16, 11, 32, 39], finale: 'Alpha of the Steppes', mat: 'Moon fang',
+      trinket: { name: 'Alpha’s claw', stats: { haste: 6, crit: 3 } } },
+    { id: 'caverns', name: 'Crystal Caverns', trash: [23, 27, 26, 8, 65, 56, 19, 17, 61, 9], bosses: [17, 19, 61, 9, 28, 23, 18, 59], finale: 'The Crystal Heart', mat: 'Prism shard',
+      trinket: { name: 'Prism heart', stats: { power: 10 } } },
+    { id: 'wastes', name: 'Ember Wastes', trash: [21, 10, 52, 24, 39, 57, 14, 62, 65, 55], bosses: [14, 62, 38, 31, 15, 10, 55, 57], finale: 'Ashmaw the Undying', mat: 'Ember heart',
+      trinket: { name: 'Ember core', stats: { fire: 12, eres: 20 } } },
+    { id: 'spire', name: 'Stormspire', trash: [45, 46, 50, 67, 66, 58, 34, 47, 20, 16], bosses: [20, 34, 68, 58, 16, 67, 46, 35], finale: 'The Storm Engine', mat: 'Storm core',
+      trinket: { name: 'Storm eye', stats: { heal: 10 }, passives: { surge: 10 } } },
+    { id: 'citadel', name: 'Frozen Citadel', trash: [44, 41, 37, 33, 4, 18, 7, 48, 31, 32], bosses: [18, 33, 44, 37, 48, 31, 32, 15], finale: 'The Frost Tyrant', mat: 'Frost crystal',
+      trinket: { name: 'Frozen heart', stats: { hpPct: 8, mres: 30 } } },
+    { id: 'ruins', name: 'Starfall Ruins', trash: [64, 47, 43, 34, 59, 49, 35, 58, 61, 62], bosses: [35, 59, 58, 31, 61, 64, 47, 34], finale: 'The Fallen Star', mat: 'Star shard',
+      trinket: { name: 'Fallen star', stats: { power: 8, regen: 2 } } },
+    { id: 'rift', name: 'The Void Rift', trash: [64, 28, 62, 48, 25, 35, 63, 60, 59, 32], bosses: [63, 60, 32, 15, 48, 28, 62, 25], finale: 'The Void Titan', mat: 'Void shard',
+      trinket: { name: 'Void heart', stats: { power: 6, defPct: 6, hpPct: 6 }, passives: { lifesteal: 5 } } },
   ];
+  // Every region has a raid set for each class (in that class's armour type), a raid weapon for
+  // each class, and two trinkets. Bosses in a region each drop a different mix of them.
+  const THEMES = ['Scrap', 'Warband', 'Grave', 'Moon', 'Prism', 'Ember', 'Storm', 'Frost', 'Star', 'Void'];
+  const SET_KINDS = { melee: { type: 'plate', suffix: 'guard' }, ranged: { type: 'leather', suffix: 'stalker' }, magic: { type: 'cloth', suffix: 'weave' }, healer: { type: 'vestment', suffix: 'ward' } };
+  const SET_PASSIVES = { melee: ['thorns', 'bleed', 'lifesteal'], ranged: ['multishot', 'bleed', 'prismatic'], magic: ['prismatic', 'burn', 'lifesteal'], healer: ['overflow', 'surge'] };
+  const PASSIVE_SCALE = { thorns: [20, 3], bleed: [15, 2], lifesteal: [6, 0.6], multishot: [12, 1.2], prismatic: [35, 4], burn: [18, 2], overflow: [25, 2.5], surge: [10, 1] };
+  const SET_TWO = {
+    melee: i => ({ hpPct: 6 + i, defPct: 2 + i / 2 }), ranged: i => ({ crit: 3 + i / 2, haste: 2 + i / 2 }),
+    magic: i => ({ power: 5 + i, regen: 0.5 + i / 5 }), healer: i => ({ heal: 7 + i, regen: 1 + i / 5 }),
+  };
+  const UNIQUE_KINDS = { melee: ['greatsword', 'axe', 'mace', 'sword'], ranged: ['longbow', 'crossbow', 'daggers', 'shortbow'], magic: ['staff', 'sceptre', 'crystal', 'wand'], healer: ['codex', 'lantern', 'tome', 'scroll'] };
+  const UNIQUE_SUFFIX = { melee: 'forged', ranged: 'fletched', magic: 'bound', healer: 'blessed' };
+  const UNIQUE_PASSIVE = { melee: i => ({ bleed: 10 + 2 * i }), ranged: i => ({ multishot: 8 + i }), magic: i => ({ burn: 12 + 2 * i }), healer: i => ({ surge: 8 + i }) };
+  const SET_BY_ID = {};
+  REGIONS.forEach((reg, i) => {
+    reg.theme = THEMES[i];
+    reg.charm = { name: `${THEMES[i]} charm`, stats: i % 2 ? { hpPct: 4 + i, mres: 8 + 4 * i } : { crit: 3 + Math.floor(i / 2), haste: 3 + Math.floor(i / 2) } };
+    reg.sets = {};
+    Object.entries(SET_KINDS).forEach(([cls, k]) => {
+      const pas = SET_PASSIVES[cls][i % SET_PASSIVES[cls].length];
+      const [base, step] = PASSIVE_SCALE[pas];
+      const set = { id: `${i + 1}_${cls}`, region: i, cls, name: THEMES[i] + k.suffix, type: k.type,
+        two: Object.fromEntries(Object.entries(SET_TWO[cls](i)).map(([s, v]) => [s, Math.round(v * 10) / 10])), three: { passives: { [pas]: Math.round((base + step * i) * 10) / 10 } } };
+      reg.sets[cls] = set;
+      SET_BY_ID[set.id] = set;
+    });
+  });
+  // How trash enemies fight. Swarms come in bigger packs; healers mend their allies; archers
+  // ignore taunts; brutes hit slowly and hard; elites lead packs on their own.
+  const TRASH_ROLES = {
+    grunt: { name: 'Grunt', hp: 1, dmg: 1, cast: 1 },
+    brute: { name: 'Brute', hp: 1.7, dmg: 1.35, cast: 1.4 },
+    swarm: { name: 'Swarm', hp: 0.45, dmg: 0.5, cast: 0.8 },
+    caster: { name: 'Caster', hp: 0.8, dmg: 1.2, cast: 1.1, magic: true },
+    archer: { name: 'Archer', hp: 0.8, dmg: 1, cast: 1, noTaunt: true },
+    healer: { name: 'Healer', hp: 0.9, dmg: 0.5, cast: 1.2, heals: true, magic: true },
+    elite: { name: 'Elite', hp: 2.6, dmg: 1.7, cast: 1.2 },
+  };
+  const FOE_ROLE = FOES.map((_, i) => (FOE_DAMAGE[i] === 'magic' ? (i % 3 === 0 ? 'healer' : 'caster') : ['grunt', 'brute', 'swarm', 'archer', 'grunt', 'brute'][i % 6]));
+  // Boss mechanics. `every`: used on every nth attack.
+  const MECHANICS = {
+    cleave: { name: 'Cleave', cost: 0.05, every: 4, desc: 'Every 4th attack hits every pilot.' },
+    smash: { name: 'Crushing blow', cost: 0.08, every: 5, desc: 'Every 5th attack is a slow blow on one pilot for 2.5× damage.' },
+    poison: { name: 'Venom spray', cost: 0.06, every: 6, desc: 'Poisons every pilot for 5 seconds.' },
+    drain: { name: 'Mana drain', cost: 0.04, every: 5, desc: 'Drains mana from every pilot.' },
+    mend: { name: 'Regenerate', cost: 0.1, every: 7, desc: 'Heals itself for 6% of its HP.' },
+    summon: { name: 'Call for help', cost: 0.15, desc: 'Calls in more enemies at 70% and 35% HP.' },
+    shield: { name: 'Iron hide', cost: 0.12, desc: 'At half HP, shields itself for 15% of its HP.' },
+    enrage: { name: 'Enrage', cost: 0.08, desc: 'Below 30% HP it hits 40% harder and faster.' },
+  };
+  const MECH_POOL = Object.keys(MECHANICS);
   const ADJECTIVES = ['Rotting', 'Savage', 'Ancient', 'Blighted', 'Furious', 'Hollow', 'Gilded', 'Twisted', 'Scarred', 'Venomous', 'Colossal', 'Cursed', 'Frenzied', 'Iron-clad', 'Starving', 'Grim'];
   const PASSIVES = {
     thorns: v => `Thorns: reflects ${v}% of damage taken.`,
@@ -332,8 +383,15 @@
     { id: 'mythic', name: 'Mythic', hp: 3, dmg: 2.1, xp: 3, drop: 4, mats: 2.5, colour: '#ff9a3c' },
   ];
   const DIFF_BY_ID = Object.fromEntries(DIFFICULTIES.map(d => [d.id, d]));
-  const FIGHT = { respawnMs: 25000, waveGapMs: 1500, gapMs: 3000, safetyMs: 45 * 60000, bossKillS: 40, trashKillS: 9, deathS: 30 };
-  const PARTY = { max: 4, hpPerExtra: 1.2, dmgPerExtra: 0.22 };
+  // bossKillS / trashKillS: seconds a reference pilot (matching crafted gear) needs to kill a boss or
+  // a trash wave at the start of a region. deathS: seconds of that enemy damage the pilot survives.
+  // frenzyS: after this long in the boss wave (a third of it for a trash wave) enemies hit harder every 10 seconds.
+  const FIGHT = { respawnMs: 25000, waveGapMs: 1500, gapMs: 3000, safetyMs: 20 * 60000, bossKillS: 40, trashKillS: 9, deathS: 75, frenzyS: 100 };
+  // Raid strength through a region, relative to the region's reference pilot: start + rise * (k/24)^shape.
+  // region: extra strength per region (up to the 6th), since gear percentages (block, crit) grow with tier.
+  // first: the first region is gentler while pilots learn the game.
+  const RAID_CURVE = { start: 0.8, rise: 0.55, shape: 1, finale: 1.05, region: 0.035, first: 0.88 };
+  const PARTY = { max: 4, hpPerExtra: 0.75, dmgPerExtra: 0.22 };
 
   // ---------- Items ----------
   // Icon variants: each item base has several game-icons shapes; higher tiers use later ones.
@@ -359,7 +417,7 @@
     herb: t => [t.herb, 'herb', `Gathered at Herbalism ${t.level}. For Scribing, Weaving and Alchemy.`],
   };
 
-  item('gold', { name: 'Gold', type: 'resource', icon: 'gold', colour: '#f2c14e', desc: 'Raid bosses drop it. Founding a guild costs 500.' });
+  item('gold', { name: 'Gold', type: 'resource', icon: 'gold', colour: '#f2c14e', desc: 'Raid bosses drop it.' });
   item('reed', { name: 'Reed', type: 'resource', icon: 'reed', colour: '#c9d08a', desc: 'Gathered alongside herbs. Used for scrolls, vestments and potions.' });
   TIERS.forEach(t => MAT_KEYS.forEach(k => {
     const [name, icon, desc] = MAT_INFO[k](t);
@@ -408,17 +466,28 @@
     const reg = REGIONS[n - 1];
     item(`sigil_${n}`, { name: `${reg.mat.split(' ')[0]} sigil`, type: 'gear', slot: 'trinket', icon: iconFor('sigil', n), colour: t.colour, tier: n,
       stats: { power: 2 + 2 * n, hpPct: 2 + 2 * n }, desc: `A trinket carved from ${reg.mat.toLowerCase()}s with Runecrafting.` });
-    // Raid set pieces and trinkets drop from this region's raids.
-    const set = reg.set;
-    const at = ARMOUR_TYPES[set.type];
-    ['head', 'body', 'legs'].forEach(slot => {
-      const base = ITEMS[`${t.id}_${set.type}_${slot}`].stats;
-      const stats = Object.fromEntries(Object.entries(base).map(([k, v]) => [k, STATS[k] && STATS[k].pct ? round1(v * 1.25) : Math.round(v * 1.2)]));
-      item(`set${n}_${slot}`, { name: `${set.name} ${at.nouns[slot]}`, type: 'gear', slot, armour: set.type, set: n, icon: iconFor(`${at.icon}_${slot}`, Math.min(10, n + 2)), colour: t.colour, tier: n, rare: true, stats,
-        desc: `Raid set piece from ${reg.name}. Counts as ${at.name.toLowerCase()} armour.` });
+    // Raid set pieces: one set per class, a little stronger than crafted armour of the tier.
+    Object.values(reg.sets).forEach(set => {
+      const at = ARMOUR_TYPES[set.type];
+      ['head', 'body', 'legs'].forEach(slot => {
+        const base = ITEMS[`${t.id}_${set.type}_${slot}`].stats;
+        const stats = Object.fromEntries(Object.entries(base).map(([k, v]) => [k, STATS[k] && STATS[k].pct ? round1(v * 1.3) : Math.round(v * 1.25)]));
+        item(`set${n}_${set.cls}_${slot}`, { name: `${set.name} ${at.nouns[slot]}`, type: 'gear', slot, armour: set.type, set: set.id, icon: iconFor(`${at.icon}_${slot}`, Math.min(10, n + 2)),
+          colour: t.colour, tier: n, rare: true, stats, desc: `Raid set piece from ${reg.name}, made for ${CLASSES[set.cls].name.toLowerCase()} pilots. Counts as ${at.name.toLowerCase()} armour.` });
+      });
+    });
+    // Raid weapons: one per class, hitting like a weapon half a tier higher, with a passive.
+    Object.entries(UNIQUE_KINDS).forEach(([cls, kinds]) => {
+      const w = WEAPON_BY_ID[kinds[(n - 1) % kinds.length]];
+      const base = ITEMS[`${t.id}_${w.id}`].stats;
+      item(`u${n}_${cls}`, { name: `${reg.theme}${UNIQUE_SUFFIX[cls]} ${w.noun}`, type: 'gear', slot: 'weapon', weapon: w.id, cls, icon: iconFor(w.id, Math.min(10, n + 3)),
+        colour: t.colour, tier: n, rare: true, twoHanded: !!w.twoHanded, stats: { atk: Math.round(base.atk * 1.3), ...scaleExtra(w.extra, n + 2) }, passives: UNIQUE_PASSIVE[cls](n - 1),
+        desc: `A rare ${CLASSES[cls].name.toLowerCase()} weapon from ${reg.name}. ${w.note}` });
     });
     item(`trinket_${n}`, { name: reg.trinket.name, type: 'gear', slot: 'trinket', icon: `trinket_${n - 1}`, colour: t.colour, tier: n, rare: true,
       stats: reg.trinket.stats, passives: reg.trinket.passives, desc: `A rare trinket from ${reg.name}.` });
+    item(`charm_${n}`, { name: reg.charm.name, type: 'gear', slot: 'trinket', icon: `trinket_${(n + 4) % 10}`, colour: t.colour, tier: n, rare: true,
+      stats: reg.charm.stats, desc: `A rare trinket from ${reg.name}.` });
   });
 
   // ---------- Actions ----------
@@ -499,8 +568,8 @@
       if (n >= 3) { add(a.bonus3); bonuses.push(`${a.bonus3.name} (3 ${a.name.toLowerCase()}): ${describe(a.bonus3)}`); }
       if (n >= 5) { add(a.bonus5); bonuses.push(`${a.bonus5.name} (5 ${a.name.toLowerCase()}): ${describe(a.bonus5)}`); }
     });
-    Object.entries(sets).forEach(([n, count]) => {
-      const set = REGIONS[n - 1].set;
+    Object.entries(sets).forEach(([id, count]) => {
+      const set = SET_BY_ID[id];
       if (count >= 2) { add(set.two); bonuses.push(`${set.name} (2): ${describe(set.two)}`); }
       if (count >= 3) { add(set.three, set.three.passives); bonuses.push(`${set.name} (3): ${Object.entries(set.three.passives).map(([k, v]) => PASSIVES[k](v)).join(' ')}`); }
     });
@@ -540,8 +609,13 @@
   }
 
   // ---------- Raids ----------
+  // Raids in a region get harder from start to finish: the first ones suit that region's crafted
+  // gear, the last ones need gear from the next tier (made with this region's raid material and
+  // higher skill levels). A pilot with matching gear wins early raids comfortably and starts to
+  // lose around the middle of the region.
   const RAIDS = [];
   const COMBAT_XP = [32, 138, 280, 453, 651, 860, 1087, 1338, 1589, 1650];
+  const CLASS_IDS = ['melee', 'ranged', 'magic', 'healer'];
   REGIONS.forEach((reg, ri) => {
     const t = TIERS[ri];
     const ref = mechStats(kit('melee', t.n), { melee: t.level + 5 });
@@ -552,8 +626,9 @@
     for (let k = 0; k < 25; k++) {
       const g = ri * 25 + k;
       const rand = rng(7919 * (g + 1));
-      const f = 0.7 + 0.6 * k / 24;
+      const pick = list => list[Math.floor(rand() * list.length)];
       const finale = k === 24;
+      const f = (RAID_CURVE.start + RAID_CURVE.rise * Math.pow(k / 24, RAID_CURVE.shape)) * (finale ? RAID_CURVE.finale : 1) * (1 + RAID_CURVE.region * Math.min(ri, 5)) * (ri === 0 ? RAID_CURVE.first : 1);
       const [adj, bossFoe] = finale ? [null, reg.bosses[0]] : combos[k];
       const styles = ['melee', 'ranged', 'magic'];
       const weak = styles[Math.floor(rand() * 3)];
@@ -566,23 +641,43 @@
       const dtype = FOE_DAMAGE[bossFoe] || 'physical';
       const resistOf = type => (type === 'physical' ? ref.def : type === 'magic' ? ref.mres : ref.eres);
       const dpsFor = type => Math.round(ref.hp * (100 + resistOf(type)) / 100 / FIGHT.deathS * f * 10) / 10;
+      // Boss mechanics: one for the first few raids, two after, three (always including adds) for a finale.
+      const mechs = [];
+      if (finale) mechs.push('summon');
+      while (mechs.length < (finale ? 3 : k < 3 ? 1 : 2)) { const m = pick(MECH_POOL); if (!mechs.includes(m)) mechs.push(m); }
+      const cost = 1 + mechs.reduce((a, m) => a + MECHANICS[m].cost, 0);
+      // Loot: every boss has its own table.
+      const res = [];
+      while (res.length < 2) { const m = pick(MAT_KEYS); if (!res.includes(m)) res.push(m); }
+      const cons = pick(CONSUMABLES.filter(c => c.tier <= t.n));
+      const slot = () => pick(['head', 'body', 'legs']);
+      const setDrops = finale
+        ? CLASS_IDS.map(cls => ({ item: `set${t.n}_${cls}_${slot()}`, qty: [1, 1], p: 0.035, rare: true }))
+        : [CLASS_IDS[k % 4], CLASS_IDS[(k + 2) % 4]].map(cls => ({ item: `set${t.n}_${cls}_${slot()}`, qty: [1, 1], p: 0.02, rare: true }));
+      const uniqueDrops = finale
+        ? [CLASS_IDS[Math.floor(rand() * 4)]].concat(CLASS_IDS[Math.floor(rand() * 4)]).filter((c, i, a) => a.indexOf(c) === i).map(cls => ({ item: `u${t.n}_${cls}`, qty: [1, 1], p: 0.02, rare: true }))
+        : [{ item: `u${t.n}_${CLASS_IDS[(k + 1) % 4]}`, qty: [1, 1], p: 0.008, rare: true }];
+      const trinketDrops = finale
+        ? [{ item: `trinket_${t.n}`, qty: [1, 1], p: 0.02, rare: true }, { item: `charm_${t.n}`, qty: [1, 1], p: 0.02, rare: true }]
+        : [{ item: k % 2 ? `trinket_${t.n}` : `charm_${t.n}`, qty: [1, 1], p: 0.007, rare: true }];
       RAIDS.push({
         id: `r${g + 1}`, n: g + 1, region: ri, tier: t.n, k,
         name: finale ? reg.finale : `${adj} ${FOES[bossFoe].toLowerCase()}`,
         regionName: reg.name, foe: bossFoe, finale,
         res: { [weak]: 1.15, [resist]: 0.88 }, weakElement: elements[Math.floor(rand() * 4)],
-        boss: { hp: Math.round(refDps * FIGHT.bossKillS * f * (finale ? 1.3 : 1) / 10) * 10, def, mres, eres, dps: Math.round(dpsFor(dtype) * (finale ? 1.15 : 1) * 10) / 10, dtype },
-        trash: { pool: reg.trash, maxWaves: 1 + Math.floor(k / 8), hp: Math.round(refDps * FIGHT.trashKillS * f), dps: Math.round(dpsFor('physical') * 0.55 * 10) / 10,
+        boss: { hp: Math.round(refDps * FIGHT.bossKillS * f / cost / 10) * 10, def, mres, eres, dps: Math.round(dpsFor(dtype) / Math.sqrt(cost) * 10) / 10, dtype, mechs },
+        trash: { pool: reg.trash, maxWaves: 1 + Math.floor(k / 6), hp: Math.round(refDps * FIGHT.trashKillS * f), dps: Math.round(dpsFor('physical') * 0.6 * 10) / 10,
           def: Math.round(def * 0.7), mres: Math.round(mres * 0.7), eres: Math.round(eres * 0.7) },
-        moves: { basic: finale ? 'Crushing blow' : 'Strike', sweep: finale ? 'Cataclysm' : 'Rampage' },
-        recommended: Math.round(power(ref) * (0.8 + 0.4 * k / 24)),
+        moves: { basic: finale ? 'Crushing blow' : 'Strike' },
+        recommended: Math.round(power(ref) * f),
         xp: Math.round(COMBAT_XP[ri] * (0.85 + 0.3 * k / 24) * (finale ? 1.5 : 1)),
         drops: [
           { item: `mat_${t.n}`, qty: [1, 2 + Math.floor(k / 12)] },
           { item: 'gold', qty: [Math.round(5 * t.mult), Math.round(12 * t.mult)] },
-          { item: matId(['ore', 'hide', 'branch', 'herb'][k % 4], t), qty: [2, 4] },
-          ...['head', 'body', 'legs'].map(slot => ({ item: `set${t.n}_${slot}`, qty: [1, 1], p: finale ? 0.04 : 0.012, rare: true })),
-          { item: `trinket_${t.n}`, qty: [1, 1], p: finale ? 0.025 : 0.006, rare: true },
+          { item: matId(res[0], t), qty: [2, 4] },
+          { item: matId(res[1], t), qty: [1, 3] },
+          { item: cons.id, qty: [1, 2], p: 0.3 },
+          ...setDrops, ...uniqueDrops, ...trinketDrops,
         ],
       });
     }
@@ -590,6 +685,15 @@
   const RAID_BY_ID = Object.fromEntries(RAIDS.map(r => [r.id, r]));
 
   const PATCH_NOTES = [
+    { v: '0.7', date: '2026-09-28', notes: [
+      'Raids are harder and can be lost: if every pilot is down at the same time, the fight is a defeat (a quarter of the XP, no loot).',
+      'Raids get tougher through each region. The first raids suit the region’s crafted gear; the last ones need next-tier gear, made with that region’s raid material.',
+      'Bosses have mechanics: cleaves, crushing blows, venom, mana drain, regeneration, summoned adds, shields and enrage. Every enemy frenzies if a wave drags on.',
+      'Trash packs vary: swarms, brutes, casters, archers who ignore taunts, healers who mend their allies, and elite champions.',
+      'Every region now has a raid set for each class, a raid weapon for each class and two trinkets. Each boss drops its own mix, shown on the raid list.',
+      'Founding a guild is free.',
+      'When a party leader leaves, the next pilot takes over instead of the party breaking up.',
+    ] },
     { v: '0.6', date: '2026-09-29', notes: [
       '250 raids across 10 regions, each with trash waves before the boss, in Normal, Heroic and Mythic.',
       'Abilities: 7 per combat class and 7 generic ones. Equip 2 class abilities and 1 generic.',
@@ -611,10 +715,10 @@
   const GAME = {
     MAX_LEVEL, OFFLINE_CAP, TIERS, TIER_BY_ID, CLASSES, ROLES, CLASS_OF_SKILL, UNARMED_COLOUR, SKILLS, SKILL_BY_ID, COMBAT_SKILLS, STATS, describe,
     WEAPON_KINDS, WEAPON_BY_ID, OFFHAND_KINDS, OFFHAND_BY_ID, SLOTS, ARMOUR_SLOTS, ARMOUR_TYPES, CONSUMABLES, CONSUMABLE_BY_ID,
-    ABILITIES, ABILITY_BY_ID, ABILITY_SLOTS, SUBCLASSES, SUBCLASS_BY_ID, REGIONS, FOES, FOE_DAMAGE, PASSIVES, DIFFICULTIES, DIFF_BY_ID, FIGHT, PARTY,
+    ABILITIES, ABILITY_BY_ID, ABILITY_SLOTS, SUBCLASSES, SUBCLASS_BY_ID, REGIONS, SET_BY_ID, TRASH_ROLES, FOE_ROLE, MECHANICS, RAID_CURVE, FOES, FOE_DAMAGE, PASSIVES, DIFFICULTIES, DIFF_BY_ID, FIGHT, PARTY,
     ITEMS, ACTIONS, ACTION_BY_ID, RAIDS, RAID_BY_ID, PATCH_NOTES, CLASS_KIT,
     xpForLevel, levelFromXp, skillMult, mechStats, power, combatLevel, kit, rng,
-    PARTY_MAX: PARTY.max, POTIONS_PER_RAID: 3, GUILD_COST: 500, QUEUE_MAX: 5,
+    PARTY_MAX: PARTY.max, POTIONS_PER_RAID: 3, GUILD_COST: 0, QUEUE_MAX: 5,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = GAME;
   else root.GAME = GAME;
