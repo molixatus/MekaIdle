@@ -99,11 +99,12 @@
   // ---------- Session state ----------
   let me = null;      // latest /api/me payload
   let offset = 0;     // server clock minus local clock
-  let page = store(PAGE_KEY) || 'skill:scrapping';
+  let page = store(PAGE_KEY) || 'skill:salvaging';
   let pollTimer = null;
   let polls = 0;
-  let lastRaidAt = 0;
   let pageRefresh = null; // refresh hook for pages that load their own data
+  let pageTick = null;    // called after every poll while its page is open
+  let pageCleanup = null; // called when leaving the page
 
   const now = () => Date.now() + offset;
   const lvl = skill => G.levelFromXp(me.state.skills[skill].xp);
@@ -128,9 +129,12 @@
     if (isLivePage()) renderPage();
   }
 
+  const raiding = () => !!(me && me.state.activity && me.state.activity.type);
+
   function activityProgress() {
     const a = me && me.state.activity;
     if (!a) return null;
+    if (a.type) return a.ms ? { frac: Math.max(0, Math.min(1, (now() - a.start) / a.ms)) } : null;
     const action = G.ACTION_BY_ID[a.id];
     const t = a.progress + (now() - me.state.lastTick);
     return { action, frac: Math.min(1, (t % action.time) / action.time) };
@@ -145,17 +149,20 @@
     closeModal();
   }
 
-  function mechSvg(colour, equipment = {}) {
-    const svg = $('mech-template').content.firstElementChild.cloneNode(true);
-    svg.style.setProperty('--paint', colour);
-    G.SLOTS.forEach(s => {
-      const g = svg.querySelector('.m-' + s.id);
-      const id = G.ITEMS[equipment[s.id]] ? equipment[s.id] : null;
-      if (id) g.style.setProperty('--part', G.ITEMS[id].colour);
-      g.classList.toggle('empty', !id);
-    });
-    return svg;
+  // Pixel-art mech for a paint colour and set of fitted gear. Sprite markup is generated
+  // locally from game data (colours and ids only), never from player text.
+  function mechArt(colour, equipment = {}, label = 'Mech') {
+    const col = slot => (G.ITEMS[equipment[slot]] ? G.ITEMS[equipment[slot]].colour : null);
+    const weapon = G.ITEMS[equipment.weapon];
+    const el = h('span', { class: 'sprite mech-sprite', role: 'img', 'aria-label': label, html: window.SPRITES.mech({
+      paint: colour, accent: G.ACCENTS[colour], armour: col('armour'), legs: col('legs'), reactor: col('reactor'), module: col('module'),
+      weapon: weapon ? weapon.weapon : null, weaponColour: weapon ? weapon.colour : null,
+    }) });
+    el.firstElementChild.removeAttribute('role');
+    el.firstElementChild.setAttribute('aria-hidden', 'true');
+    return el;
   }
+  const bossArt = (id, cls = '') => h('span', { class: `sprite boss-sprite ${cls}`, 'aria-hidden': 'true', html: window.SPRITES.boss(id) });
 
   function setupAuth() {
     const tabs = { create: $('tab-create'), login: $('tab-login') };
@@ -177,7 +184,7 @@
       sw.style.background = c;
       paints.append(h('label', { class: 'swatch' }, input, sw));
     });
-    const preview = () => $('create-preview').replaceChildren(mechSvg(forms.create.colour.value, {}));
+    const preview = () => $('create-preview').replaceChildren(mechArt(forms.create.colour.value, {}, 'Your mech'));
     paints.addEventListener('change', preview);
     preview();
 
@@ -211,7 +218,6 @@
     try { data = await api('/api/me'); } catch (e) { showAuth(); return; }
     me = data;
     offset = data.now - Date.now();
-    lastRaidAt = me.state.raidLog[0] ? me.state.raidLog[0].at : 0;
     $('auth').hidden = true;
     $('app').hidden = false;
     buildChrome();
@@ -228,16 +234,10 @@
       const data = await api('/api/me');
       me = data;
       offset = data.now - Date.now();
-      const latest = me.state.raidLog[0];
-      if (latest && latest.at > lastRaidAt) {
-        lastRaidAt = latest.at;
-        const raid = G.RAID_BY_ID[latest.raid];
-        toast(`${latest.win ? 'Victory' : 'Defeat'}: your party ${latest.win ? 'beat' : 'fell to'} the ${raid.name}.`, latest.win ? '' : 'error',
-          latest.runId ? { label: 'Watch', onclick: () => watchReplay(latest.runId) } : null);
-      }
       renderChrome();
       if (isLivePage()) renderPage();
       else if (pageRefresh && ++polls % 2 === 0) pageRefresh();
+      if (pageTick) pageTick();
     } catch (e) { /* keep polling; errors surface on actions */ }
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden && me) poll(); });
@@ -255,6 +255,7 @@
     openModal(
       h('h2', { id: 'modal-title' }, 'Welcome back'),
       h('p', { class: 'muted' }, `You were away for ${fmtTime(g.ms)}.${capped ? ` Offline progress is capped at ${G.OFFLINE_CAP / 3600000} hours.` : ''}`),
+      g.fights ? h('p', {}, `Your mech fought ${plural(g.fights, 'raid fight')} and won ${num(g.wins)}.`) : null,
       h('div', { class: 'gains' }, rows),
     );
   }
@@ -263,7 +264,7 @@
   let lastFocus = null;
   function openModal(...content) {
     lastFocus = document.activeElement;
-    $('modal-body').replaceChildren(...content);
+    $('modal-body').replaceChildren(...content.filter(Boolean));
     $('modal').hidden = false;
     $('modal-close').focus();
   }
@@ -314,8 +315,10 @@
 
   function renderChrome() {
     if (!me) return;
-    const activeSkill = me.state.activity && G.ACTION_BY_ID[me.state.activity.id].skill;
+    const act0 = me.state.activity;
+    const activeSkill = !act0 ? null : act0.type ? myStats().skill : G.ACTION_BY_ID[act0.id].skill;
     Object.values(navRefs).forEach(({ btn, right, spin, item, fill }) => {
+      if (item.id === 'raids') spin.hidden = !raiding();
       btn.toggleAttribute('aria-current', false);
       if (item.id === page) btn.setAttribute('aria-current', 'page');
       if (item.skill) {
@@ -336,8 +339,14 @@
 
     // Current activity card
     const card = $('now-card');
-    const a = me.state.activity && G.ACTION_BY_ID[me.state.activity.id];
-    if (a) {
+    const a = act0 && !act0.type && G.ACTION_BY_ID[act0.id];
+    if (act0 && act0.type) {
+      const raid = G.RAID_BY_ID[act0.raid];
+      card.className = 'now-card';
+      card.replaceChildren(bossArt(act0.raid, 'now-boss'),
+        h('div', { class: 'now-name' }, h('span', {}, raid ? raid.name : 'Raid'), h('small', {}, `${act0.type === 'party' ? 'Party' : 'Solo'} · fight ${act0.n || 1}`)),
+        h('div', { class: 'bar red' }, h('span', { id: 'now-fill' })));
+    } else if (a) {
       const sk = G.SKILLS.find(s => s.id === a.skill);
       card.className = 'now-card';
       card.replaceChildren(itemIco(a.item),
@@ -345,14 +354,14 @@
         h('div', { class: 'bar' }, h('span', { id: 'now-fill' })));
     } else {
       card.className = 'now-card idle';
-      card.replaceChildren(h('span', {}, 'Idle. Pick a skill action to start training.'));
+      card.replaceChildren(h('span', {}, 'Idle. Pick a skill action or a raid to start.'));
     }
 
     const s = myStats();
     $('wallet').replaceChildren(
       h('div', { class: 'coin', title: 'Scrap' }, itemIco('scrap'), h('span', {}, fmt(have('scrap'))), h('small', {}, 'Scrap')),
-      h('div', { class: 'coin', title: 'Power cells' }, itemIco('power_cell'), h('span', {}, fmt(have('power_cell'))), h('small', {}, 'Cells')),
-      h('div', { class: 'coin', title: 'Mech power' }, ui('power', 'skill-engineering'), h('span', {}, num(G.power(s))), h('small', {}, 'Power')),
+      h('div', { class: 'coin', title: 'Intact circuits' }, itemIco('circuit'), h('span', {}, fmt(have('circuit'))), h('small', {}, 'Circuits')),
+      h('div', { class: 'coin', title: 'Mech power' }, ui('power', 'skill-ranged'), h('span', {}, num(G.power(s))), h('small', {}, 'Power')),
     );
     const dot = h('span', { class: 'pilot-dot' });
     dot.style.background = me.player.colour;
@@ -378,16 +387,19 @@
 
   function go(id) {
     const kind = id.split(':')[0];
-    if (!PAGES[kind] || (kind === 'skill' && !G.SKILLS.some(s => 'skill:' + s.id === id))) id = 'skill:scrapping';
+    if (!PAGES[kind] || (kind === 'skill' && !G.SKILLS.some(s => 'skill:' + s.id === id))) id = 'skill:salvaging';
+    if (pageCleanup) pageCleanup();
     page = id;
     store(PAGE_KEY, id);
-    pageRefresh = null;
+    pageRefresh = pageTick = pageCleanup = null;
     renderChrome();
     renderPage();
     window.scrollTo(0, 0);
   }
 
   function renderPage() {
+    if (pageCleanup) pageCleanup();
+    pageRefresh = pageTick = pageCleanup = null;
     const [kind, arg] = page.split(':');
     const el = PAGES[kind](arg);
     if (el) $('page').replaceChildren(...[].concat(el));
@@ -403,19 +415,20 @@
     return h('section', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', {}, title), note ? h('p', {}, note) : null), ...body);
   }
 
+  function roleChip(role, stance) {
+    const r = G.ROLES[role] || G.ROLES.melee;
+    const chip = h('span', { class: 'role-chip' }, stance === 'tank' ? `${r.name} · Tank` : r.name);
+    chip.style.setProperty('--role', r.colour);
+    return chip;
+  }
+
   function statsLine(it) {
     if (!it) return null;
     const bits = [];
     const w = it.weapon && G.WEAPON_BY_ID[it.weapon];
-    if (w) {
-      const role = G.ROLES[w.role];
-      const chip = h('span', { class: 'role-chip' }, role.name);
-      chip.style.setProperty('--role', role.colour);
-      bits.push(chip);
-      if (w.role === 'striker') bits.push(h('span', { class: 'dtype-' + w.dtype }, G.DTYPE_BY_ID[w.dtype].name));
-    }
+    if (w) bits.push(roleChip(w.role, w.stance));
     if (it.stats) {
-      if (it.stats.atk) bits.push(h('span', { class: 'stat-atk' }, `+${it.stats.atk} ${w && w.role === 'mechanic' ? 'HEAL/S' : 'DMG/S'}`));
+      if (it.stats.atk) bits.push(h('span', { class: 'stat-atk' }, `+${it.stats.atk} ${w && w.role === 'healer' ? 'HEAL/S' : 'DMG/S'}`));
       if (it.stats.def) bits.push(h('span', { class: 'stat-def' }, `+${it.stats.def} DEF`));
       if (it.stats.hp) bits.push(h('span', { class: 'stat-hp' }, `+${it.stats.hp} HULL`));
     }
@@ -425,8 +438,8 @@
 
   // Skill page
   const SKILL_SECTION = {
-    scrapping: 'Scrap sites', mining: 'Veins', siphoning: 'Gas clouds', smelting: 'Furnace', chemistry: 'Recipes',
-    engineering: 'Blueprints', weaponsmithing: 'Weapons', fabrication: 'Mech parts',
+    salvaging: 'Wrecks', mining: 'Veins', harvesting: 'Gas clouds', smelting: 'Furnace', alchemy: 'Tonics',
+    crafting: 'Workbench', weaponsmithing: 'Weapons', armoursmithing: 'Armour',
   };
 
   function levelBox(id) {
@@ -452,35 +465,30 @@
   function combatSkillBody(sk) {
     const L = lvl(sk.id);
     const s = myStats();
-    const weapons = G.WEAPON_KINDS.filter(w => w.skill === sk.id);
+    const kinds = G.WEAPON_KINDS.filter(w => w.skill === sk.id);
     const fitted = me.state.equipment.weapon && G.ITEMS[me.state.equipment.weapon];
-    const trains = sk.id === 'shielding' || s.skill === sk.id;
-    const bonus = {
-      shielding: `+${L - 1}% defence and hull`,
-      repair: `+${L - 1}% healing`,
-      electronics: `+${L - 1}% to target locks, jamming and ion pulses`,
-    }[sk.id] || `+${L - 1}% ${sk.name.toLowerCase()} damage`;
+    const trains = s.skill === sk.id;
     const earned = me.state.raidLog.reduce((a, e) => a + ((e.xp && e.xp[sk.id]) || 0), 0);
+    const nouns = kinds.map(w => `${/^[aeiou]/i.test(w.noun) ? 'an' : 'a'} ${w.noun}`).join(' or ');
     const body = [
       h('div', { class: 'two-col' },
         h('div', { class: 'panel stack' },
           h('h2', {}, 'How it trains'),
-          h('p', {}, sk.id === 'shielding'
-            ? 'Every raid trains Shielding, whatever you’re carrying: 40% of the raid’s combat XP goes here.'
-            : `Fight in raids with ${weapons.map(w => `${/^[aeiou]|^EMP/i.test(w.noun) ? 'an' : 'a'} ${w.noun}`).join(' or ')} fitted. A win gives the raid’s full XP, a loss a quarter. It can’t be trained any other way.`),
+          h('p', {}, `Fight raid bosses with ${nouns} fitted. Every win gives the boss’s full XP, a loss a quarter. Nothing else trains it.`),
+          kinds.map(w => h('p', { class: 'muted' }, roleChip(w.role, w.stance), ' ', G.STANCES[w.stance])),
           h('p', { class: trains ? 'ok' : 'warn' }, trains
-            ? `Your mech is training ${sk.name} right now.`
+            ? `Your mech is set up to train ${sk.name}.`
             : fitted ? `Your ${fitted.name.toLowerCase()} trains ${G.SKILL_BY_ID[s.skill].name} instead.` : 'Fit a weapon in the Hangar to start training.'),
           h('p', { class: 'actions' }, h('button', { type: 'button', class: 'btn primary', onclick: () => go('raids') }, 'Go to raids'),
             h('button', { type: 'button', class: 'btn', onclick: () => go('hangar') }, 'Open hangar'))),
         h('div', { class: 'panel stack' },
           h('h2', {}, 'Current bonus'),
-          h('p', { class: 'big-number' }, bonus),
-          h('p', { class: 'muted' }, `${num(earned)} XP earned in your last ${plural(me.state.raidLog.length, 'raid')}.`))),
+          h('p', { class: 'big-number' }, `+${L - 1}% ${sk.id === 'healing' ? 'healing' : `${sk.name.toLowerCase()} damage`}`),
+          h('p', { class: 'muted' }, `${num(earned)} XP earned in your last ${plural(me.state.raidLog.length, 'fight')}.`))),
     ];
-    if (weapons.length) {
-      body.push(section('Weapons', `Forged with Weaponsmithing. ${G.ROLES[weapons[0].role].desc}`, h('div', { class: 'slot-list' }, G.TIERS.map(t => {
-        const id = `${t.id}_${weapons[0].id}`;
+    kinds.forEach(w => {
+      body.push(section(`${w.noun[0].toUpperCase()}${w.noun.slice(1)}s`, 'Forged with Weaponsmithing.', h('div', { class: 'slot-list' }, G.TIERS.map(t => {
+        const id = `${t.id}_${w.id}`;
         const it = G.ITEMS[id];
         const recipe = G.ACTION_BY_ID['smith_' + id];
         const on = me.state.equipment.weapon === id;
@@ -488,11 +496,11 @@
           h('div', { class: 'slot-info' }, h('small', {}, on ? 'Fitted' : `${num(have(id))} owned · Weaponsmithing ${recipe.level}`), h('b', {}, it.name), statsLine(it)),
           have(id) && !on ? h('button', { type: 'button', class: 'btn small primary', onclick: () => act('/api/equip', { item: id }, `${it.name} fitted.`) }, 'Fit') : null);
       }))));
-    }
-    if (sk.dtype) {
-      body.push(section('Against the bosses', 'Bosses take more damage from some types and shrug off others.', h('div', { class: 'list' }, G.RAIDS.map(r => {
-        const m = r.res[sk.dtype] || 1;
-        return h('div', { class: 'row' }, h('span', { class: 'ico lg boss-ico', 'aria-hidden': 'true', html: I.boss(r.id) }),
+    });
+    if (sk.role !== 'healer') {
+      body.push(section('Against the bosses', 'Bosses take more damage from some styles and shrug off others.', h('div', { class: 'list' }, G.RAIDS.map(r => {
+        const m = r.res[sk.role] || 1;
+        return h('div', { class: 'row' }, bossArt(r.id, 'boss-ico'),
           h('div', { class: 'grow' }, h('div', { class: 'name' }, r.name), h('small', {}, `Tier ${r.tier}`)),
           h('span', { class: m > 1 ? 'ok' : m < 1 ? 'bad' : 'muted' }, m > 1 ? `Weak: +${Math.round((m - 1) * 100)}%` : m < 1 ? `Resists: ${Math.round((m - 1) * 100)}%` : 'Neutral'));
       }))));
@@ -506,7 +514,7 @@
     const out = G.ITEMS[a.item];
     const inputs = Object.entries(a.inputs);
     let yieldText = null;
-    if (a.skill === 'scrapping') {
+    if (a.skill === 'salvaging') {
       const [lo, hi] = a.outputs.scrap;
       yieldText = `${lo}–${hi} scrap, ${Math.round(a.chance[0].p * 100)}% circuit`;
     }
@@ -519,7 +527,7 @@
       locked
         ? h('div', { class: 'card-xp' }, ui('lock', 'sm'), `Level ${a.level}`)
         : h('div', { class: 'card-xp' }, `${a.xp} XP`),
-      out.type === 'gear' ? statsLine(out) : out.boost ? h('div', { class: 'stats-line' }, h('span', { class: 'stat-pct' }, out.desc.replace('Raid supply: ', ''))) : null,
+      out.type === 'gear' ? statsLine(out) : out.boost ? h('div', { class: 'stats-line' }, h('span', { class: 'stat-pct' }, out.desc.replace('Raid tonic: ', ''))) : null,
       inputs.length ? h('div', { class: 'needs' }, inputs.map(([id, n]) =>
         h('span', { class: `need${have(id) < n ? ' short' : ''}`, title: G.ITEMS[id].name }, itemIco(id, 'sm'), String(n), h('small', {}, `/${fmt(have(id))}`)))) : null,
       h('div', { class: 'card-foot' }, h('span', {}, yieldText || `Owned: ${fmt(have(a.item))}`), active ? h('span', { class: 'ok' }, 'Running') : null),
@@ -528,17 +536,12 @@
 
   async function toggleAction(a) {
     const active = me.state.activity && me.state.activity.id === a.id;
-    await act(active ? '/api/action/stop' : '/api/action/start', active ? {} : { id: a.id });
+    await act(active ? '/api/action/stop' : '/api/action/start', active ? {} : { id: a.id }, !active && raiding() ? 'Raid stopped. Training instead.' : null);
   }
 
   // Hangar
   function roleLine(s) {
-    const role = G.ROLES[s.role];
-    const chip = h('span', { class: 'role-chip' }, role.name);
-    chip.style.setProperty('--role', role.colour);
-    return h('div', { class: 'stats-line left' }, chip,
-      s.role === 'striker' ? h('span', { class: 'dtype-' + s.dtype }, `${G.DTYPE_BY_ID[s.dtype].name} damage`) : null,
-      h('span', { class: 'muted' }, `Trains ${G.SKILL_BY_ID[s.skill].name}`));
+    return h('div', { class: 'stats-line left' }, roleChip(s.role, s.stance), h('span', { class: 'muted' }, `Trains ${G.SKILL_BY_ID[s.skill].name}`));
   }
 
   function hangarPage() {
@@ -548,30 +551,30 @@
       .sort((x, y) => G.ITEMS[y].tier - G.ITEMS[x].tier);
     const supplies = Object.values(G.ITEMS).filter(it => it.supply);
     return [
-      pageHead('hangar', 'skill-shielding', me.player.mech, `Piloted by ${me.player.name}. Your weapon decides your role in a raid and which combat skill you train.`),
+      pageHead('hangar', 'skill-melee', me.player.mech, `Piloted by ${me.player.name}. Your weapon decides your combat class and which combat skill you train.`),
       h('div', { class: 'hangar' },
-        h('div', { class: 'panel' }, mechSvg(me.player.colour, eq), roleLine(s),
+        h('div', { class: 'panel hangar-mech' }, h('div', { class: 'hangar-stage' }, mechArt(me.player.colour, eq, `${me.player.mech}, your mech`)), roleLine(s),
           h('div', { class: 'mech-stats' },
-            h('div', { class: 'mech-stat' }, h('b', { class: s.role === 'mechanic' ? 'stat-hp' : 'stat-atk' }, num(s.atk)), h('small', {}, s.role === 'mechanic' ? 'Heal/s' : 'Damage/s')),
+            h('div', { class: 'mech-stat' }, h('b', { class: s.role === 'healer' ? 'stat-hp' : 'stat-atk' }, num(s.atk)), h('small', {}, s.role === 'healer' ? 'Heal/s' : 'Damage/s')),
             h('div', { class: 'mech-stat' }, h('b', { class: 'stat-def' }, num(s.def)), h('small', {}, 'Defence')),
             h('div', { class: 'mech-stat' }, h('b', { class: 'stat-hp' }, num(s.hp)), h('small', {}, 'Hull')),
             h('div', { class: 'mech-stat' }, h('b', {}, num(G.power(s))), h('small', {}, 'Power')))),
         h('div', {},
-          section('Fitted parts', null, h('div', { class: 'slot-list' }, G.SLOTS.map(slot => {
+          section('Fitted gear', raiding() ? 'Changes take effect from your next fight.' : null, h('div', { class: 'slot-list' }, G.SLOTS.map(slot => {
             const it = eq[slot.id] && G.ITEMS[eq[slot.id]];
             return h('div', { class: `slot${it ? '' : ' empty-slot'}` },
-              it ? itemIco(it.id) : h('span', { class: 'ico', 'aria-hidden': 'true', html: I.item(slot.id === 'weapon' ? 'autocannon' : slot.id, '#5d6575') }),
+              it ? itemIco(it.id) : h('span', { class: 'ico', 'aria-hidden': 'true', html: I.item(slot.id === 'weapon' ? 'blade' : slot.id, '#5d6575') }),
               h('div', { class: 'slot-info' }, h('small', {}, slot.name), h('b', {}, it ? it.name : 'Empty'), statsLine(it)),
               it ? h('button', { type: 'button', class: 'btn small', onclick: () => act('/api/unequip', { slot: slot.id }) }, 'Remove') : null);
           }))),
-          section('Raid supplies', 'Ticked supplies go into every raid while you have them. Kits are only used when needed; boosts are used up each raid.',
+          section('Raid supplies', 'Ticked supplies go into every fight while you have them. Kits are only used when needed; tonics are used up each fight.',
             h('div', { class: 'slot-list' }, supplies.map(it => {
               const on = me.state.supplies[it.id] !== false;
               const box = h('input', { type: 'checkbox', checked: on, 'aria-label': `Bring ${it.name}`, onchange: e => act('/api/supplies', { item: it.id, on: e.target.checked }) });
               return h('label', { class: `slot supply${on ? '' : ' off'}` }, box, itemIco(it.id),
                 h('div', { class: 'slot-info' }, h('small', {}, `${num(have(it.id))} owned`), h('b', {}, it.name), h('span', { class: 'muted small' }, it.desc)));
             }))),
-          section('Gear in storage', gear.length ? null : 'Forge weapons, fabricate parts, trade for them, or build core modules in Engineering.',
+          section('Gear in storage', gear.length ? null : 'Forge weapons and armour, trade for them, or craft core modules.',
             gear.length ? h('div', { class: 'slot-list' }, gear.map(id => {
               const it = G.ITEMS[id];
               return h('div', { class: 'slot' }, itemIco(id),
@@ -594,7 +597,7 @@
     if (invSelected && !me.state.items[invSelected]) invSelected = null;
     const filters = [['all', 'All'], ['resource', 'Resources'], ['material', 'Raid materials'], ['consumable', 'Consumables'], ['gear', 'Gear']];
     return [
-      pageHead('inventory', 'skill-engineering', 'Inventory', `${plural(ids.length, 'kind')} of item in storage. Select one to see what it’s for.`),
+      pageHead('inventory', 'skill-crafting', 'Inventory', `${plural(ids.length, 'kind')} of item in storage. Select one to see what it’s for.`),
       h('div', { class: 'chips', role: 'group', 'aria-label': 'Filter items' }, filters.map(([id, name]) =>
         h('button', { type: 'button', class: 'chip', 'aria-pressed': String(invFilter === id), onclick: () => { invFilter = id; renderPage(); } }, name))),
       h('div', { class: 'inv section' },
@@ -603,7 +606,7 @@
             type: 'button', class: 'tile', title: G.ITEMS[id].name, 'aria-label': `${G.ITEMS[id].name}, ${have(id)}`,
             'aria-pressed': String(invSelected === id), onclick: () => { invSelected = id; renderPage(); },
           }, itemIco(id), h('span', { class: 'qty' }, fmt(have(id))))))
-          : h('div', { class: 'empty' }, 'Nothing here yet. Start Scrapping to find your first materials.'),
+          : h('div', { class: 'empty' }, 'Nothing here yet. Start Salvaging to find your first materials.'),
         itemDetail(invSelected)),
     ];
   }
@@ -630,27 +633,30 @@
 
   function resChips(r) {
     return h('div', { class: 'res-chips' }, Object.entries(r.res).sort((a, b) => b[1] - a[1]).map(([d, m]) =>
-      h('span', { class: `res-chip ${m > 1 ? 'weak' : 'resist'}` }, `${m > 1 ? 'Weak' : 'Resists'}: ${G.DTYPE_BY_ID[d].name} ${m > 1 ? '+' : ''}${Math.round((m - 1) * 100)}%`)));
+      h('span', { class: `res-chip ${m > 1 ? 'weak' : 'resist'}` }, `${m > 1 ? 'Weak' : 'Resists'}: ${G.STYLE_BY_ID[d].name} ${m > 1 ? '+' : ''}${Math.round((m - 1) * 100)}%`)));
   }
 
   function raidsPage() {
+    const battle = createBattle();
     const partyBox = h('div');
     const openBox = h('div');
     const cards = h('div', { class: 'raid-grid' });
     const history = h('div');
-    const s = myStats();
-    const pw = G.power(s);
     let data = { party: null, open: [] };
 
     function drawCards() {
+      const s = myStats();
+      const pw = G.power(s);
+      const a = me.state.activity;
       cards.replaceChildren(...G.RAIDS.map(r => {
         const tier = G.TIERS[r.tier - 1];
         const ratio = pw / r.recommended;
         const cls = ratio >= 1 ? 'ok' : ratio >= 0.8 ? 'warn' : 'bad';
-        const mult = s.dtype ? r.res[s.dtype] || 1 : 1;
-        const card = h('article', { class: 'raid' },
+        const mult = s.role !== 'healer' ? r.res[s.role] || 1 : 1;
+        const here = a && a.type === 'raid' && a.raid === r.id;
+        const card = h('article', { class: `raid${here ? ' fighting' : ''}` },
           h('div', { class: 'raid-top' },
-            h('span', { class: 'boss-portrait', 'aria-hidden': 'true', html: I.boss(r.id) }),
+            h('span', { class: 'boss-portrait' }, bossArt(r.id)),
             h('div', { class: 'raid-title' }, h('span', { class: 'tier' }, `Tier ${r.tier} · ${tier.name}`), h('h3', {}, r.name),
               h('small', { class: 'muted' }, `${r.moves.basic} · ${r.moves.sweep} every ${G.BOSS_MOVES.sweepEvery}th attack`))),
           h('p', {}, r.desc),
@@ -660,12 +666,13 @@
             h('div', {}, h('b', { class: 'stat-atk' }, num(r.boss.dps)), h('small', {}, 'Damage/s')),
             h('div', {}, h('b', { class: 'stat-def' }, num(r.boss.def)), h('small', {}, 'Defence'))),
           h('div', { class: 'power-check' }, h('span', {}, `Recommended power ${num(r.recommended)}`), h('span', { class: cls }, `Yours ${num(pw)}`)),
-          s.role === 'striker' && mult !== 1 ? h('div', { class: 'power-check' }, h('span', { class: 'muted' }, `Your ${G.DTYPE_BY_ID[s.dtype].name.toLowerCase()} weapon`), h('span', { class: mult > 1 ? 'ok' : 'bad' }, `${mult > 1 ? '+' : ''}${Math.round((mult - 1) * 100)}% damage`)) : null,
-          h('div', { class: 'power-check' }, h('span', { class: 'muted' }, `Costs ${plural(r.cells, 'power cell')} each`), h('span', { class: have('power_cell') >= r.cells ? 'ok' : 'bad' }, `You have ${num(have('power_cell'))}`)),
-          h('div', {}, h('small', { class: 'muted' }, 'Drops'), h('div', { class: 'drops' }, r.drops.map(d =>
+          mult !== 1 ? h('div', { class: 'power-check' }, h('span', { class: 'muted' }, `Your ${G.ROLES[s.role].name.toLowerCase()} weapon`), h('span', { class: mult > 1 ? 'ok' : 'bad' }, `${mult > 1 ? '+' : ''}${Math.round((mult - 1) * 100)}% damage`)) : null,
+          h('div', {}, h('small', { class: 'muted' }, 'Drops on a win'), h('div', { class: 'drops' }, r.drops.map(d =>
             h('span', { class: 'need', title: G.ITEMS[d.item].name }, itemIco(d.item, 'sm'), `${d.qty[0]}–${d.qty[1]}${d.p ? ` (${Math.round(d.p * 100)}%)` : ''}`)))),
           h('div', { class: 'actions' },
-            h('button', { type: 'button', class: 'btn primary', disabled: have('power_cell') < r.cells, onclick: () => solo(r) }, 'Raid solo'),
+            here
+              ? h('button', { type: 'button', class: 'btn danger', onclick: stopRaid }, 'Stop fighting')
+              : h('button', { type: 'button', class: 'btn primary', onclick: () => startSolo(r) }, 'Fight'),
             h('button', { type: 'button', class: 'btn', disabled: !!data.party, onclick: () => partyAct('/api/party/create', { raid: r.id }, 'Party formed. Friends and guildmates can now join.') }, 'Form a party')));
         card.style.setProperty('--tier', tier.colour);
         return card;
@@ -678,39 +685,41 @@
       else {
         const raid = G.RAID_BY_ID[p.raid];
         const leader = p.leader === me.player.id;
-        partyBox.replaceChildren(section('Your party', `Breaks up ${fmtTime(p.expires - now())} from now if not launched.`,
+        const note = p.running ? `Raiding now · fight ${p.running.n}` : `Breaks up ${fmtTime(p.expires - now())} from now if not started.`;
+        partyBox.replaceChildren(section('Your party', note,
           h('div', { class: 'panel party' },
-            h('div', { class: 'raid-top' }, h('span', { class: 'boss-portrait small', 'aria-hidden': 'true', html: I.boss(raid.id) }),
+            h('div', { class: 'raid-top' }, h('span', { class: 'boss-portrait small' }, bossArt(raid.id)),
               h('div', { class: 'raid-title' }, h('span', { class: 'tier' }, `Tier ${raid.tier}`), h('h3', {}, raid.name)),
               h('span', { class: 'muted' }, `${p.members.length} / ${G.PARTY_MAX} pilots`)),
             h('div', { class: 'member-list' }, p.members.map(m => memberRow(m, m.id === p.leader ? 'Leader' : null))),
-            h('p', { class: 'muted' }, `Each pilot needs ${plural(raid.cells, 'power cell')}. The boss gets tougher with every pilot, but its hits get shared out. Mix in a Mechanic or Tactician.`),
+            h('p', { class: 'muted' }, 'The boss gets tougher with every pilot, but its attacks get shared out. A tank draws its attacks and a healer keeps everyone standing. Fights repeat until the leader stops them.'),
             h('div', { class: 'actions' },
-              leader ? h('button', { type: 'button', class: 'btn primary', onclick: startParty }, 'Launch raid') : h('span', { class: 'muted' }, 'Waiting for the leader to launch.'),
+              leader && !p.running ? h('button', { type: 'button', class: 'btn primary', onclick: () => partyAct('/api/party/start', {}, 'Party raid started.') }, 'Start raiding') : null,
+              leader && p.running ? h('button', { type: 'button', class: 'btn', onclick: () => partyAct('/api/party/stop', {}, 'Party raid stopped.') }, 'Stop raiding') : null,
+              !leader ? h('span', { class: 'muted' }, p.running ? 'Fighting with the party.' : 'Waiting for the leader to start.') : null,
               h('button', { type: 'button', class: 'btn danger', onclick: () => partyAct('/api/party/leave', {}, leader ? 'Party disbanded.' : 'You left the party.') }, leader ? 'Disband' : 'Leave')))));
       }
-      openBox.replaceChildren(section('Open parties', 'Parties led by your friends and guildmates.',
+      openBox.replaceChildren(section('Open parties', 'Parties led by your friends and guildmates. Joining a running party puts you straight into its next fight.',
         data.open.length ? h('div', { class: 'list' }, data.open.map(o => {
           const raid = G.RAID_BY_ID[o.raid];
           const lead = o.members.find(m => m.id === o.leader) || o.members[0];
           return h('div', { class: 'row' },
-            h('span', { class: 'ico lg boss-ico', 'aria-hidden': 'true', html: I.boss(raid.id) }),
-            h('div', { class: 'grow' }, h('div', { class: 'name' }, `${lead ? lead.name : 'Someone'}’s party`), h('small', {}, `${raid.name} · ${o.members.length}/${G.PARTY_MAX} pilots`)),
+            bossArt(raid.id, 'boss-ico'),
+            h('div', { class: 'grow' }, h('div', { class: 'name' }, `${lead ? lead.name : 'Someone'}’s party`), h('small', {}, `${raid.name} · ${o.members.length}/${G.PARTY_MAX} pilots${o.running ? ' · raiding now' : ''}`)),
             h('button', { type: 'button', class: 'btn small primary', disabled: !!data.party, onclick: () => partyAct('/api/party/join', { id: o.id }, 'Joined the party.') }, 'Join'));
-        })) : h('div', { class: 'empty' }, 'No open parties right now. Form one below, or add friends and join a guild to see theirs.')));
+        })) : h('div', { class: 'empty' }, 'No open parties right now. Form one from a boss below, or add friends and join a guild to see theirs.')));
     }
 
     function drawHistory() {
       const log = me.state.raidLog;
-      history.replaceChildren(section('Recent raids', null, log.length ? h('div', { class: 'history' }, log.slice(0, 10).map(e => {
+      history.replaceChildren(section('Recent fights', null, log.length ? h('div', { class: 'history' }, log.slice(0, 10).map(e => {
         const raid = G.RAID_BY_ID[e.raid];
         return h('div', { class: 'history-row' },
-          h('span', { class: 'ico lg boss-ico', 'aria-hidden': 'true', html: I.boss(raid.id) }),
+          bossArt(raid.id, 'boss-ico'),
           h('span', { class: `result ${e.win ? 'ok' : 'bad'}` }, e.win ? 'Victory' : 'Defeat'),
-          h('div', { class: 'what' }, h('div', {}, raid.name), h('small', {}, `${e.party.length > 1 ? e.party.join(', ') : 'Solo'} · ${e.ms ? fmtTime(e.ms) : `${e.rounds} rounds`} · ${ago(e.at)}`)),
-          h('span', { class: 'loot' }, h('span', { class: 'skill-kinetic' }, xpText(e.xp)), Object.entries(e.loot).map(([id, n]) => h('span', { title: G.ITEMS[id].name }, itemIco(id, 'sm'), num(n)))),
-          e.runId ? h('button', { type: 'button', class: 'btn small', onclick: () => watchReplay(e.runId) }, ui('replay', 'sm'), 'Replay') : null);
-      })) : h('div', { class: 'empty' }, 'No raids yet. Forge an iron weapon, fabricate iron parts, build some power cells, then take on the Scrapyard Warden.')));
+          h('div', { class: 'what' }, h('div', {}, raid.name), h('small', {}, `${e.party.length > 1 ? e.party.join(', ') : 'Solo'} · ${fmtTime(e.ms || 0)} · ${ago(e.at)}`)),
+          h('span', { class: 'loot' }, h('span', { class: 'skill-ranged' }, xpText(e.xp)), Object.entries(e.loot).map(([id, n]) => h('span', { title: G.ITEMS[id].name }, itemIco(id, 'sm'), num(n)))));
+      })) : h('div', { class: 'empty' }, 'No fights yet. Forge an iron weapon, fit some iron armour, then take on the Warden.')));
     }
 
     async function load() {
@@ -722,25 +731,27 @@
       } catch (e) { /* shown on next action */ }
     }
     async function partyAct(path, body, msg) {
-      if (await act(path, body, msg)) load();
+      if (await act(path, body, msg)) { await poll(); load(); battle.sync(); }
     }
-    async function solo(r) {
-      const res = await act('/api/raid/solo', { raid: r.id });
-      if (res) { openRaidView(res.result); load(); }
+    async function startSolo(r) {
+      if (await act('/api/raid/start', { raid: r.id }, `Fighting ${r.name}. Fights repeat until you stop.`)) { load(); battle.sync(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
     }
-    async function startParty() {
-      const res = await act('/api/party/start', {});
-      if (res) { openRaidView(res.result); load(); }
+    async function stopRaid() {
+      if (await act('/api/action/stop', {}, 'Stopped fighting.')) { load(); battle.sync(); }
     }
+    battle.onStop = stopRaid;
 
     pageRefresh = load;
+    pageTick = () => { battle.sync(); drawHistory(); };
+    pageCleanup = () => battle.destroy();
     drawCards();
     drawParty();
     drawHistory();
     load();
+    battle.sync();
     return [
-      pageHead('raids', 'skill-thermal', 'Raids', 'Take your mech into boss fights, alone or with friends and guildmates. Each boss drops the material you need to build the next tier.'),
-      partyBox, openBox, section('Bosses', 'Win or lose, each pilot burns their power cells and earns combat XP for their weapon, plus Shielding.', cards), history,
+      pageHead('raids', 'skill-melee', 'Raids', 'Pick a boss and press Fight. Fights repeat on their own, even while you’re away, until you stop or start a skill. Each boss drops the material you need for the next tier.'),
+      battle.el, partyBox, openBox, section('Bosses', 'Win or lose, you earn combat XP for your weapon’s skill. No entry cost.', cards), history,
     ];
   }
 
@@ -752,37 +763,56 @@
       h('small', {}, `Power ${num(m.power)}`));
   }
 
-  // ---------- Live raid view ----------
-  // Replays a fight's timeline in real time. Each cast bar fills from its cast event to the
-  // moment its hit lands, so bars and damage numbers stay in step.
+  // ---------- Battle panel ----------
+  // Plays the current fight inside the Raids page, in step with the server's clock. The server
+  // decides each fight up front; the panel replays its timeline, so every cast bar finishes
+  // on the exact frame its hit or heal lands.
   const SERIES = ['#5b9bff', '#f2c14e', '#3ddc84', '#ef5a45'];
-  let raidView = null;
+  const fmtClock = ms => {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  };
 
-  async function watchReplay(runId) {
-    try {
-      const r = await api('/api/raid/replay?id=' + runId);
-      openRaidView(r.result);
-    } catch (e) { toast(e.message, 'error'); }
-  }
-
-  function openRaidView(result) {
-    if (raidView) raidView.close();
-    const raid = G.RAID_BY_ID[result.raid];
-    const events = result.events;
-    const endT = events[events.length - 1].t;
-    const entry = me.state.raidLog.find(e => e.runId === result.runId) || (result.perPlayer && result.perPlayer[me.player.id]);
-    if (entry) lastRaidAt = Math.max(lastRaidAt, entry.at);
+  function createBattle() {
+    const root = h('section', { class: 'battle', 'aria-label': 'Current raid fight' });
     const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const api_ = { el: root, sync, destroy, onStop: null };
+    let cur = null, raf = 0, fetching = false, idx = 0, quiet = false, asked = false;
+    let party = [], boss = null, dealt = [], healed = [], buckets = [], meterRows = [], lastMeter = 0, lastSec = -1;
+    let clockEl, statusEl, meter, graph, footer;
 
-    // Units: pilots on the left, the boss on the right.
-    function makeUnit(name, sub, art, max, boss) {
+    function destroy() { cancelAnimationFrame(raf); }
+
+    function idle() {
+      cancelAnimationFrame(raf);
+      cur = null;
+      root.classList.add('idle');
+      root.replaceChildren(
+        h('div', { class: 'battle-empty' },
+          h('div', { class: 'battle-empty-art' }, mechArt(me.player.colour, me.state.equipment, 'Your mech'), h('span', { class: 'vs' }, 'VS'), h('span', { class: 'unknown' }, '?')),
+          h('div', {}, h('h2', {}, 'No fight running'), h('p', { class: 'muted' }, 'Choose a boss below and press Fight, or join a party. Your fights play out here.'))));
+    }
+
+    async function sync() {
+      const a = me && me.state.activity;
+      if (!a || !a.type) { if (cur || !root.firstChild) idle(); return; }
+      if (cur && cur.n === a.n && cur.start === a.start) { drawFooter(); return; }
+      if (fetching) return;
+      fetching = true;
+      try {
+        const r = await api('/api/raid/current');
+        if (r.current) load(r.current); else idle();
+      } catch (e) { /* retried on the next poll */ } finally { fetching = false; }
+    }
+
+    function makeUnit(name, sub, art, max, big) {
       const floats = h('div', { class: 'floats', 'aria-hidden': 'true' });
       const artBox = h('div', { class: 'unit-art' }, art, floats);
       const hpFill = h('span'), hpText = h('b');
       const castFill = h('span'), castText = h('b', {}, 'Getting ready');
       const castBar = h('div', { class: 'castbar idle' }, castFill, castText);
       const statuses = h('div', { class: 'statuses' });
-      const el = h('div', { class: `unit${boss ? ' boss' : ''}` }, artBox,
+      const el = h('div', { class: `unit${big ? ' big' : ''}` }, artBox,
         h('div', { class: 'unit-info' }, h('div', { class: 'unit-name' }, h('span', {}, name), sub), h('div', { class: 'hpbar' }, hpFill, hpText), castBar, statuses));
       const u = { name, el, artBox, floats, hpFill, hpText, castFill, castText, castBar, statuses, hp: max, max, cast: null, down: false, buffs: {} };
       drawHp(u);
@@ -795,63 +825,74 @@
       u.hpText.textContent = `${num(Math.max(0, u.hp))} / ${num(u.max)}`;
     }
 
-    const fighters = result.fighters.map((f, i) => {
-      const role = G.ROLES[f.role] || G.ROLES.striker;
-      const chip = h('span', { class: 'role-chip' }, role.name);
-      chip.style.setProperty('--role', role.colour);
-      const sub = h('small', {}, chip, f.role === 'striker' && f.dtype ? h('span', { class: 'dtype-' + f.dtype }, ` ${G.DTYPE_BY_ID[f.dtype].name}`) : null);
-      const art = mechSvg(f.colour || '#8d95a5', f.gear || {});
-      art.setAttribute('aria-label', `${f.name}’s mech`);
-      const u = makeUnit(f.name, sub, art, f.max, false);
-      u.el.style.setProperty('--series', SERIES[i]);
-      return u;
-    });
-    const boss = makeUnit(raid.name, h('small', { class: 'tier' }, `Tier ${raid.tier}`), h('span', { class: 'boss-art', html: I.boss(raid.id) }), result.bossMax, true);
-    const unit = k => (k === 'b' ? boss : fighters[k]);
+    function load(c) {
+      cancelAnimationFrame(raf);
+      cur = c;
+      idx = 0;
+      asked = false;
+      lastSec = -1;
+      const f = c.fight;
+      const raid = G.RAID_BY_ID[f.raid];
+      root.classList.remove('idle');
 
-    // Damage meter and graph.
-    const dealt = fighters.map(() => 0), healed = fighters.map(() => 0);
-    const buckets = fighters.map(() => []);
-    const meterRows = result.fighters.map((f, i) => {
-      const fill = h('span'), val = h('span', { class: 'meter-val' });
-      fill.style.background = SERIES[i];
-      const row = h('div', { class: 'meter-row' }, h('div', { class: 'meter-name' }, h('span', { class: 'swatch-dot' }), f.name, val), h('div', { class: 'meter-bar' }, fill));
-      row.querySelector('.swatch-dot').style.background = SERIES[i];
-      return { row, fill, val, i };
-    });
-    const meter = h('div', { class: 'meter' }, meterRows.map(r => r.row));
-    const graph = h('div', { class: 'graph', role: 'img', 'aria-label': 'Damage per second over time for each pilot' });
-    const legend = h('div', { class: 'legend' }, result.fighters.map((f, i) => {
-      const d = h('span', { class: 'swatch-dot' });
-      d.style.background = SERIES[i];
-      return h('span', {}, d, f.name);
-    }));
+      party = f.fighters.map((p, i) => {
+        const u = makeUnit(p.name, roleChip(p.role, p.stance), mechArt(p.colour || '#8d95a5', p.gear || {}, `${p.name}’s mech`), p.max, false);
+        u.el.style.setProperty('--series', SERIES[i]);
+        u.stance = p.stance;
+        return u;
+      });
+      boss = makeUnit(raid.name, h('span', { class: 'tier' }, `Tier ${raid.tier}`), bossArt(raid.id), f.bossMax, true);
+      dealt = f.fighters.map(() => 0);
+      healed = f.fighters.map(() => 0);
+      buckets = f.fighters.map(() => []);
+      meterRows = f.fighters.map((p, i) => {
+        const fill = h('span'), val = h('span', { class: 'meter-val' });
+        fill.style.background = SERIES[i];
+        const dot = h('span', { class: 'swatch-dot' });
+        dot.style.background = SERIES[i];
+        return { row: h('div', { class: 'meter-row' }, h('div', { class: 'meter-name' }, dot, p.name, val), h('div', { class: 'meter-bar' }, fill)), fill, val, i };
+      });
+      meter = h('div', { class: 'meter' }, meterRows.map(r => r.row));
+      graph = h('div', { class: 'graph', role: 'img', 'aria-label': 'Damage per second over time for each pilot' });
+      const legend = h('div', { class: 'legend' }, f.fighters.map((p, i) => {
+        const d = h('span', { class: 'swatch-dot' });
+        d.style.background = SERIES[i];
+        return h('span', {}, d, p.name);
+      }));
+      clockEl = h('span', { class: 'battle-clock' }, '0:00');
+      statusEl = h('span', { class: 'battle-status' });
+      footer = h('footer', { class: 'battle-foot' });
+      root.replaceChildren(
+        h('header', { class: 'battle-head' },
+          h('div', { class: 'battle-title' }, h('span', { class: 'tier' }, `Tier ${raid.tier} · ${c.party ? 'Party raid' : 'Solo raid'} · Fight ${c.n}`), h('h2', {}, raid.name)),
+          statusEl, clockEl,
+          h('button', { type: 'button', class: 'btn small danger', onclick: () => api_.onStop && api_.onStop() }, !c.party ? 'Stop fighting' : c.leader === me.player.id ? 'Stop party raid' : 'Leave party')),
+        h('div', { class: 'battle-grid' },
+          h('div', { class: 'battle-cell' }, h('h3', {}, c.party ? 'Your party' : 'You'), h('div', { class: 'unit-list' }, party.map(u => u.el))),
+          h('div', { class: 'battle-cell enemy' }, h('h3', {}, 'Enemy'), boss.el),
+          h('div', { class: 'battle-cell' }, h('h3', {}, 'Damage meter'), meter),
+          h('div', { class: 'battle-cell' }, h('h3', {}, 'Damage per second'), graph, legend)),
+        footer);
+      drawFooter();
 
-    const clockEl = h('span', { class: 'rv-clock' }, '0:00');
-    const speedBtn = h('button', { type: 'button', class: 'btn small', onclick: () => { speed = speed >= 4 ? 1 : speed * 2; speedBtn.textContent = `${speed}× speed`; } }, '1× speed');
-    const skipBtn = h('button', { type: 'button', class: 'btn small', onclick: skip }, ui('skip', 'sm'), 'Skip to end');
-    const resultBox = h('div', { class: 'rv-result', hidden: true, 'aria-live': 'polite' });
+      // Joining mid-fight: catch up silently to the current moment.
+      const clock = now() - c.start;
+      quiet = true;
+      while (idx < f.events.length && f.events[idx].t <= clock) apply(f.events[idx++], clock);
+      quiet = false;
+      drawMeter(clock);
+      drawGraph(clock);
+      raf = requestAnimationFrame(tick);
+    }
 
-    const view = h('div', { class: 'rv', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'rv-title' },
-      h('div', { class: 'rv-inner' },
-        h('header', { class: 'rv-head' },
-          h('div', {}, h('span', { class: 'tier' }, `Raid · tier ${raid.tier}`), h('h2', { id: 'rv-title' }, raid.name)),
-          clockEl,
-          h('div', { class: 'actions' }, speedBtn, skipBtn, h('button', { type: 'button', class: 'btn small', onclick: () => close() }, ui('close', 'sm'), 'Close'))),
-        resultBox,
-        h('div', { class: 'rv-arena' },
-          h('div', { class: `rv-party n${fighters.length}` }, fighters.map(u => u.el)),
-          h('div', { class: 'rv-vs', 'aria-hidden': 'true' }, 'VS'),
-          h('div', { class: 'rv-enemy' }, boss.el)),
-        h('div', { class: 'rv-meters' },
-          h('section', { class: 'panel' }, h('h3', {}, 'Damage meter'), meter),
-          h('section', { class: 'panel' }, h('h3', {}, 'Damage per second'), graph, legend))));
-    document.body.append(view);
-    document.body.classList.add('no-scroll');
-    const lastFocus = document.activeElement;
-    skipBtn.focus();
-
-    let clock = 0, speed = 1, idx = 0, lastFrame = performance.now(), raf = 0, lastMeter = 0, lastSec = -1, finished = false, quiet = false;
+    function drawFooter() {
+      if (!footer) return;
+      const e = me.state.raidLog[0];
+      if (!e) { footer.replaceChildren(h('span', { class: 'muted' }, 'Loot and XP from each fight show here and in Recent fights.')); return; }
+      footer.replaceChildren(h('span', { class: 'muted' }, 'Last fight:'), h('b', { class: e.win ? 'ok' : 'bad' }, e.win ? 'Victory' : 'Defeat'),
+        h('span', { class: 'skill-ranged' }, xpText(e.xp)),
+        ...Object.entries(e.loot || {}).map(([id, n]) => h('span', { class: 'pill', title: G.ITEMS[id].name }, itemIco(id, 'sm'), `+${num(n)}`)));
+    }
 
     function float(u, text, cls) {
       if (quiet) return;
@@ -866,17 +907,13 @@
       void u.artBox.offsetWidth; // restart the animation
       u.artBox.classList.add(cls);
     }
+    const unit = k => (k === 'b' ? boss : party[k]);
     function castLabel(e) {
-      if (e.a === 'b') return e.tg === 'all' ? `${e.n} → everyone` : `${e.n} → ${fighters[e.tg].name}`;
-      return typeof e.tg === 'number' ? `${e.n} → ${fighters[e.tg].name}` : e.n;
-    }
-    function drawStatuses(u) {
-      const chips = Object.entries(u.buffs).filter(([, b]) => b.until > clock)
-        .map(([n, b]) => h('span', { class: `status ${b.cls}` }, b.pct ? `${n} ${b.pct}` : n));
-      u.statuses.replaceChildren(...chips);
+      if (e.a === 'b') return e.tg === 'all' ? `${e.n} → everyone` : `${e.n} → ${party[e.tg].name}`;
+      return typeof e.tg === 'number' ? `${e.n} → ${party[e.tg].name}` : e.n;
     }
 
-    function apply(e) {
+    function apply(e, clock) {
       if (e.e === 'cast') {
         const u = unit(e.a);
         u.cast = { start: e.t, d: e.d };
@@ -900,18 +937,10 @@
             const sec = Math.floor(e.t / 1000);
             buckets[e.a][sec] = (buckets[e.a][sec] || 0) + e.v;
           }
-          if (e.k === 'burn') target.buffs.Burning = { until: e.t + 1100, cls: 'burn' };
+          if (e.k === 'burn') target.buffs['Psi burn'] = { until: e.t + 1100, cls: 'burn' };
         }
         drawHp(target);
-        if (e.k !== 'burn' && e.k !== 'kit') {
-          const src = unit(e.a);
-          src.castFill.style.width = '100%';
-        }
-      } else if (e.e === 'buff') {
-        boss.buffs[e.n] = { until: e.until, pct: e.n === 'Jammed' ? `−${e.pct}%` : `+${e.pct}%`, cls: e.n === 'Jammed' ? 'jam' : 'lock' };
-        float(boss, e.n === 'Jammed' ? 'JAMMED' : 'LOCKED', 'tag');
-        const src = unit(e.a);
-        src.castFill.style.width = '100%';
+        if (e.k !== 'burn' && e.k !== 'kit') unit(e.a).castFill.style.width = '100%';
       } else if (e.e === 'down') {
         const u = unit(e.tg);
         u.down = true;
@@ -920,10 +949,24 @@
         u.castBar.classList.add('idle');
         u.castFill.style.width = '0';
         u.castText.textContent = 'Downed';
+      } else if (e.e === 'end') {
+        [...party, boss].forEach(u => { if (!u.down) { u.castBar.classList.add('idle'); u.cast = null; } });
+        if (e.win) { boss.el.classList.add('down'); boss.castText.textContent = 'Destroyed'; }
       }
+      void clock;
     }
 
-    function drawMeter() {
+    function drawStatuses(clock) {
+      const tank = party.find(u => u.stance === 'tank' && !u.down);
+      if (tank) boss.buffs.Taunted = { until: Infinity, cls: 'taunt', label: `Taunted by ${tank.name}` };
+      else delete boss.buffs.Taunted;
+      [...party, boss].forEach(u => {
+        u.statuses.replaceChildren(...Object.entries(u.buffs).filter(([, b]) => b.until > clock)
+          .map(([n, b]) => h('span', { class: `status ${b.cls}` }, b.label || n)));
+      });
+    }
+
+    function drawMeter(clock) {
       const secs = Math.max(1, clock / 1000);
       const dps = dealt.map(d => d / secs);
       const top = Math.max(1, ...dps);
@@ -934,7 +977,7 @@
       });
     }
 
-    function drawGraph() {
+    function drawGraph(clock) {
       const sec = Math.floor(clock / 1000);
       const span = Math.max(20, sec + 4);
       const series = buckets.map(b => {
@@ -947,7 +990,7 @@
         return pts;
       });
       const top = Math.max(10, ...series.flat()) * 1.1;
-      const W = 400, H = 150;
+      const W = 400, H = 140;
       const x = s => (s / span) * W, y = v => H - (v / top) * H;
       const grid = [0.25, 0.5, 0.75].map(f => `<line x1="0" x2="${W}" y1="${H * f}" y2="${H * f}" class="gl"/><text x="4" y="${H * f - 3}" class="gt">${Math.round(top * (1 - f))}</text>`).join('');
       const lines = series.map((pts, i) => `<polyline fill="none" stroke="${SERIES[i]}" stroke-width="2" stroke-linejoin="round" points="${pts.map((v, s) => `${x(s).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}"/>`).join('');
@@ -955,78 +998,33 @@
     }
 
     function tick(t) {
-      const dt = Math.min(100, t - lastFrame);
-      lastFrame = t;
-      clock = Math.min(endT, clock + dt * speed);
-      while (idx < events.length && events[idx].t <= clock) apply(events[idx++]);
-      for (const u of [...fighters, boss]) {
+      if (!cur) return;
+      const f = cur.fight;
+      const clock = Math.min(now() - cur.start, f.ms);
+      while (idx < f.events.length && f.events[idx].t <= clock) apply(f.events[idx++], clock);
+      [...party, boss].forEach(u => {
         if (u.cast && !u.down) u.castFill.style.width = `${Math.min(1, (clock - u.cast.start) / u.cast.d) * 100}%`;
-      }
+      });
       clockEl.textContent = fmtClock(clock);
-      if (t - lastMeter > 200) {
-        lastMeter = t;
-        drawMeter();
-        [...fighters, boss].forEach(drawStatuses);
+      const done = now() - cur.start >= f.ms;
+      if (done) {
+        const next = cur.start + f.ms + G.FIGHT.gapMs - now();
+        statusEl.className = `battle-status ${f.win ? 'ok' : 'bad'}`;
+        statusEl.textContent = `${f.win ? 'Victory' : f.timeout ? 'Out of time' : 'Defeat'} · next fight ${next > 0 ? `in ${Math.ceil(next / 1000)}s` : 'starting'}`;
+        // Ask the server to move on once the gap is over.
+        if (next < -300 && !asked) { asked = true; poll(); }
+      } else {
+        statusEl.className = 'battle-status';
+        statusEl.textContent = 'Fighting';
       }
+      if (t - lastMeter > 200) { lastMeter = t; drawMeter(clock); drawStatuses(clock); }
       const sec = Math.floor(clock / 1000);
-      if (sec !== lastSec) { lastSec = sec; drawGraph(); }
-      if (idx >= events.length) finish();
-      else raf = requestAnimationFrame(tick);
+      if (sec !== lastSec) { lastSec = sec; drawGraph(clock); }
+      raf = requestAnimationFrame(tick);
     }
 
-    function skip() {
-      quiet = true;
-      clock = endT;
-      while (idx < events.length) apply(events[idx++]);
-      quiet = false;
-      finish();
-    }
-
-    function finish() {
-      if (finished) return;
-      finished = true;
-      cancelAnimationFrame(raf);
-      clock = endT;
-      clockEl.textContent = fmtClock(clock);
-      drawMeter();
-      drawGraph();
-      [...fighters, boss].forEach(u => { if (!u.down) { u.castBar.classList.add('idle'); u.castText.textContent = u === boss && result.win ? 'Destroyed' : 'Standing'; } drawStatuses(u); });
-      if (result.win) boss.el.classList.add('down');
-      skipBtn.hidden = true;
-      speedBtn.hidden = true;
-      const loot = entry ? Object.entries(entry.loot || {}) : [];
-      resultBox.replaceChildren(
-        h('div', { class: `rv-banner ${result.win ? 'ok' : 'bad'}` }, result.win ? 'Victory' : result.timeout ? 'Out of time' : 'Defeat'),
-        h('div', { class: 'rv-rewards' },
-          h('span', { class: 'muted' }, fmtTime(endT)),
-          entry ? h('span', { class: 'skill-kinetic' }, xpText(entry.xp)) : null,
-          loot.map(([id, n]) => h('span', { class: 'pill', title: G.ITEMS[id].name }, itemIco(id, 'sm'), `+${num(n)} ${G.ITEMS[id].name}`)),
-          !result.win ? h('span', { class: 'muted' }, 'No loot this time. Try a weapon the boss is weak to, bring repair kits and boosts, or bring a party.') : null));
-      resultBox.hidden = false;
-    }
-
-    function close() {
-      cancelAnimationFrame(raf);
-      view.remove();
-      document.body.classList.remove('no-scroll');
-      document.removeEventListener('keydown', onKey);
-      raidView = null;
-      if (lastFocus && lastFocus.focus) lastFocus.focus();
-      if (page === 'raids') renderPage();
-    }
-    function onKey(e) { if (e.key === 'Escape') close(); }
-    document.addEventListener('keydown', onKey);
-
-    drawGraph();
-    drawMeter();
-    raidView = { close };
-    raf = requestAnimationFrame(t => { lastFrame = t; tick(t); });
+    return api_;
   }
-
-  const fmtClock = ms => {
-    const s = Math.floor(ms / 1000);
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-  };
 
   // Trade
   let tradePrefill = null;

@@ -18,7 +18,6 @@ const GUILD_MAX = 30;
 const FRIENDS_MAX = 100;
 const OPEN_TRADES_MAX = 10;
 const BODY_LIMIT = 16 * 1024;
-const RUN_TTL = 48 * 3600 * 1000; // how long raid replays are kept
 
 // ---------- Database ----------
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -38,13 +37,16 @@ db.exec(`
     name TEXT NOT NULL, text TEXT NOT NULL, at INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS trades (id INTEGER PRIMARY KEY, from_id INTEGER NOT NULL, to_id INTEGER NOT NULL,
     give TEXT NOT NULL, want TEXT NOT NULL, status TEXT NOT NULL, created INTEGER NOT NULL, updated INTEGER NOT NULL);
-  CREATE TABLE IF NOT EXISTS parties (id INTEGER PRIMARY KEY, leader_id INTEGER NOT NULL, raid TEXT NOT NULL, created INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS parties (id INTEGER PRIMARY KEY, leader_id INTEGER NOT NULL, raid TEXT NOT NULL, created INTEGER NOT NULL, session TEXT);
   CREATE TABLE IF NOT EXISTS party_members (party_id INTEGER NOT NULL, player_id INTEGER NOT NULL UNIQUE, joined INTEGER NOT NULL);
-  CREATE TABLE IF NOT EXISTS raid_runs (id INTEGER PRIMARY KEY, created INTEGER NOT NULL, players TEXT NOT NULL, data TEXT NOT NULL);
   CREATE INDEX IF NOT EXISTS guild_chat_guild ON guild_chat (guild_id, id);
   CREATE INDEX IF NOT EXISTS trades_to ON trades (to_id, status);
   CREATE INDEX IF NOT EXISTS trades_from ON trades (from_id, status);
 `);
+
+// Added after launch: a running party raid's session. Existing databases get the column here.
+try { db.exec('ALTER TABLE parties ADD COLUMN session TEXT'); } catch (e) { /* already there */ }
+db.exec('DROP TABLE IF EXISTS raid_runs');
 
 const stmts = new Map();
 const q = sql => {
@@ -84,7 +86,6 @@ setInterval(() => {
   const now = Date.now();
   for (const [k, list] of hits) if (!list.some(t => now - t < 3600e3)) hits.delete(k);
   q('DELETE FROM sessions WHERE expires < ?').run(now);
-  q('DELETE FROM raid_runs WHERE created < ?').run(now - RUN_TTL);
 }, 600e3).unref();
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
@@ -106,11 +107,20 @@ function loadPlayer(id) {
   return row;
 }
 
-// Loads a player and runs their activity forward to now.
+// Loads a player and runs their activity (a skill, a solo raid or a party raid) forward to now.
 function fresh(id) {
   const p = loadPlayer(id);
   if (!p) bad('That pilot no longer exists.');
-  p.gained = game.advance(p.state, Date.now());
+  const now = Date.now();
+  p.gained = game.advance(p.state, now);
+  const a = p.state.activity;
+  if (a && a.type === 'raid') {
+    game.advanceRaid(a, [p], now, { [p.id]: p.gained });
+  } else if (a && a.type === 'party') {
+    const party = q('SELECT * FROM parties WHERE id = ?').get(a.party);
+    if (party && party.session) advanceParty(party, now, p);
+    else p.state.activity = null;
+  }
   return p;
 }
 
@@ -119,13 +129,23 @@ function savePlayer(p) {
     .run(JSON.stringify(p.state), game.totalLevel(p.state), game.power(p.state), p.id);
 }
 
+// The state as the client sees it: raid sessions are summarised, without the fight timeline.
+function clientState(state) {
+  const a = state.activity;
+  if (!a || !a.type) return state;
+  if (a.type === 'raid') return { ...state, activity: { type: 'raid', ...game.sessionSummary(a) } };
+  const party = q('SELECT session FROM parties WHERE id = ?').get(a.party);
+  const session = party && party.session ? JSON.parse(party.session) : null;
+  return { ...state, activity: { type: 'party', party: a.party, ...game.sessionSummary(session) } };
+}
+
 // Loads, advances, applies fn and saves one player inside a transaction.
 function withPlayer(id, fn) {
   return tx(() => {
     const p = fresh(id);
     const r = fn(p.state, p);
     savePlayer(p);
-    return r === undefined ? { state: p.state } : r;
+    return r === undefined ? { state: clientState(p.state) } : r;
   });
 }
 
@@ -255,7 +275,7 @@ route('GET', '/api/me', ctx => tx(() => {
   return {
     now: Date.now(),
     player: { id: p.id, name: p.name, mech: p.mech, colour: p.colour },
-    state: p.state,
+    state: clientState(p.state),
     away,
     guild: p.guild_id ? q('SELECT id, name, tag FROM guilds WHERE id = ?').get(p.guild_id) : null,
     alerts: {
@@ -266,15 +286,86 @@ route('GET', '/api/me', ctx => tx(() => {
   };
 }));
 
-route('POST', '/api/action/start', ctx => withPlayer(ctx.me, s => game.startAction(s, str(ctx.body.id))));
-route('POST', '/api/action/stop', ctx => withPlayer(ctx.me, s => game.stopAction(s)));
+// Starting a skill ends any raid you're in, the same as switching between skills.
+route('POST', '/api/action/start', ctx => withPlayer(ctx.me, (s, p) => {
+  const action = G.ACTION_BY_ID[str(ctx.body.id)];
+  if (action && game.level(s, action.skill) >= action.level && game.hasItems(s.items, action.inputs)) leaveRaid(p);
+  game.startAction(s, str(ctx.body.id));
+}));
+route('POST', '/api/action/stop', ctx => withPlayer(ctx.me, (s, p) => { leaveRaid(p); game.stopAction(s); }));
 route('POST', '/api/equip', ctx => withPlayer(ctx.me, s => game.equip(s, str(ctx.body.item))));
 route('POST', '/api/unequip', ctx => withPlayer(ctx.me, s => game.unequip(s, str(ctx.body.slot))));
 route('POST', '/api/supplies', ctx => withPlayer(ctx.me, s => game.setSupply(s, str(ctx.body.item), ctx.body.on === true)));
 
 // ---------- Raids and parties ----------
+// A solo raid lives in the player's activity. A party raid lives on the party row (its
+// session), and each member's activity points at the party. Either way, fights repeat
+// until stopped, and are caught up whenever any pilot involved is loaded.
+const memberIds = partyId => q('SELECT player_id FROM party_members WHERE party_id = ? ORDER BY joined').all(partyId).map(r => r.player_id);
+
+function advanceParty(party, now, self) {
+  const session = JSON.parse(party.session);
+  const players = memberIds(party.id).map(id => {
+    if (self && id === self.id) return self;
+    const o = loadPlayer(id);
+    if (o) o.gained = game.advance(o.state, now);
+    return o;
+  }).filter(Boolean);
+  game.advanceRaid(session, players, now, Object.fromEntries(players.map(p => [p.id, p.gained])));
+  players.forEach(p => { if (p !== self) savePlayer(p); });
+  party.session = JSON.stringify(session);
+  q('UPDATE parties SET session = ? WHERE id = ?').run(party.session, party.id);
+  return session;
+}
+
+// Starts the current party fight over, for when someone joins or leaves mid-fight.
+function restartParty(party) {
+  const s = JSON.parse(party.session);
+  Object.assign(s, { start: Date.now(), fight: null, n: (s.n || 0) + 1 });
+  party.session = JSON.stringify(s);
+  q('UPDATE parties SET session = ? WHERE id = ?').run(party.session, party.id);
+}
+
+// Ends a party's raid (members go idle). `self` is the already-loaded caller, saved by them.
+function stopPartyRaid(party, self, disband) {
+  for (const id of memberIds(party.id)) {
+    const o = self && id === self.id ? self : loadPlayer(id);
+    if (!o) continue;
+    if (o !== self) game.advance(o.state, Date.now());
+    if (o.state.activity && o.state.activity.type === 'party' && o.state.activity.party === party.id) o.state.activity = null;
+    if (o !== self) savePlayer(o);
+  }
+  if (disband) {
+    q('DELETE FROM party_members WHERE party_id = ?').run(party.id);
+    q('DELETE FROM parties WHERE id = ?').run(party.id);
+  } else {
+    q('UPDATE parties SET session = NULL, created = ? WHERE id = ?').run(Date.now(), party.id);
+  }
+}
+
+// Takes a freshly loaded player out of any raid: solo raids stop, party members leave,
+// and a party leader stops the party's raid.
+function leaveRaid(p) {
+  const a = p.state.activity;
+  if (a && a.type === 'raid') { p.state.activity = null; return; }
+  const m = q('SELECT party_id FROM party_members WHERE player_id = ?').get(p.id);
+  const party = m && q('SELECT * FROM parties WHERE id = ?').get(m.party_id);
+  if (party && party.session) {
+    if (party.leader_id === p.id) stopPartyRaid(party, p, false);
+    else leaveParty(p, party);
+  }
+  if (p.state.activity && p.state.activity.type) p.state.activity = null;
+}
+
+function leaveParty(p, party) {
+  if (party.leader_id === p.id) return stopPartyRaid(party, p, true);
+  q('DELETE FROM party_members WHERE player_id = ?').run(p.id);
+  if (p.state.activity && p.state.activity.type === 'party') p.state.activity = null;
+  if (party.session) restartParty(party);
+}
+
 function purgeParties() {
-  const old = q('SELECT id FROM parties WHERE created < ?').all(Date.now() - PARTY_TTL);
+  const old = q('SELECT id FROM parties WHERE session IS NULL AND created < ?').all(Date.now() - PARTY_TTL);
   old.forEach(p => {
     q('DELETE FROM party_members WHERE party_id = ?').run(p.id);
     q('DELETE FROM parties WHERE id = ?').run(p.id);
@@ -282,8 +373,11 @@ function purgeParties() {
 }
 
 function partyView(party) {
-  const members = q('SELECT player_id FROM party_members WHERE party_id = ? ORDER BY joined').all(party.id).map(m => pubById(m.player_id));
-  return { id: party.id, raid: party.raid, leader: party.leader_id, created: party.created, expires: party.created + PARTY_TTL, members };
+  return {
+    id: party.id, raid: party.raid, leader: party.leader_id, created: party.created, expires: party.created + PARTY_TTL,
+    members: memberIds(party.id).map(pubById).filter(Boolean),
+    running: party.session ? game.sessionSummary(JSON.parse(party.session)) : null,
+  };
 }
 
 function canJoin(me, party) {
@@ -303,29 +397,31 @@ route('GET', '/api/raids', ctx => {
   return { party: mine ? partyView(q('SELECT * FROM parties WHERE id = ?').get(mine.party_id)) : null, open };
 });
 
-// Runs a raid, stores the fight so every pilot in it can replay it, and saves them all.
-function launch(raidId, players) {
-  const result = game.runRaid(raidId, players, Date.now());
-  const { perPlayer, ...replay } = result;
-  const runId = Number(q('INSERT INTO raid_runs (created, players, data) VALUES (?, ?, ?)')
-    .run(Date.now(), JSON.stringify(players.map(p => p.id)), JSON.stringify(replay)).lastInsertRowid);
-  players.forEach(p => { p.state.raidLog[0].runId = runId; savePlayer(p); });
-  return { ...result, runId };
-}
+// The fight on screen right now, with its full timeline.
+route('GET', '/api/raid/current', ctx => tx(() => {
+  const p = fresh(ctx.me);
+  savePlayer(p);
+  const a = p.state.activity;
+  let session = null, leader = null;
+  if (a && a.type === 'raid') session = a;
+  else if (a && a.type === 'party') {
+    const party = q('SELECT session, leader_id FROM parties WHERE id = ?').get(a.party);
+    session = party && party.session ? JSON.parse(party.session) : null;
+    leader = party ? party.leader_id : null;
+  }
+  if (!session || !session.fight) return { current: null };
+  return { current: { ...game.sessionSummary(session), party: a.type === 'party', leader, fight: session.fight } };
+}));
 
-route('GET', '/api/raid/replay', ctx => {
-  const run = q('SELECT * FROM raid_runs WHERE id = ?').get(Number(ctx.url.searchParams.get('id')));
-  if (!run || !JSON.parse(run.players).includes(ctx.me)) bad('That replay is no longer available.');
-  return { result: { ...JSON.parse(run.data), runId: run.id } };
-});
-
-route('POST', '/api/raid/solo', ctx => {
+route('POST', '/api/raid/start', ctx => {
   const raid = G.RAID_BY_ID[str(ctx.body.raid)];
   if (!raid) bad('Unknown raid.');
-  return tx(() => {
-    const p = fresh(ctx.me);
-    const result = launch(raid.id, [p]);
-    return { result, state: p.state };
+  return withPlayer(ctx.me, (s, p) => {
+    leaveRaid(p);
+    const m = q('SELECT party_id FROM party_members WHERE player_id = ?').get(p.id);
+    if (m) leaveParty(p, q('SELECT * FROM parties WHERE id = ?').get(m.party_id));
+    s.activity = { type: 'raid', ...game.newSession(raid.id, Date.now()) };
+    game.advanceRaid(s.activity, [p], Date.now(), null);
   });
 });
 
@@ -342,36 +438,59 @@ route('POST', '/api/party/create', ctx => tx(() => {
 route('POST', '/api/party/join', ctx => tx(() => {
   purgeParties();
   const party = q('SELECT * FROM parties WHERE id = ?').get(int(ctx.body.id));
-  if (!party) bad('That party has already launched or broken up.');
+  if (!party) bad('That party has broken up.');
   if (!canJoin(ctx.me, party)) bad('You can only join parties led by a friend or guildmate.');
   if (q('SELECT 1 FROM party_members WHERE player_id = ?').get(ctx.me)) bad('Leave your current party first.');
-  if (q('SELECT COUNT(*) AS n FROM party_members WHERE party_id = ?').get(party.id).n >= G.PARTY_MAX) bad('That party is full.');
+  if (memberIds(party.id).length >= G.PARTY_MAX) bad('That party is full.');
+  const p = fresh(ctx.me);
   q('INSERT INTO party_members (party_id, player_id, joined) VALUES (?, ?, ?)').run(party.id, ctx.me, Date.now());
+  if (party.session) {
+    // Joining a raid that's already running puts you straight into its next fight.
+    leaveRaid(p);
+    p.state.activity = { type: 'party', party: party.id };
+    restartParty(party);
+  }
+  savePlayer(p);
 }));
 
 route('POST', '/api/party/leave', ctx => tx(() => {
   const m = q('SELECT party_id FROM party_members WHERE player_id = ?').get(ctx.me);
   if (!m) return;
-  const party = q('SELECT * FROM parties WHERE id = ?').get(m.party_id);
-  if (party && party.leader_id === ctx.me) {
-    q('DELETE FROM party_members WHERE party_id = ?').run(party.id);
-    q('DELETE FROM parties WHERE id = ?').run(party.id);
-  } else {
-    q('DELETE FROM party_members WHERE player_id = ?').run(ctx.me);
-  }
+  const p = fresh(ctx.me);
+  leaveParty(p, q('SELECT * FROM parties WHERE id = ?').get(m.party_id));
+  savePlayer(p);
+  return { state: clientState(p.state) };
 }));
 
 route('POST', '/api/party/start', ctx => tx(() => {
   const m = q('SELECT party_id FROM party_members WHERE player_id = ?').get(ctx.me);
   const party = m && q('SELECT * FROM parties WHERE id = ?').get(m.party_id);
   if (!party) bad('You’re not in a party.');
-  if (party.leader_id !== ctx.me) bad('Only the party leader can launch the raid.');
-  const ids = q('SELECT player_id FROM party_members WHERE party_id = ? ORDER BY joined').all(party.id).map(r => r.player_id);
-  const players = ids.map(fresh);
-  const result = launch(party.raid, players);
-  q('DELETE FROM party_members WHERE party_id = ?').run(party.id);
-  q('DELETE FROM parties WHERE id = ?').run(party.id);
-  return { result, state: players[0].state };
+  if (party.leader_id !== ctx.me) bad('Only the party leader can start the raid.');
+  if (party.session) bad('The raid is already running.');
+  const now = Date.now();
+  // Every member switches from whatever they were doing to the party raid.
+  const players = memberIds(party.id).map(fresh);
+  players.forEach(p => {
+    if (p.state.activity && p.state.activity.type === 'raid') p.state.activity = null;
+    p.state.activity = { type: 'party', party: party.id };
+  });
+  const session = game.newSession(party.raid, now);
+  game.advanceRaid(session, players, now, null);
+  q('UPDATE parties SET session = ? WHERE id = ?').run(JSON.stringify(session), party.id);
+  players.forEach(savePlayer);
+  return { state: clientState(players.find(p => p.id === ctx.me).state) };
+}));
+
+route('POST', '/api/party/stop', ctx => tx(() => {
+  const m = q('SELECT party_id FROM party_members WHERE player_id = ?').get(ctx.me);
+  const party = m && q('SELECT * FROM parties WHERE id = ?').get(m.party_id);
+  if (!party || !party.session) bad('Your party isn’t raiding.');
+  if (party.leader_id !== ctx.me) bad('Only the party leader can stop the raid. You can leave instead.');
+  const p = fresh(ctx.me);
+  stopPartyRaid(party, p, false);
+  savePlayer(p);
+  return { state: clientState(p.state) };
 }));
 
 // ---------- Friends ----------

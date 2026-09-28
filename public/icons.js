@@ -62,47 +62,36 @@
     emp: c => `<path d="M8 34a16 16 0 0 1 16-16v16z" fill="${c}"/><path d="M8 34a16 16 0 0 1 16-16v16z" ${shade}/>
       <rect x="6" y="34" width="20" height="6" rx="2" fill="${c}"/><circle cx="24" cy="18" r="3" fill="#b66cf0"/>
       <path d="M30 12a10 10 0 0 1 0 12M35 8a16 16 0 0 1 0 20M40 4a22 22 0 0 1 0 28" fill="none" stroke="#b66cf0" stroke-width="2.5" stroke-linecap="round"/>`,
+    blade: c => `<path d="M30 4 38 6 18 30 14 28z" fill="${c}"/><path d="M38 6 18 30 16 29z" fill="#fff" opacity=".35"/>
+      <rect x="9" y="27" width="14" height="4" rx="1.5" fill="#8d95a5" transform="rotate(-45 16 29)"/>
+      <path d="M8 40 14 34 17 37 11 43z" fill="#5b4c3e"/><circle cx="8" cy="41" r="3" fill="#ef5a45"/>`,
+    bulwark: c => `<path d="M24 4 40 9V24C40 34 33 40 24 44 15 40 8 34 8 24V9Z" fill="${c}"/>
+      <path d="M24 4V44C15 40 8 34 8 24V9Z" fill="#fff" opacity=".14"/><rect x="21" y="12" width="6" height="24" rx="1" fill="#ef5a45"/>
+      <rect x="15" y="19" width="18" height="6" rx="1" fill="#ef5a45"/>`,
+    rifle: c => `<rect x="4" y="20" width="18" height="10" rx="2" fill="${c}"/><rect x="20" y="22" width="24" height="4" rx="1" fill="${c}"/>
+      <rect x="20" y="24" width="24" height="2" ${shade}/><rect x="10" y="15" width="10" height="4" rx="1" fill="#5bc8ff"/>
+      <rect x="8" y="29" width="6" height="11" rx="2" fill="${c}"/><rect x="8" y="29" width="6" height="11" rx="2" ${shade}/>`,
+    focus: c => `<circle cx="24" cy="22" r="16" fill="#b66cf0" opacity=".18"/><path d="M24 6 34 20 24 34 14 20Z" fill="${c}"/>
+      <path d="M24 6 34 20 24 34Z" ${shade}/><circle cx="24" cy="20" r="5" fill="#c58cff"/><circle cx="23" cy="19" r="2" fill="#fff"/>
+      <rect x="21" y="34" width="6" height="10" rx="2" fill="${c}"/>`,
+    staff: c => `<rect x="22" y="14" width="4" height="31" rx="1.5" fill="${c}"/><rect x="24" y="14" width="2" height="31" ${shade}/>
+      <circle cx="24" cy="10" r="7" fill="none" stroke="#3ddc84" stroke-width="3"/><path d="M22.5 5.5h3v3h3v3h-3v3h-3v-3h-3v-3h3z" fill="#3ddc84"/>`,
     gas: c => `<rect x="17" y="4" width="14" height="5" rx="1.5" fill="#8d95a5"/><rect x="13" y="9" width="22" height="34" rx="7" fill="${c}"/>
       <rect x="13" y="9" width="11" height="34" rx="7" fill="#fff" opacity=".15"/><rect x="17" y="20" width="14" height="10" rx="2" fill="#1b1f27" opacity=".55"/>`,
     vial: c => `<rect x="18" y="4" width="12" height="6" rx="1.5" fill="#8d95a5"/><path d="M20 10h8v9l10 17a5 5 0 0 1-4 7H14a5 5 0 0 1-4-7l10-17z" fill="#2a2f3a"/>
       <path d="M14.5 29h19l3.5 7a3 3 0 0 1-3 4.5H14a3 3 0 0 1-3-4.5z" fill="${c}"/><circle cx="20" cy="34" r="2" fill="#fff" opacity=".5"/>`,
   };
 
-  // Raid boss portraits, 120x120.
-  const BOSS = {
-    warden: `<rect x="14" y="92" width="92" height="14" rx="7" fill="#3b3226"/><rect x="18" y="95" width="84" height="8" rx="4" fill="#5b4c3e"/>
-      <rect x="30" y="64" width="46" height="30" rx="4" fill="#d99a2b"/><rect x="30" y="80" width="46" height="14" fill="#000" opacity=".2"/>
-      <rect x="36" y="69" width="18" height="11" rx="2" fill="#9ee6ff"/><circle cx="45" cy="74" r="3" fill="#ef5a45"/>
-      <path d="M62 66 96 20l6 4-32 46z" fill="#e8b923"/><path d="M62 66 96 20l3 2-33 46z" fill="#000" opacity=".2"/>
-      <path d="M99 24v26" stroke="#8d95a5" stroke-width="2"/><path d="M93 50h12l-2 8h-3l-1-4-1 4h-3z" fill="#a3adb8"/>
-      <rect x="66" y="58" width="8" height="10" fill="#5b4c3e"/>`,
-    hydra: `<ellipse cx="60" cy="98" rx="40" ry="10" fill="#3b2a26"/><path d="M28 96c0-22 12-32 32-32s32 10 32 32z" fill="#9a4a32"/>
-      <path d="M28 96c0-22 12-32 32-32v32z" fill="#fff" opacity=".08"/>
-      ${[[34, 24, -1], [60, 12, 0], [86, 24, 1]].map(([x, y, d]) => `<path d="M${60 + d * 12} 70 Q${x + d * 6} ${y + 30} ${x} ${y + 12}" stroke="#b5583a" stroke-width="10" fill="none" stroke-linecap="round"/>
-        <rect x="${x - 11}" y="${y}" width="22" height="16" rx="5" fill="#c46a45"/><rect x="${x - 11}" y="${y + 10}" width="22" height="6" rx="2" fill="#6b2e22"/>
-        <circle cx="${x - 4}" cy="${y + 6}" r="2.5" fill="#ffdf6b"/><circle cx="${x + 4}" cy="${y + 6}" r="2.5" fill="#ffdf6b"/>`).join('')}`,
-    colossus: `<rect x="38" y="84" width="16" height="24" rx="3" fill="#48607f"/><rect x="66" y="84" width="16" height="24" rx="3" fill="#48607f"/>
-      <rect x="26" y="36" width="68" height="52" rx="8" fill="#5d7bff"/><rect x="26" y="66" width="68" height="22" rx="6" fill="#000" opacity=".2"/>
-      <rect x="44" y="18" width="32" height="22" rx="4" fill="#4a64d8"/><rect x="48" y="25" width="24" height="6" rx="2" fill="#ffdf6b"/>
-      <rect x="10" y="40" width="18" height="40" rx="5" fill="#48607f"/><rect x="92" y="40" width="18" height="40" rx="5" fill="#48607f"/>
-      <rect x="12" y="30" width="6" height="12" fill="#8d95a5"/><rect x="102" y="30" width="6" height="12" fill="#8d95a5"/>
-      <rect x="38" y="46" width="44" height="8" rx="2" fill="#2d3a66"/><rect x="38" y="58" width="44" height="4" rx="2" fill="#2d3a66"/>`,
-    sentinel: `<circle cx="60" cy="56" r="40" fill="#7fd8ff" opacity=".12"/>
-      <ellipse cx="60" cy="56" rx="44" ry="10" fill="none" stroke="#7fd8ff" stroke-width="3" opacity=".7"/>
-      <path d="M60 18 84 56 60 94 36 56z" fill="#3a8fb8"/><path d="M60 18 84 56 60 94z" fill="#000" opacity=".2"/>
-      <circle cx="60" cy="56" r="10" fill="#e8fbff"/><circle cx="60" cy="56" r="5" fill="#7fd8ff"/>
-      <path d="M22 88l8-14 4 6 8-12" fill="none" stroke="#e8fbff" stroke-width="3" stroke-linejoin="round"/>
-      <path d="M98 88l-8-14-4 6-8-12" fill="none" stroke="#e8fbff" stroke-width="3" stroke-linejoin="round"/>
-      <path d="M52 104l8-10 8 10" fill="none" stroke="#7fd8ff" stroke-width="3"/>`,
-    titan: `<circle cx="60" cy="60" r="52" fill="#2ee6b6" opacity=".08"/>
-      <path d="M20 112c2-30 10-48 22-56l-6-18c8-12 40-12 48 0l-6 18c12 8 20 26 22 56z" fill="#141a22"/>
-      <path d="M36 38c8-12 40-12 48 0l-6 18H42z" fill="#1d2630"/>
-      <path d="M46 44h10l-3 5h-7zM64 44h10v5h-7z" fill="#2ee6b6"/>
-      <path d="M60 60 54 76l8 6-6 18M40 70l-8 16M80 70l8 16" stroke="#2ee6b6" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-      <path d="M26 20l6 8M94 20l-6 8M60 6v8" stroke="#2ee6b6" stroke-width="2" opacity=".6" stroke-linecap="round"/>`,
-  };
-
   const UI = {
+    salvaging: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>',
+    harvesting: '<path d="M9 3h6M10 3v4M14 3v4"/><rect x="6" y="7" width="12" height="14" rx="4"/><path d="M9 13h6"/>',
+    alchemy: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/>',
+    crafting: '<path d="M14.7 6.3a4 4 0 0 0 5 5L11.5 19.5a2.1 2.1 0 0 1-3-3l8.2-8.2a4 4 0 0 1-2-2z"/>',
+    armoursmithing: '<path d="M3 7h12c0 3 2.5 4 6 4v2.5H9l-2 3.5h10M10 13.5V17"/><path d="M5 21h14"/>',
+    melee: '<path d="M14 3h7v7L9 22l-3-3 2-2-3-3 2-2 3 3z"/><path d="M4 20l2-2"/>',
+    ranged: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',
+    magic: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/>',
+    healing: '<path d="M12 21s-8-4.5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6.5-8 11-8 11z"/><path d="M12 9v6M9 12h6"/>',
     scrapping: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>',
     mining: '<path d="M4.5 9.5c4-4 11-4 15 0"/><path d="M12 6.8 7 21"/>',
     smelting: '<path d="M12 3c1 4 5.5 5 5.5 10.5a5.5 5.5 0 0 1-11 0c0-2.3 1-3.8 2.2-4.8 0 2 1 3.3 2.3 3.3C11 9 10 6.5 12 3z"/>',
@@ -135,7 +124,6 @@
   };
 
   root.ICONS = {
-    boss: id => `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" focusable="false">${BOSS[id] || ''}</svg>`,
     item: (kind, colour) => svg((ITEM[kind] || ITEM.mat)(colour)),
     ui: name => svg(`<g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${UI[name] || ''}</g>`, 24),
   };

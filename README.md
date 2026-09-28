@@ -5,12 +5,12 @@ An online idle game about building a mech and raiding bosses, solo or with your 
 ## How it plays
 
 - **Characters:** create a pilot (name, password, mech name and paint), then log in from any device. Progress is saved on the server.
-- **Gathering:** Scrapping (scrap and rare circuits), Mining (five tiers of ore), Siphoning (gases).
-- **Artisan:** Smelting (ore + scrap into plate), Chemistry (raid boosts), Engineering (power cells, repair kits, core modules), Weaponsmithing (weapons) and Fabrication (armour, reactors, legs).
-- **Combat skills** only train in raids: Kinetic, Energy, Thermal and Missile (by fighting with that weapon type), Shielding (every raid), Repair (Mechanics) and Electronics (Tacticians). Each level adds 1% to what the skill governs.
-- **Roles come from your weapon:** autocannon, laser, flamer or missile pod make you a Striker; a repair arm makes you a Mechanic (healer); an EMP projector makes you a Tactician (target locks raise the boss's damage taken, jamming lowers its damage).
-- **Raids:** five bosses, one per tier, each weak to some damage types and resistant to others. A win drops the material needed for the next tier of gear and core modules. Fights are simulated on the server and replayed live, with cast bars, damage numbers, a DPS meter and a DPS graph. Party members can rewatch a fight for 48 hours.
-- **Balance** (from simulation): a Striker in a full set of the matching tier wins roughly 40–70% solo with no supplies, and reliably with repair kits or with the damage type the boss is weak to. Mechanics and Tacticians can't solo but make parties safe. A party in last tier's gear can't beat the 90-second limit.
+- **Gathering:** Salvaging (scrap and rare circuits), Mining (five tiers of ore), Harvesting (gases).
+- **Artisan:** Smelting (ore and scrap into plate), Alchemy (raid tonics), Crafting (repair kits, core modules), Weaponsmithing (weapons) and Armoursmithing (armour, reactors, legs).
+- **Combat skills** only train by fighting: Melee, Ranged, Magic and Healing. Your weapon sets your class: vibro-blade (melee damage), bulwark (melee tank, draws the boss's attacks), rail rifle (ranged), psi focus (magic, with burn) or nanite staff (healer).
+- **Raids:** five bosses, one per tier, each weak to some attack styles and resistant to others. Press Fight and fights repeat on their own (including offline, up to 12 hours) until you stop or start a skill, the same as skilling. Parties of up to four friends or guildmates farm together. There's no entry cost. A win drops the material needed for the next tier of gear and core modules.
+- **The fight** plays inside the Raids page: your party and the boss side by side, cast bars that finish exactly as their hits land, floating damage numbers, a damage meter and a DPS graph.
+- **Balance** (from simulation): a damage dealer in a full set of the matching tier wins roughly 40–45% solo against a neutral boss, around 90% with the style it's weak to, and reliably with repair kits. Tanks and healers need a party. A party in last tier's gear only gets through by exploiting a weakness.
 - **Social:** friends, guilds (500 scrap to found, up to 30 pilots, with chat), and trades where offered items are held until the offer is accepted, declined or cancelled.
 
 ## Running locally
@@ -32,8 +32,9 @@ Railway runs `npm start` on the `PORT` it provides and redeploys on every push t
 ## Files
 
 - `server.js` – HTTP server, accounts and sessions, the JSON API, and the SQLite schema
-- `lib/game.js` – server-side rules: offline progress, actions, equipment, supplies, the raid combat timeline and loot
+- `lib/game.js` – server-side rules: offline progress, actions, equipment, supplies, repeating raid sessions, the combat timeline and loot
 - `public/data.js` – game content (skills, items, recipes, raids) and formulas, shared by server and browser
 - `public/app.js` – the browser client
-- `public/icons.js` – inline SVG icons
+- `public/icons.js` – inline SVG item and interface icons
+- `public/sprites.js` – 8-bit pixel sprites for mechs and raid bosses
 - `public/index.html`, `public/style.css` – layout and styling
