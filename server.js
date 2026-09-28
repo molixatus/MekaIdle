@@ -217,7 +217,7 @@ async function handleApi(req, res, url) {
 
 // ---------- Auth ----------
 route('POST', '/api/register', async ctx => {
-  limit('auth:' + ctx.ip, 10, 10 * 60e3);
+  limit('auth:' + ctx.ip, 60, 10 * 60e3);
   const name = str(ctx.body.name).trim();
   const password = str(ctx.body.password);
   const mech = str(ctx.body.mech).trim().replace(/\s+/g, ' ');
@@ -232,7 +232,7 @@ route('POST', '/api/register', async ctx => {
 }, false);
 
 route('POST', '/api/login', async ctx => {
-  limit('auth:' + ctx.ip, 10, 10 * 60e3);
+  limit('auth:' + ctx.ip, 60, 10 * 60e3);
   const row = await db.get('SELECT id, pass FROM players WHERE name_key = ?', str(ctx.body.name).trim().toLowerCase());
   const password = str(ctx.body.password).slice(0, 200);
   if (!row || !checkPassword(password, row.pass)) bad('Wrong pilot name or password.');
