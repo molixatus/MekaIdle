@@ -646,6 +646,10 @@
   // higher skill levels). A pilot with matching gear wins early raids comfortably and starts to
   // lose around the middle of the region.
   const RAIDS = [];
+  // Gear drops by difficulty: the best piece (listed first: raid weapon, then trinkets, then set
+  // pieces) only drops on Mythic, the next two on Heroic or Mythic, the rest on any difficulty.
+  // Mythic drops everything.
+  const gearByDifficulty = drops => drops.map((d, i) => (i === 0 ? { ...d, minDiff: 'mythic' } : i <= 2 ? { ...d, minDiff: 'heroic' } : d));
   const COMBAT_XP = [32, 138, 280, 453, 651, 860, 1087, 1338, 1589, 1650];
   const CLASS_IDS = ['melee', 'ranged', 'magic', 'healer'];
   REGIONS.forEach((reg, ri) => {
@@ -709,7 +713,7 @@
           { item: matId(res[0], t), qty: [2, 4] },
           { item: matId(res[1], t), qty: [1, 3] },
           { item: cons.id, qty: [1, 2], p: 0.3 },
-          ...setDrops, ...uniqueDrops, ...trinketDrops,
+          ...gearByDifficulty([...uniqueDrops, ...trinketDrops, ...setDrops]),
         ],
       });
     }

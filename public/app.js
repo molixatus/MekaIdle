@@ -1091,9 +1091,13 @@
     return h('div', { class: 'loot-icons', 'aria-label': 'Drops on a win' }, r.drops.map(x => {
       const text = dropText(x, diff);
       const cls = itemClass(G.ITEMS[x.item]);
-      const chip = h('span', { class: `loot-ico${x.rare ? ' rare' : ''}${cls ? ' class-loot' : ''}` }, itemIco(x.item, 'sm'), h('small', {}, text));
+      const need = x.minDiff && G.DIFF_BY_ID[x.minDiff];
+      const off = need && G.DIFFICULTIES.indexOf(need) > G.DIFFICULTIES.findIndex(d => d.id === (diff || 'normal'));
+      const tag = need ? h('span', { class: 'diff-dot', title: `${need.name}${need.id === 'heroic' ? ' and Mythic' : ''} only` }, need.name[0]) : null;
+      if (tag) tag.style.setProperty('--diff', need.colour);
+      const chip = h('span', { class: `loot-ico${x.rare ? ' rare' : ''}${cls ? ' class-loot' : ''}${off ? ' off-diff' : ''}` }, itemIco(x.item, 'sm'), h('small', {}, off ? '–' : text), tag);
       if (cls) { chip.style.setProperty('--cls', G.CLASSES[cls].colour); chip.title = `${G.CLASSES[cls].name} gear`; }
-      return tip(chip, () => itemTip(x.item, h('p', { class: x.rare ? 'rare-loot' : 'ok' }, x.p ? `${text} chance per win` : `${text} per win`)));
+      return tip(chip, () => itemTip(x.item, h('p', { class: off ? 'bad' : x.rare ? 'rare-loot' : 'ok' }, off ? `Only drops on ${need.name}${need.id === 'heroic' ? ' or Mythic' : ''}.` : x.p ? `${text} chance per win${need ? ` (${need.name}${need.id === 'heroic' ? ' and Mythic' : ''} only)` : ''}` : `${text} per win`)));
     }));
   }
 

@@ -1075,3 +1075,6 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 .chip-count { margin-left: 6px; padding: 0 6px; border-radius: 8px; background: #2b313d; font-size: 11px; color: var(--muted); }
 .chip-count:empty { display: none; }
 .boss-hidden { margin: 18px 4px; }
+
+.diff-dot { margin-left: 2px; padding: 0 4px; border-radius: 6px; font-size: 9px; font-weight: 800; line-height: 13px; color: #0d1016; background: var(--diff); }
+.loot-ico.off-diff { opacity: .4; filter: grayscale(.8); }
