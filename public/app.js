@@ -2282,7 +2282,7 @@
         if (e.b !== undefined) target.barrier = e.b;
         if ((e.k === 'heal' || e.k === 'hot') && typeof e.a === 'number') bump('hps', e.a, e.sr, eff);
         if (e.k === 'potion') { const pid = Object.keys(G.ITEMS).find(id => G.ITEMS[id].name === (e.n || e.sr)); addLog(cur.start + e.t, 'abilities', [who(e.tg), ` drinks a ${(e.n || e.sr).toLowerCase()} (+${num(e.v)} HP)`], 'potion', pid ? itemIco(pid, 'sm') : null); }
-        float(target, `+${num(e.v)}${e.c ? '!' : ''}`, e.k === 'potion' ? 'Potion' : e.sr, '#4ee08f', e.c, 'heal');
+        float(target, `+${num(e.v)}${e.c ? '!' : ''}`, e.k === 'potion' ? 'Potion' : e.sr, '#4ee08f', e.c, 'heal', typeof e.a === 'number' ? e.a : null);
         pulse(target, 'glow');
         if (e.k !== 'hot') flash(target, 'heal');
       } else if (typeof e.tg === 'number') {
