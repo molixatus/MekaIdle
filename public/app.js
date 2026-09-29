@@ -344,6 +344,14 @@
     celebrate(before, state);
   }
 
+  const skillAct = () => (me && me.state.activity && !me.state.activity.type ? me.state.activity : me && me.state.side) || null;
+  function skillProgress() {
+    const a = skillAct();
+    const action = a && G.ACTION_BY_ID[a.id];
+    if (!action) return null;
+    const t = a.progress + (now() - me.state.lastTick);
+    return { a, action, frac: Math.min(1, (t % action.time) / action.time) };
+  }
   function activityProgress() {
     const a = me && me.state.activity;
     if (!a) return null;
@@ -739,6 +747,11 @@
         h('div', { class: 'ab-info' }, h('b', {}, raid ? raid.name : 'Raid'), h('small', {}, `${a.type === 'party' ? 'Party raid' : 'Solo raid'}${a.diff && a.diff !== 'normal' ? ` \u00b7 ${G.DIFF_BY_ID[a.diff].name}` : ''} \u00b7 fight ${a.n || 1}`)),
         h('div', { class: 'ab-bar' }, h('span', { id: 'action-fill', class: 'raid' })),
         h('button', { type: 'button', class: 'btn small', onclick: () => go('raids') }, 'Watch'));
+      const side = me.state.side && G.ACTION_BY_ID[me.state.side.id];
+      if (side) parts.push(h('div', { class: 'ab-side', title: `Training alongside the raid: ${Math.round(G.DUAL_XP * 100)}% XP for both` },
+        itemIco(side.item, 'sm'), h('div', { class: 'ab-info' }, h('b', {}, side.name), h('small', {}, `${Math.round(G.DUAL_XP * 100)}% XP · raid too`)),
+        h('div', { class: 'ab-bar' }, h('span', { id: 'side-fill' })),
+        h('button', { type: 'button', class: 'icon-btn tiny', 'aria-label': `Stop ${side.name}`, onclick: () => act('/api/action/stop', { what: 'skill' }, 'Skill stopped. Raid XP back to full.') }, ui('close', 'sm'))));
     } else if (a && G.ACTION_BY_ID[a.id]) {
       const action = G.ACTION_BY_ID[a.id];
       const sk = G.SKILL_BY_ID[action.skill];
@@ -760,7 +773,7 @@
       }) : h('p', { class: 'muted small' }, 'Nothing queued. Use Queue on any skill card to line up to five actions.'));
     const qBtn = h('button', { type: 'button', class: `btn small${queueOpen ? ' on' : ''}`, 'aria-expanded': String(queueOpen), onclick: () => { queueOpen = !queueOpen; renderActionBar(); if (queueOpen) { const pnl = document.querySelector('.ab-queue'); if (pnl) pnl.classList.add('opening'); } } },
       'Queue', q.length ? h('span', { class: 'chip-count' }, String(q.length)) : '');
-    const stop = a ? h('button', { type: 'button', class: 'btn small danger', onclick: () => (a.type === 'party' ? act('/api/party/leave', {}) : act('/api/action/stop', {})) }, a.type === 'party' ? 'Leave' : 'Stop') : '';
+    const stop = a ? h('button', { type: 'button', class: 'btn small danger', onclick: () => (a.type === 'party' ? act('/api/party/leave', {}) : act('/api/action/stop', { what: a.type ? 'raid' : 'skill' })) }, a.type === 'party' ? 'Leave' : 'Stop') : '';
     bar.replaceChildren(panel, ...parts, qBtn, stop);
   }
 
@@ -800,20 +813,24 @@
     if (nf) nf.style.width = w;
     const af = document.getElementById('action-fill');
     if (af) af.style.width = w;
-    if (p && p.action) {
-      const a = me.state.activity;
-      const done = Math.floor((a.progress + (now() - me.state.lastTick)) / p.action.time);
+    const sp = me && skillProgress();
+    const sw = sp ? `${sp.frac * 100}%` : '0%';
+    const sf = document.getElementById('side-fill');
+    if (sf) sf.style.width = sw;
+    if (sp) {
+      const done = Math.floor((sp.a.progress + (now() - me.state.lastTick)) / sp.action.time);
       const key = `${me.state.lastTick}:${done}`;
       if (done > 0 && key !== doneKey) { doneKey = key; setTimeout(poll, 150); }
     }
-    document.querySelectorAll('.card.active .card-fill').forEach(el => { el.style.width = w; });
+    document.querySelectorAll('.card.active .card-fill').forEach(el => { el.style.width = sw; });
     const ghost = document.querySelector('.xp-ghost');
     if (ghost) {
       const x = xpInfo(ghost.dataset.skill);
-      const a = p && p.action && p.action.skill === ghost.dataset.skill ? p.action : null;
-      const gain = a && !x.max ? Math.min(100 - x.pct, (a.xp / (x.to - x.from)) * 100) : 0;
+      const a = sp && sp.action.skill === ghost.dataset.skill ? sp.action : null;
+      const xpEach = a ? a.xp * (me.state.side ? G.DUAL_XP : 1) : 0;
+      const gain = a && !x.max ? Math.min(100 - x.pct, (xpEach / (x.to - x.from)) * 100) : 0;
       ghost.style.left = `${x.pct}%`;
-      ghost.style.width = `${gain && p ? gain * p.frac : 0}%`;
+      ghost.style.width = `${gain && sp ? gain * sp.frac : 0}%`;
     }
   }
 
@@ -825,7 +842,7 @@
   const levelsSig = st => G.SKILLS.map(sk => G.levelFromXp(st.skills[sk.id].xp)).join(',');
   const itemsSig = (st, keep) => Object.entries(st.items).filter(([id]) => !keep || (G.ITEMS[id] && keep(G.ITEMS[id]))).sort().join(';');
   const PAGE_SIG = {
-    skill: st => JSON.stringify([st.skills, st.items, st.activity && [st.activity.id, st.activity.left, st.activity.type], st.queue]),
+    skill: st => JSON.stringify([st.skills, st.items, st.activity && [st.activity.id, st.activity.left, st.activity.type], st.side && [st.side.id, st.side.left], st.queue]),
     equipment: st => JSON.stringify([st.equipment, st.supplies, st.subclasses, levelsSig(st), itemsSig(st, it => it.type === 'gear' || it.supply)]),
     inventory: st => JSON.stringify([itemsSig(st), st.equipment]),
     abilities: st => JSON.stringify([st.abilities, st.subclasses, st.multi, st.equipment, levelsSig(st)]),
@@ -1008,14 +1025,15 @@
 
   function actionCard(a) {
     const locked = lvl(a.skill) < a.level;
-    const active = !!me.state.activity && me.state.activity.id === a.id;
+    const running = skillAct();
+    const active = !!running && running.id === a.id;
     const out = G.ITEMS[a.item];
     const inputs = Object.entries(a.inputs);
     const outputs = Object.entries(a.outputs);
     const count = h('input', { type: 'number', min: '1', placeholder: '∞', 'aria-label': `How many ${a.name}`, inputmode: 'numeric', disabled: locked });
     const n = () => { const v = parseInt(count.value, 10); return v > 0 ? v : null; };
     const start = async () => {
-      await act('/api/action/start', { id: a.id, count: n() }, raiding() ? 'Raid stopped. Training instead.' : null);
+      await act('/api/action/start', { id: a.id, count: n() }, raiding() ? `Training alongside your raid: ${Math.round(G.DUAL_XP * 100)}% XP for both until one stops.` : null);
     };
     const queue = async () => {
       const q = (me.state.queue || []).concat({ id: a.id, count: n() || 1 });
@@ -1028,7 +1046,7 @@
     if (tierBadge) tierBadge.style.setProperty('--tier', out.colour);
     const recipe = h('p', { class: 'tip-desc muted' }, `${a.name}: ${secs(a.time)}, ${a.xp} ${G.SKILL_BY_ID[a.skill].name} XP, level ${a.level}.`);
     const main = tip(h('button', { type: 'button', class: 'card-main', disabled: locked, 'aria-pressed': String(active),
-      onclick: () => (active ? act('/api/action/stop', {}) : start()) },
+      onclick: () => (active ? act('/api/action/stop', { what: 'skill' }) : start()) },
     h('div', { class: 'card-top' }, tierBadge, out && out.type !== 'resource' ? itemName(a.item) : h('span', {}, a.name), h('span', { class: 'card-time' }, secs(a.time))),
     art,
     locked ? h('div', { class: 'card-xp' }, ui('lock', 'sm'), `Level ${a.level}`) : h('div', { class: 'card-xp' }, `${a.xp} XP`),
@@ -1036,7 +1054,7 @@
       ? h('div', { class: 'needs' }, inputs.map(([id, q]) => needChip(id, String(q), `/${fmt(have(id))}`, have(id) < q ? 'short' : '')))
       : h('div', { class: 'needs' }, outputs.map(([id, q]) => needChip(id, q[0] === q[1] ? `+${q[0]}` : `+${q[0]}–${q[1]}`)),
         a.chance.map(c => needChip(c.item, `${Math.round(c.p * 100)}%`))),
-    h('div', { class: 'card-foot' }, h('span', {}, inputs.length ? `Owned: ${fmt(have(a.item))}` : `Owned: ${[...outputs.map(([id]) => id), ...a.chance.map(c => c.item)].map(id => `${fmt(have(id))} ${G.ITEMS[id].name.split(' ').pop().toLowerCase()}`).join(', ')}`), active ? h('span', { class: 'ok' }, me.state.activity.left ? `${num(me.state.activity.left)} left` : 'Running') : null)),
+    h('div', { class: 'card-foot' }, h('span', {}, inputs.length ? `Owned: ${fmt(have(a.item))}` : `Owned: ${[...outputs.map(([id]) => id), ...a.chance.map(c => c.item)].map(id => `${fmt(have(id))} ${G.ITEMS[id].name.split(' ').pop().toLowerCase()}`).join(', ')}`), active ? h('span', { class: 'ok' }, running.left ? `${num(running.left)} left` : (me.state.side ? `Running · ${Math.round(G.DUAL_XP * 100)}% XP` : "Running")) : null)),
     () => itemTip(a.item, recipe));
     return h('div', { class: `card action${active ? ' active' : ''}${locked ? ' locked' : ''}` }, main,
       h('div', { class: 'card-controls' }, count,
@@ -1713,7 +1731,7 @@
       }
     }
     async function stopRaid() {
-      if (await act('/api/action/stop', {}, 'Stopped fighting.')) { load(); battle.sync(true); }
+      if (await act('/api/action/stop', { what: 'raid' }, 'Stopped fighting.')) { load(); battle.sync(true); }
     }
     battle.onStop = () => {
       const a = me.state.activity;

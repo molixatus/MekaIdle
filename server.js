@@ -393,7 +393,7 @@ async function rejoinParty(id, info) {
     if (!existing || existing.leader_id !== leader.id || !existing.session || existing.raid !== info.raid) return;
     if ((await memberIds(existing.id)).length >= G.PARTY_MAX) return;
     await db.run('INSERT INTO party_members (party_id, player_id, joined) VALUES (?, ?, ?)', existing.id, id, now);
-    p.state.activity = { type: 'party', party: existing.id };
+    game.enterRaid(p.state, { type: 'party', party: existing.id });
     await savePlayer(p);
     await restartParty(existing);
     return;
@@ -403,7 +403,7 @@ async function rejoinParty(id, info) {
   const pid = await db.insert('INSERT INTO parties (leader_id, raid, diff, visibility, created, session) VALUES (?, ?, ?, ?, ?, ?)',
     id, a.raid, session.diff, VISIBILITY.includes(info.visibility) ? info.visibility : 'friends', now, JSON.stringify(session));
   await db.run('INSERT INTO party_members (party_id, player_id, joined) VALUES (?, ?, ?)', pid, id, now);
-  p.state.activity = { type: 'party', party: pid };
+  game.enterRaid(p.state, { type: 'party', party: pid });
   await savePlayer(p);
   for (const name of info.members || []) {
     const m = await findByName(name);
@@ -411,7 +411,7 @@ async function rejoinParty(id, info) {
     const mp = await fresh(m.id);
     if (!onRaid(mp.state.activity)) continue;
     await db.run('INSERT INTO party_members (party_id, player_id, joined) VALUES (?, ?, ?)', pid, m.id, now);
-    mp.state.activity = { type: 'party', party: pid };
+    game.enterRaid(mp.state, { type: 'party', party: pid });
     await savePlayer(mp);
   }
   await restartParty(await db.get('SELECT * FROM parties WHERE id = ?', pid));
@@ -444,10 +444,10 @@ route('GET', '/api/me', async ctx => {
 });
 
 // Starting a skill ends any raid you're in, the same as switching between skills.
-route('POST', '/api/action/start', ctx => withPlayer(ctx.me, async (s, p) => {
-  const action = G.ACTION_BY_ID[str(ctx.body.id)];
-  if (action && game.level(s, action.skill) >= action.level && game.hasItems(s.items, action.inputs)) await leaveRaid(p);
-  game.startAction(s, str(ctx.body.id), ctx.body.count);
+// Starting a skill while raiding trains it alongside the raid, with reduced XP for both.
+route('POST', '/api/action/start', ctx => withPlayer(ctx.me, async s => {
+  if (s.activity && s.activity.type) game.startSide(s, str(ctx.body.id), ctx.body.count);
+  else game.startAction(s, str(ctx.body.id), ctx.body.count);
 }));
 route('POST', '/api/queue', ctx => withPlayer(ctx.me, s => game.setQueue(s, ctx.body.queue)));
 // Loadout changes (gear, abilities, subclass, supplies) take effect in a running raid straight away:
@@ -460,7 +460,17 @@ async function refight(p) {
 const withLoadout = (ctx, fn) => withPlayer(ctx.me, async (s, p) => { fn(s); await refight(p); });
 route('POST', '/api/abilities', ctx => withLoadout(ctx, s => game.setAbilities(s, ctx.body.cls, str(ctx.body.generic) || null)));
 route('POST', '/api/subclass', ctx => withLoadout(ctx, s => game.setSubclass(s, str(ctx.body.cls), str(ctx.body.sub), str(ctx.body.second))));
-route('POST', '/api/action/stop', ctx => withPlayer(ctx.me, async (s, p) => { await leaveRaid(p); game.stopAction(s); }));
+// what: 'skill' stops the skill, 'raid' leaves the raid (a skill alongside it carries on at full XP),
+// anything else stops both.
+route('POST', '/api/action/stop', ctx => withPlayer(ctx.me, async (s, p) => {
+  const what = str(ctx.body.what);
+  const raiding = s.activity && s.activity.type;
+  if (what === 'skill') { if (raiding) s.side = null; else game.stopAction(s); return; }
+  await leaveRaid(p);
+  if (what === 'raid') { if (!s.activity && s.side) { s.activity = s.side; s.side = null; } return; }
+  game.stopAction(s);
+  s.side = null;
+}));
 route('POST', '/api/equip', ctx => withLoadout(ctx, s => game.equip(s, str(ctx.body.item))));
 route('POST', '/api/unequip', ctx => withLoadout(ctx, s => game.unequip(s, str(ctx.body.slot))));
 route('POST', '/api/supplies', ctx => withLoadout(ctx, s => game.setSupply(s, str(ctx.body.item), ctx.body.on === true)));
@@ -619,7 +629,7 @@ route('POST', '/api/raid/start', ctx => {
     await leaveRaid(p);
     const party = await partyOf(p.id);
     if (party) await leaveParty(p, party);
-    s.activity = { type: 'raid', ...game.newSession(raid.id, diff, Date.now()) };
+    game.enterRaid(s, { type: 'raid', ...game.newSession(raid.id, diff, Date.now()) });
     game.advanceRaid(s.activity, [p], Date.now(), null);
   });
 });
@@ -636,7 +646,7 @@ route('POST', '/api/raid/open', async ctx => {
     const id = await db.insert('INSERT INTO parties (leader_id, raid, diff, visibility, created, session) VALUES (?, ?, ?, ?, ?, ?)',
       ctx.me, a.raid, session.diff, visibility, now, JSON.stringify(session));
     await db.run('INSERT INTO party_members (party_id, player_id, joined) VALUES (?, ?, ?)', id, ctx.me, now);
-    p.state.activity = { type: 'party', party: id };
+    game.enterRaid(p.state, { type: 'party', party: id });
   } else {
     const party = await partyOf(ctx.me);
     if (!party) bad('You’re not in a raid.');
@@ -685,7 +695,7 @@ route('POST', '/api/party/join', async ctx => {
   await db.run('INSERT INTO party_members (party_id, player_id, joined) VALUES (?, ?, ?)', party.id, ctx.me, Date.now());
   if (party.session) {
     // Joining a raid that's already running puts you straight into its next fight.
-    p.state.activity = { type: 'party', party: party.id };
+    game.enterRaid(p.state, { type: 'party', party: party.id });
     await restartParty(party);
   }
   await savePlayer(p);
@@ -711,7 +721,7 @@ route('POST', '/api/party/start', async ctx => {
   for (const id of await memberIds(party.id)) players.push(await fresh(id));
   const raid = G.RAID_BY_ID[party.raid];
   players.forEach(p => requireFinaleGear(p.state, raid, p.id === ctx.me ? null : p.name));
-  players.forEach(p => { p.state.activity = { type: 'party', party: party.id }; });
+  players.forEach(p => { game.enterRaid(p.state, { type: 'party', party: party.id }); });
   const session = game.newSession(party.raid, party.diff || 'normal', now);
   game.advanceRaid(session, players, now, null);
   await db.run('UPDATE parties SET session = ? WHERE id = ?', JSON.stringify(session), party.id);

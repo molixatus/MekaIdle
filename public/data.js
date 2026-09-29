@@ -849,6 +849,8 @@
   // armour pieces (tier 10 in the last region).
   // An off-hand from another class earns that class this share of each fight's XP.
   const OFFHAND_XP_SHARE = 0.3;
+  // Skilling and raiding at the same time: both earn this share of their usual XP.
+  const DUAL_XP = 0.6;
   const FINALE_ARMOUR = 3, RAID_GEAR_NEED = 2;
   const GEAR_STAGE = k => (k >= 24 ? 'finale' : k >= 16 ? 'next' : k >= 8 ? 'raid' : null);
   function gearCheck(equipment, raid) {
@@ -871,6 +873,7 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'Skill and raid at the same time: start a skill while raiding (or a raid while skilling) and both keep going, each at 60% of its usual XP. Stop either one and the other goes back to full XP. The bottom bar shows the skill next to the raid.',
       '80 gear tiers instead of 10: every region’s material now comes in 8 grades (Copper, Fine copper, Sturdy copper … Perfect copper), one for every 3 bosses, each with its own gathering, weapons, armour, raid sets, raid weapons, trinkets and sigils.',
       'Much harder progression: each group of 3 bosses is balanced against its own tier’s gear. Gear a tier behind loses on Normal, so every 3 bosses you craft the next tier or farm the last tier’s raid gear. Heroic takes a little more, and Mythic needs this tier’s raid gear (which then carries you into the next tier).',
       'Next-tier gear needs raid material from the previous tier’s bosses, so crafting and raiding alternate.',
@@ -983,7 +986,7 @@
     MAX_LEVEL, OFFLINE_CAP, TIERS, TIER_BY_ID, CLASSES, ROLES, CLASS_OF_SKILL, UNARMED_COLOUR, SKILLS, SKILL_BY_ID, COMBAT_SKILLS, STATS, describe,
     WEAPON_KINDS, WEAPON_BY_ID, OFFHAND_KINDS, OFFHAND_BY_ID, SLOTS, ARMOUR_SLOTS, ARMOUR_TYPES, CONSUMABLES, CONSUMABLE_BY_ID,
     GRADES, TIER_STEP, ABILITIES, ABILITY_BY_ID, ABILITY_SLOTS, SUBCLASSES, SUBCLASS_BY_ID, resolveSubclass, REGIONS, SET_BY_ID, TRASH_ROLES, FOE_ROLE, MECHANICS, RAID_CURVE, FOES, FOE_DAMAGE, PASSIVES, DIFFICULTIES, DIFF_BY_ID, FIGHT, PARTY,
-    ITEMS, ACTIONS, ACTION_BY_ID, RAIDS, RAID_BY_ID, finaleGear, gearCheck, FINALE_ARMOUR, RAID_GEAR_NEED, OFFHAND_XP_SHARE, PATCH_NOTES, CLASS_KIT,
+    ITEMS, ACTIONS, ACTION_BY_ID, RAIDS, RAID_BY_ID, finaleGear, gearCheck, FINALE_ARMOUR, RAID_GEAR_NEED, OFFHAND_XP_SHARE, DUAL_XP, PATCH_NOTES, CLASS_KIT,
     xpForLevel, levelFromXp, skillMult, mechStats, power, combatLevel, kit, rng,
     PARTY_MAX: PARTY.max, partyDmg, POTIONS_PER_RAID: 3, GUILD_COST: 0, QUEUE_MAX: 5,
   };
