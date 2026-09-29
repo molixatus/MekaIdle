@@ -1004,13 +1004,14 @@
     const L = lvl(sk.id);
     const kinds = G.WEAPON_KINDS.filter(w => w.cls === cls);
     const off = G.OFFHAND_KINDS.find(o => o.cls === cls);
-    const trains = myClass() === cls || (mySubclass() === 'multiclass' && (me.state.multi || {})[myClass()] === cls);
+    const offCls = (G.ITEMS[me.state.equipment.offhand] || {}).cls;
+    const trains = myClass() === cls || (mySubclass() === 'multiclass' && (me.state.multi || {})[myClass()] === cls) || (offCls === cls && myClass() !== cls);
     const abilities = G.ABILITIES.filter(a => a.cls === cls);
     return [
       h('div', { class: 'two-col' },
         h('div', { class: 'panel stack' },
           h('h2', {}, 'How it trains'),
-          h('p', {}, `Fight raids with a ${cls} weapon (${kinds.map(w => w.noun).join(', ')}). A win gives the raid’s full XP, a loss a quarter. Multiclassing splits the XP 60/40 between two classes.`),
+          h('p', {}, `Fight raids with a ${cls} weapon (${kinds.map(w => w.noun).join(', ')}). A win gives the raid’s full XP, a loss a quarter. Multiclassing splits the XP 60/40 between two classes, and an off-hand from another class takes ${Math.round(G.OFFHAND_XP_SHARE * 100)}% for its class.`),
           cls === 'healer' ? h('p', { class: 'muted' }, 'Healers heal anyone under 80% HP and smite the rest of the time, so they can clear raids alone, just more slowly.') : null,
           h('p', { class: trains ? 'ok' : 'warn' }, trains ? `You are training ${sk.name}.` : `Fit a ${cls} weapon in Equipment to train ${sk.name}.`),
           h('p', { class: 'actions' }, h('button', { type: 'button', class: 'btn primary', onclick: () => go('raids') }, 'Go to raids'),

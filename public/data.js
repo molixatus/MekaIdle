@@ -776,6 +776,8 @@
   // raids 1-8 need nothing extra; raids 9-16 need 2 pieces of this region's raid gear (or better)
   // fitted; raids 17-24 need a next-tier weapon; the finale a next-tier weapon and 3 next-tier
   // armour pieces (tier 10 in the last region).
+  // An off-hand from another class earns that class this share of each fight's XP.
+  const OFFHAND_XP_SHARE = 0.3;
   const FINALE_ARMOUR = 3, RAID_GEAR_NEED = 2;
   const GEAR_STAGE = k => (k >= 24 ? 'finale' : k >= 16 ? 'next' : k >= 8 ? 'raid' : null);
   function gearCheck(equipment, raid) {
@@ -797,6 +799,7 @@
 
   const PATCH_NOTES = [
     { v: '0.11', date: '2026-09-29', notes: [
+      'An off-hand from another class now trains that class too: it takes 30% of each fight’s XP, and the rest goes to your main class (split 60/40 if you multiclass).',
       'Fixed damage numbers near the edge of an enemy squashing into an empty box with the number spilling out.',
       'In parties, each pilot’s damage numbers pop up in their own spot on the enemy (a grid with a cell per pilot), so they no longer pile on top of each other.',
       'New Settings page (above Log out): turn damage numbers, hit flashes, item shine and animations on or off, download a backup of your save, or reset your progress and start again.',
@@ -883,7 +886,7 @@
     MAX_LEVEL, OFFLINE_CAP, TIERS, TIER_BY_ID, CLASSES, ROLES, CLASS_OF_SKILL, UNARMED_COLOUR, SKILLS, SKILL_BY_ID, COMBAT_SKILLS, STATS, describe,
     WEAPON_KINDS, WEAPON_BY_ID, OFFHAND_KINDS, OFFHAND_BY_ID, SLOTS, ARMOUR_SLOTS, ARMOUR_TYPES, CONSUMABLES, CONSUMABLE_BY_ID,
     ABILITIES, ABILITY_BY_ID, ABILITY_SLOTS, SUBCLASSES, SUBCLASS_BY_ID, REGIONS, SET_BY_ID, TRASH_ROLES, FOE_ROLE, MECHANICS, RAID_CURVE, FOES, FOE_DAMAGE, PASSIVES, DIFFICULTIES, DIFF_BY_ID, FIGHT, PARTY,
-    ITEMS, ACTIONS, ACTION_BY_ID, RAIDS, RAID_BY_ID, finaleGear, gearCheck, FINALE_ARMOUR, RAID_GEAR_NEED, PATCH_NOTES, CLASS_KIT,
+    ITEMS, ACTIONS, ACTION_BY_ID, RAIDS, RAID_BY_ID, finaleGear, gearCheck, FINALE_ARMOUR, RAID_GEAR_NEED, OFFHAND_XP_SHARE, PATCH_NOTES, CLASS_KIT,
     xpForLevel, levelFromXp, skillMult, mechStats, power, combatLevel, kit, rng,
     PARTY_MAX: PARTY.max, partyDmg, POTIONS_PER_RAID: 3, GUILD_COST: 0, QUEUE_MAX: 5,
   };
