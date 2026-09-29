@@ -41,12 +41,17 @@
     const cell = SHEET && SHEET.map[id];
     if (!cell) return gi(it.icon, it.colour, `${cls}${it.rare ? ' rare' : ''}`);
     const [r, c, hue] = cell;
-    const el = h('span', { class: `ico item-sprite ${cls}${it.rare ? ' rare' : ''}`, 'aria-hidden': 'true' });
-    el.style.backgroundImage = `url(${SHEET.src})`;
-    el.style.backgroundSize = `${SHEET.cols * 100}% ${SHEET.rows * 100}%`;
-    el.style.backgroundPosition = `${(c / (SHEET.cols - 1)) * 100}% ${(r / (SHEET.rows - 1)) * 100}%`;
-    if (hue) el.style.filter = `hue-rotate(${hue}deg)`;
-    return el;
+    // The sheet is drawn larger than the box and offset so only the inside of the cell shows: a
+    // margin of each cell is cut off, which hides stray pixels from neighbouring icons.
+    const m = 0.08, k = 1 / (1 - 2 * m);
+    const inner = h('span', { class: 'item-sprite-img' });
+    inner.style.backgroundImage = `url(${SHEET.src})`;
+    inner.style.width = `${SHEET.cols * k * 100}%`;
+    inner.style.height = `${SHEET.rows * k * 100}%`;
+    inner.style.left = `${-(c + m) * k * 100}%`;
+    inner.style.top = `${-(r + m) * k * 100}%`;
+    if (hue) inner.style.filter = `hue-rotate(${hue}deg)`;
+    return h('span', { class: `ico item-sprite ${cls}${it.rare ? ' rare' : ''}`, 'aria-hidden': 'true' }, inner);
   };
   // Item names are coloured by the item's tier.
   const itemName = (id, tag = 'span') => {
@@ -316,24 +321,39 @@
     spriteCache.set(key, svg);
     return svg;
   }
-  // Enemies the pixel-art sheet has a creature for (index in G.FOES -> [row, col]).
-  const FOE_SHEET = {
-    4: [14, 0], 5: [14, 2], 7: [14, 3], 48: [14, 4], 25: [22, 12], 27: [23, 11], 28: [23, 0], 51: [23, 2],
-    55: [1, 15], 56: [15, 7], 57: [16, 6], 61: [10, 13],
-  };
+  // Enemy sprites from the monster sheet (public/monsters.png, 12 x 16 cells of 48 x 72, made
+  // transparent from the supplied sheet). Index in G.FOES -> [row, col]. The mech enemies have no
+  // match and keep their game-icons sprites.
+  const MONSTERS = { src: 'monsters.png', cols: 12, rows: 16, map: {
+    0: [1, 8], 1: [3, 11], 2: [0, 7], 3: [3, 0], 4: [0, 0], 5: [3, 5], 6: [7, 4], 7: [0, 8], 8: [14, 1], 9: [4, 9],
+    10: [6, 11], 11: [0, 4], 12: [7, 2], 13: [1, 9], 14: [9, 9], 15: [11, 5], 16: [10, 4], 17: [2, 6], 18: [11, 6], 19: [8, 11],
+    20: [12, 8], 21: [2, 10], 22: [2, 9], 23: [8, 10], 24: [1, 2], 25: [10, 7], 26: [2, 11], 27: [8, 7], 28: [10, 5], 29: [4, 0],
+    30: [14, 6], 31: [9, 3], 32: [1, 5], 33: [7, 0], 34: [14, 0], 35: [1, 0], 36: [9, 7], 37: [4, 7], 38: [5, 11], 39: [9, 0],
+    40: [0, 5], 41: [6, 4], 42: [6, 1], 43: [1, 1], 44: [7, 6], 47: [5, 1], 48: [15, 0], 49: [4, 8], 50: [12, 7], 51: [2, 7],
+    52: [2, 8], 53: [5, 4], 54: [14, 3], 55: [2, 5], 56: [4, 4], 57: [9, 1], 58: [13, 8], 59: [13, 10], 60: [10, 8], 61: [11, 8],
+    62: [6, 10], 63: [10, 0], 64: [5, 6], 65: [10, 9],
+  } };
   function foeArt(foe, boss, cls = '', size) {
-    const cell = FOE_SHEET[foe];
-    if (cell && SHEET) {
-      const el = h('span', { class: `sprite foe-sprite sheet-foe${boss ? ' boss-art' : ''} ${cls}`, 'aria-hidden': 'true' });
-      el.style.backgroundImage = `url(${SHEET.src})`;
-      el.style.backgroundSize = `${SHEET.cols * 100}% ${SHEET.rows * 100}%`;
-      el.style.backgroundPosition = `${(cell[1] / (SHEET.cols - 1)) * 100}% ${(cell[0] / (SHEET.rows - 1)) * 100}%`;
+    const cell = MONSTERS.map[foe];
+    const box = cell && window.MONSTER_BOXES && window.MONSTER_BOXES[cell[0] * MONSTERS.cols + cell[1]];
+    if (box) {
+      // Scale the monster so its own outline (not its cell) fills the space: bosses 150px, enemies
+      // in a fight 96px, small portraits 36px.
+      const [bx, by, bw, bh] = box;
+      const target = size === 48 ? 150 : size === 32 ? 96 : 36;
+      const sc = target / Math.max(bw, bh);
+      const el = h('span', { class: `sprite foe-sprite mon-sprite${boss ? ' boss-art' : ''} ${cls}`, 'aria-hidden': 'true' });
+      el.style.width = `${Math.round(bw * sc)}px`;
+      el.style.height = `${Math.round(bh * sc)}px`;
+      el.style.backgroundImage = `url(${MONSTERS.src})`;
+      el.style.backgroundSize = `${576 * sc}px ${1152 * sc}px`;
+      el.style.backgroundPosition = `${-bx * sc}px ${-by * sc}px`;
       return el;
     }
     return h('span', { class: `sprite foe-sprite${boss ? ' boss-art' : ''} ${cls}`, 'aria-hidden': 'true', html: foeSprite(foe, boss, size) });
   }
   // Raid list portraits use the plain icon in the boss's colour.
-  const bossIcon = (raid, cls = '') => gi(`foe_${raid.foe}`, hslToHex(foeColour(raid.foe, true)), `boss-ico-svg ${cls}`);
+  const bossIcon = (raid, cls = '') => (MONSTERS.map[raid.foe] ? foeArt(raid.foe, false, `boss-ico-mon ${cls}`) : gi(`foe_${raid.foe}`, hslToHex(foeColour(raid.foe, true)), `boss-ico-svg ${cls}`));
 
   // ---------- Auth ----------
   function showAuth() {
@@ -1133,19 +1153,36 @@
         })),
         h('span', { class: 'muted small' }, diff === 'normal' ? 'Base rewards. Clear a raid on Normal to unlock the next one and its Heroic mode.'
           : `Enemies have ${dd.hp}× HP and hit ${dd.dmg}× harder. ${dd.xp}× XP, ${dd.mats}× materials and ${dd.drop}× rare drop chance.`));
-      const frontier = Math.max(1, ...G.RAIDS.filter(r => raidOpen(r, 'normal')).map(r => r.n));
-      const regions = G.REGIONS.map((reg, ri) => {
+      // One list of every open region, with a header per region. Filters hide bosses cleared on the
+      // chosen difficulty, or bosses whose rare loot (set pieces, weapons, trinkets) you all own.
+      const owns = id => have(id) > 0 || Object.values(me.state.equipment).includes(id);
+      const diffRank = G.DIFFICULTIES.findIndex(x => x.id === diff) + 1;
+      const hideCleared = store('mekaidle-hide-cleared') === '1';
+      const hideLooted = store('mekaidle-hide-looted') === '1';
+      const looted = r => r.drops.filter(x => x.rare).every(x => owns(x.item));
+      const check = (key, label, on) => {
+        const box = h('input', { type: 'checkbox', checked: on || null, onchange: e => { store(key, e.target.checked ? '1' : '0'); drawBosses(); } });
+        return h('label', { class: 'raid-filter' }, box, label);
+      };
+      const filters = h('div', { class: 'raid-filters' },
+        check('mekaidle-hide-cleared', `Hide bosses cleared on ${dd.name}`, hideCleared),
+        check('mekaidle-hide-looted', 'Hide bosses whose rare loot I all own', hideLooted));
+      const list = [];
+      let hidden = 0;
+      for (const [ri, reg] of G.REGIONS.entries()) {
         const raids = G.RAIDS.filter(r => r.region === ri);
         const unlocked = raidOpen(raids[0], 'normal');
         const cleared = raids.filter(r => clearsOf(r.id) >= 1).length;
-        const note = unlocked ? `Tier ${ri + 1} · ${cleared}/25 cleared` : 'Locked';
-        const title = h('span', { class: 'region-title' }, bossIcon(raids[24]), reg.name);
-        title.style.setProperty('--tier', G.TIERS[ri].colour);
-        const body = unlocked ? h('div', { class: 'raid-list' }, raids.map(r => raidRow(r, diff, ctx)))
-          : h('div', { class: 'empty' }, `Beat ${G.REGIONS[ri - 1].finale} (#${ri * 25}) to open ${reg.name}.`);
-        return collapsible(`region-${ri}`, title, note, body, raids.some(r => r.n === frontier));
-      });
-      bossBox.replaceChildren(collapsible('bosses', 'Bosses', '250 raids in 10 regions', h('div', {}, diffBar, regions), true));
+        const head = h('div', { class: 'region-head' }, h('span', { class: 'region-title' }, bossIcon(raids[24]), reg.name),
+          h('small', {}, unlocked ? `Tier ${ri + 1} \u00b7 ${cleared}/25 cleared` : `Locked \u00b7 beat ${G.REGIONS[ri - 1].finale} (#${ri * 25}) to open`));
+        head.style.setProperty('--tier', G.TIERS[ri].colour);
+        list.push(head);
+        if (!unlocked) break;
+        const shown = raids.filter(r => !(hideCleared && clearsOf(r.id) >= diffRank) && !(hideLooted && looted(r)));
+        hidden += raids.length - shown.length;
+        list.push(shown.length ? h('div', { class: 'raid-list' }, shown.map(r => raidRow(r, diff, ctx))) : h('div', { class: 'empty small' }, 'Every boss here is hidden by your filters.'));
+      }
+      bossBox.replaceChildren(collapsible('bosses', 'Bosses', hidden ? `${hidden} hidden by filters` : '250 raids in 10 regions', h('div', {}, diffBar, filters, list), true));
     }
 
     function visibilityPicker(current, disabled) {
@@ -1167,7 +1204,7 @@
           h('div', { class: 'panel party' },
             h('div', { class: 'raid-top' }, h('span', { class: 'boss-ico' }, bossIcon(raid)),
               h('div', { class: 'raid-title' }, h('small', { class: 'muted' }, `#${raid.n} · ${raid.regionName}`), h('h3', {}, raid.name, ' ', diffTag(p.diff))),
-              h('span', { class: 'muted' }, `${p.members.length} / ${G.PARTY_MAX} pilots`)),
+              h('span', { class: 'muted' }, plural(p.members.length, 'pilot'))),
             h('div', { class: 'member-list' }, p.members.map(m => {
               const row = memberRow(m, m.id === p.leader ? 'Leader' : null);
               if (leader && m.id !== me.player.id) row.append(h('button', { type: 'button', class: 'btn small', onclick: () => partyAct('/api/party/kick', { id: m.id }, `${m.name} removed from the party.`) }, 'Kick'));
@@ -1188,7 +1225,7 @@
           return h('div', { class: 'row' },
             h('span', { class: 'boss-ico' }, bossIcon(raid)),
             h('div', { class: 'grow' }, h('div', { class: 'name' }, `${lead ? lead.name : 'Someone'}’s party `, diffTag(o.diff)),
-              h('small', {}, `#${raid.n} ${raid.name} · ${o.members.length}/${G.PARTY_MAX} pilots${o.running ? ' · raiding now' : ''}${o.visibility === 'public' ? ' · open to everyone' : ''}`)),
+              h('small', {}, `#${raid.n} ${raid.name} · ${plural(o.members.length, 'pilot')}${o.running ? ' · raiding now' : ''}${o.visibility === 'public' ? ' · open to everyone' : ''}`)),
             h('button', { type: 'button', class: 'btn small primary', disabled: !!data.party, onclick: () => partyAct('/api/party/join', { id: o.id }, 'Joined the party.') }, 'Join'));
         })) : h('div', { class: 'empty' }, 'No open parties. Form one from a raid below, open your running raid to others, or add friends and join a guild to see theirs.'), true));
     }
@@ -1335,7 +1372,10 @@
     // ----- Units -----
     function makeUnit(o) {
       const floats = h('div', { class: 'floats', 'aria-hidden': 'true' });
-      const artBox = h('div', { class: 'unit-art' }, o.art);
+      const bob = h('span', { class: 'bob' }, o.art);
+      bob.style.animationDelay = `-${(Math.random() * 3).toFixed(2)}s`;
+      const actEl = h('span', { class: 'act' }, bob);
+      const artBox = h('div', { class: 'unit-art' }, actEl);
       const hpFill = h('span', { class: 'hp-fill' }), hpTrail = h('span', { class: 'hp-trail' }), hpShield = h('span', { class: 'hp-shield' }), hpText = h('b');
       const hpBar = h('div', { class: 'hpbar' }, hpTrail, hpFill, hpShield, hpText);
       const manaFill = h('span');
@@ -1349,7 +1389,7 @@
           hpBar, manaBar, castBar, statuses),
         floats);
       if (o.colour) el.style.setProperty('--series', o.colour);
-      const u = { ...o, el, artBox, floats, hpFill, hpTrail, hpShield, hpText, hpBar, manaFill, castFill, castText, castBar, statuses, hp: o.max, barrier: 0, cast: null, down: false, buffs: {}, mana: o.maxMana };
+      const u = { ...o, el, artBox, actEl, floats, hpFill, hpTrail, hpShield, hpText, hpBar, manaFill, castFill, castText, castBar, statuses, hp: o.max, barrier: 0, cast: null, down: false, buffs: {}, mana: o.maxMana };
       drawHp(u);
       drawMana(u);
       return u;
@@ -1380,7 +1420,7 @@
     }
     function pulse(u, cls) {
       if (quiet || reduced) return;
-      const el = cls === 'glow' ? u.el : u.artBox;
+      const el = cls === 'glow' ? u.el : cls === 'lunge' || cls === 'cast-flash' ? u.actEl : u.artBox;
       el.classList.remove(cls);
       void el.offsetWidth; // restart the animation
       el.classList.add(cls);
@@ -1529,6 +1569,7 @@
         u.cast = { start: e.t, d: e.d };
         u.castText.textContent = castLabel(e);
         u.castBar.className = `castbar k-${e.k}`;
+        if (e.k !== 'attack' && e.k !== 'enemy') pulse(u, 'cast-flash');
         if (e.m != null && u.maxMana) { u.mana = e.m; drawMana(u); }
         if (typeof e.a === 'number' && ABILITY_NAMES.has(e.n)) addLog(at, 'abilities', [who(e.a), ` casts ${e.n}`], 'ability');
         else if (e.k === 'danger') addLog(at, 'abilities', [foeName(e.a), ` begins ${e.n}!`], 'danger');
@@ -1608,6 +1649,7 @@
         bump('taken', e.tg, src, e.v - (e.ab || 0));
         bump('mit', e.tg, src, Math.max(0, (e.raw || e.v) - e.v) + (e.ab || 0));
         float(target, `${num(e.v)}${e.c ? '!' : ''}`, e.ab ? `${e.ty} · ${num(e.ab)} absorbed` : e.ty, '#ff6b5b', e.c, 'taken');
+        if (foes[e.a] && e.k !== 'dot') pulse(foes[e.a], 'lunge');
         pulse(target, 'shake');
       } else if (e.k === 'eheal') {
         // An enemy healing itself or an ally.
@@ -1622,7 +1664,7 @@
         bump('dps', e.a, e.sr, e.v);
         const from = party[e.a];
         float(target, `${num(e.v)}${e.c ? '!' : ''}`, e.ty, from ? from.colour : '#fff', e.c, e.k === 'dot' ? 'dot' : 'dmg');
-        if (e.k !== 'dot') pulse(target, 'shake');
+        if (e.k !== 'dot') { pulse(target, 'shake'); if (from && e.k !== 'thorns') pulse(from, 'lunge'); }
       }
       drawHp(target);
     }

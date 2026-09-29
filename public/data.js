@@ -150,10 +150,10 @@
   const WEAPON_BY_ID = Object.fromEntries(WEAPON_KINDS.map(w => [w.id, w]));
 
   const OFFHAND_KINDS = [
-    { id: 'shield', noun: 'shield', cls: 'melee', maker: 'smithing', stats: { def: 8, hp: 20 }, extra: { block: 8 }, mats: { ore: 6 }, offset: 3, note: 'Blocks part of every hit.' },
-    { id: 'quiver', noun: 'quiver', cls: 'ranged', maker: 'fletching', stats: { def: 3, hp: 10 }, extra: { haste: 6, crit: 3 }, mats: { hide: 4, bone: 1 }, offset: 3, note: 'Faster, sharper shots.' },
-    { id: 'orb', noun: 'orb', cls: 'magic', maker: 'enchanting', stats: { def: 2, hp: 8, mana: 20 }, extra: { power: 6, regen: 1 }, mats: { essence: 3, branch: 2 }, offset: 3, note: 'Focuses power and mana.' },
-    { id: 'relic', noun: 'relic', cls: 'healer', maker: 'scribing', stats: { def: 3, hp: 10, mana: 15 }, extra: { heal: 8, regen: 1 }, mats: { herb: 3, reed: 2 }, offset: 3, note: 'A holy focus for healers.' },
+    { id: 'shield', noun: 'shield', cls: 'melee', maker: 'smithing', stats: { def: 8, hp: 200 }, extra: { block: 8 }, mats: { ore: 6 }, offset: 3, note: 'Blocks part of every hit.' },
+    { id: 'quiver', noun: 'quiver', cls: 'ranged', maker: 'fletching', stats: { def: 3, hp: 100 }, extra: { haste: 6, crit: 3 }, mats: { hide: 4, bone: 1 }, offset: 3, note: 'Faster, sharper shots.' },
+    { id: 'orb', noun: 'orb', cls: 'magic', maker: 'enchanting', stats: { def: 2, hp: 80, mana: 20 }, extra: { power: 6, regen: 1 }, mats: { essence: 3, branch: 2 }, offset: 3, note: 'Focuses power and mana.' },
+    { id: 'relic', noun: 'relic', cls: 'healer', maker: 'scribing', stats: { def: 3, hp: 100, mana: 15 }, extra: { heal: 8, regen: 1 }, mats: { herb: 3, reed: 2 }, offset: 3, note: 'A holy focus for healers.' },
   ];
   const OFFHAND_BY_ID = Object.fromEntries(OFFHAND_KINDS.map(o => [o.id, o]));
 
@@ -170,16 +170,16 @@
   // Totals for a full tier 1 set; each slot takes its share. Percent stats step up per tier.
   const ARMOUR_TYPES = {
     plate: { name: 'Plate', maker: 'armoursmithing', mat: 'ore', icon: 'plate', nouns: { head: 'helm', body: 'breastplate', legs: 'greaves', hands: 'gauntlets', feet: 'sabatons' },
-      total: { def: 30, hp: 90, mres: 6, eres: 10 }, pct: { block: [4, 0.4] },
+      total: { def: 30, hp: 900, mres: 6, eres: 10 }, pct: { block: [4, 0.4] },
       bonus3: { name: 'Fortified', defPct: 8 }, bonus5: { name: 'Bulwark', hpPct: 10, block: 6 } },
     leather: { name: 'Leather', maker: 'leatherworking', mat: 'hide', icon: 'leather', nouns: { head: 'hood', body: 'jerkin', legs: 'leggings', hands: 'bracers', feet: 'boots' },
-      total: { def: 22, hp: 80, mres: 10, eres: 14 }, pct: { crit: [5, 0.5], haste: [3, 0.3] },
+      total: { def: 22, hp: 800, mres: 10, eres: 14 }, pct: { crit: [5, 0.5], haste: [3, 0.3] },
       bonus3: { name: 'Keen eye', crit: 4 }, bonus5: { name: 'Stalker', haste: 8, crit: 4 } },
     cloth: { name: 'Cloth', maker: 'tailoring', mat: 'fibre', icon: 'cloth', nouns: { head: 'hat', body: 'robe', legs: 'trousers', hands: 'gloves', feet: 'slippers' },
-      total: { def: 15, hp: 72, mres: 24, eres: 10, mana: 30 }, pct: { power: [8, 1] }, flat: { regen: [1, 0.2] },
+      total: { def: 15, hp: 720, mres: 24, eres: 10, mana: 30 }, pct: { power: [8, 1] }, flat: { regen: [1, 0.2] },
       bonus3: { name: 'Attuned', power: 6 }, bonus5: { name: 'Archmage', power: 8, regen: 2 } },
     vestment: { name: 'Vestment', maker: 'weaving', mat: 'reed', icon: 'vest', nouns: { head: 'circlet', body: 'vestment', legs: 'skirt', hands: 'prayer beads', feet: 'sandals' },
-      total: { def: 17, hp: 76, mres: 18, eres: 12, mana: 25 }, pct: { heal: [10, 1] }, flat: { regen: [1.5, 0.25] },
+      total: { def: 17, hp: 760, mres: 18, eres: 12, mana: 25 }, pct: { heal: [10, 1] }, flat: { regen: [1.5, 0.25] },
       bonus3: { name: 'Blessed', heal: 8 }, bonus5: { name: 'Saintly', heal: 10, regen: 3 } },
   };
   const tierLabel = (t, type) => (type === 'plate' ? t.metal : type === 'leather' ? t.leather : type === 'cloth' ? t.cloth : `${t.order.replace('’s', '')}`);
@@ -386,12 +386,15 @@
   // bossKillS / trashKillS: seconds a reference pilot (matching crafted gear) needs to kill a boss or
   // a trash wave at the start of a region. deathS: seconds of that enemy damage the pilot survives.
   // frenzyS: after this long in the boss wave (a third of it for a trash wave) enemies hit harder every 10 seconds.
-  const FIGHT = { respawnMs: 25000, waveGapMs: 1500, gapMs: 3000, safetyMs: 20 * 60000, bossKillS: 40, trashKillS: 9, deathS: 75, frenzyS: 100 };
+  const FIGHT = { respawnMs: 25000, waveGapMs: 1500, gapMs: 3000, safetyMs: 20 * 60000, bossKillS: 40, trashKillS: 9, deathS: 38, frenzyS: 100 };
   // Raid strength through a region, relative to the region's reference pilot: start + rise * (k/24)^shape.
   // region: extra strength per region (up to the 6th), since gear percentages (block, crit) grow with tier.
   // first: the first region is gentler while pilots learn the game.
   const RAID_CURVE = { start: 0.8, rise: 0.55, shape: 1, finale: 1.05, region: 0.035, first: 0.88 };
-  const PARTY = { max: 4, hpPerExtra: 0.75, dmgPerExtra: 0.22 };
+  // No size limit. Enemy HP grows with every pilot; enemy damage grows gently up to 4 pilots, then
+  // by each extra pilot's share, so a big party isn't safer per pilot than a party of four.
+  const PARTY = { max: Infinity, hpPerExtra: 0.75, dmgPerExtra: 0.22, dmgPerExtraBig: 0.42, extraFoesMax: 6 };
+  const partyDmg = n => 1 + PARTY.dmgPerExtra * (Math.min(n, 4) - 1) + PARTY.dmgPerExtraBig * Math.max(0, n - 4);
 
   // ---------- Items ----------
   // Icon variants: each item base has several game-icons shapes; higher tiers use later ones.
@@ -469,7 +472,7 @@
     WEAPON_KINDS.forEach(w => {
       const name = w.cls === 'melee' ? `${t.metal} ${w.noun}` : w.cls === 'ranged' ? `${t.bow} ${w.noun}` : w.cls === 'magic' ? `${t.wood} ${w.noun}` : `${t.order} ${w.noun}`;
       item(`${t.id}_${w.id}`, { name, type: 'gear', slot: 'weapon', weapon: w.id, cls: w.cls, icon: iconFor(w.id, n), colour: t.colour, tier: n, twoHanded: !!w.twoHanded,
-        stats: { atk: Math.round(10 * t.mult * (w.twoHanded ? 1.35 : 1)), ...scaleExtra(w.extra, n) }, desc: `Tier ${n} ${CLASSES[w.cls].name.toLowerCase()} weapon. ${w.note}` });
+        stats: { atk: Math.round(100 * t.mult * (w.twoHanded ? 1.35 : 1)), ...scaleExtra(w.extra, n) }, desc: `Tier ${n} ${CLASSES[w.cls].name.toLowerCase()} weapon. ${w.note}` });
     });
     OFFHAND_KINDS.forEach(o => {
       const name = o.cls === 'melee' ? `${t.metal} ${o.noun}` : o.cls === 'ranged' ? `${t.leather} ${o.noun}` : o.cls === 'magic' ? `${t.wood} ${o.noun}` : `${t.order} ${o.noun}`;
@@ -569,7 +572,8 @@
   const ACTION_BY_ID = Object.fromEntries(ACTIONS.map(a => [a.id, a]));
 
   // ---------- Mech stats ----------
-  const BASE = { atk: 5, def: 4, hp: 120, mres: 2, eres: 2, mana: 100, regen: 3 };
+  // HP and damage are on a x10 scale (so hits read 10-70, not 1-7); armour and resists are percentages-based and unscaled.
+  const BASE = { atk: 50, def: 4, hp: 1200, mres: 2, eres: 2, mana: 100, regen: 3 };
   const PCT_KEYS = ['crit', 'critDmg', 'power', 'heal', 'haste', 'pen', 'block', 'double', 'bleed', 'burn', 'poison', 'fire', 'frost', 'shock', 'lifesteal', 'defPct', 'hpPct', 'enemyDmg'];
 
   // opts: { boosts: stats from fight buffs, subclass: subclass id }
@@ -757,7 +761,7 @@
     ABILITIES, ABILITY_BY_ID, ABILITY_SLOTS, SUBCLASSES, SUBCLASS_BY_ID, REGIONS, SET_BY_ID, TRASH_ROLES, FOE_ROLE, MECHANICS, RAID_CURVE, FOES, FOE_DAMAGE, PASSIVES, DIFFICULTIES, DIFF_BY_ID, FIGHT, PARTY,
     ITEMS, ACTIONS, ACTION_BY_ID, RAIDS, RAID_BY_ID, finaleGear, FINALE_ARMOUR, PATCH_NOTES, CLASS_KIT,
     xpForLevel, levelFromXp, skillMult, mechStats, power, combatLevel, kit, rng,
-    PARTY_MAX: PARTY.max, POTIONS_PER_RAID: 3, GUILD_COST: 0, QUEUE_MAX: 5,
+    PARTY_MAX: PARTY.max, partyDmg, POTIONS_PER_RAID: 3, GUILD_COST: 0, QUEUE_MAX: 5,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = GAME;
   else root.GAME = GAME;

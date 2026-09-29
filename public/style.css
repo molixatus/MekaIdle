@@ -970,3 +970,70 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 .loot-ico.class-loot { background: color-mix(in srgb, var(--cls) 16%, #1a1e27); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cls) 55%, transparent); color: var(--cls); }
 .loot-ico.class-loot.rare { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cls) 70%, transparent), 0 0 6px color-mix(in srgb, var(--cls) 35%, transparent); }
 .gear-lock { color: var(--gold); cursor: help; }
+
+/* v0.9: monster sprites, item icon crop, battle animation. */
+.item-sprite { position: relative; overflow: hidden; background: none !important; }
+.item-sprite-img { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; image-rendering: pixelated; }
+.mon-sprite { background-repeat: no-repeat; image-rendering: pixelated; aspect-ratio: 2 / 3; }
+.unit.enemy .foe-sprite.mon-sprite { width: auto; height: 72px; }
+.unit.enemy.boss .foe-sprite.mon-sprite { width: auto; height: 124px; }
+.now-card .foe-sprite.mon-sprite { width: auto; height: 34px; }
+.boss-ico .mon-sprite { width: auto; height: 100%; }
+.history-row .mon-sprite { width: auto; height: 30px; }
+.unit-art .act, .unit-art .bob { display: inline-grid; place-items: center; }
+.unit-art .bob { animation: bob 2.8s ease-in-out infinite; }
+.unit.enemy .unit-art .bob { animation-duration: 3.4s; }
+.unit.down .unit-art .bob { animation: none; transform: rotate(-14deg) translateY(8px); transition: transform .3s; }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.unit.pilot .act.lunge { animation: lunge-right .32s ease-out; }
+.unit.enemy .act.lunge { animation: lunge-left .32s ease-out; }
+@keyframes lunge-right { 0%, 100% { transform: translateX(0); } 35% { transform: translateX(12px) scale(1.04); } }
+@keyframes lunge-left { 0%, 100% { transform: translateX(0); } 35% { transform: translateX(-12px) scale(1.04); } }
+.act.cast-flash { animation: cast-flash .5s ease-out; }
+@keyframes cast-flash { 0%, 100% { filter: none; } 40% { filter: brightness(1.5) drop-shadow(0 0 8px rgba(160, 200, 255, .9)); } }
+@media (prefers-reduced-motion: reduce) { .unit-art .bob, .act.lunge, .act.cast-flash { animation: none !important; } }
+
+.raid-filters { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 4px 0 14px; }
+.raid-filter { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #c3c9d4; cursor: pointer; }
+.raid-filter input { width: 16px; height: 16px; min-height: 0; accent-color: var(--green); }
+.region-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 18px 0 8px; padding-bottom: 6px; border-bottom: 2px solid color-mix(in srgb, var(--tier) 45%, transparent); }
+.region-head .region-title { font: 700 16px/1.2 var(--display); color: var(--tier); }
+.region-head small { color: var(--muted); font-size: 12px; }
+
+/* Monster sprites size themselves (inline width/height); give the art column room. */
+.unit.enemy .foe-sprite.mon-sprite, .unit.enemy.boss .foe-sprite.mon-sprite, .now-card .foe-sprite.mon-sprite,
+.boss-ico .mon-sprite, .history-row .mon-sprite { aspect-ratio: auto; }
+.unit.enemy { grid-template-columns: 104px 1fr; }
+.unit.enemy .unit-art { width: 104px; height: 104px; }
+.unit.enemy.boss { grid-template-columns: 160px 1fr; }
+.unit.enemy.boss .unit-art { width: 160px; height: 160px; }
+.boss-ico { overflow: hidden; }
+.boss-ico .mon-sprite { max-width: 100%; max-height: 100%; }
+.now-card .mon-sprite { max-height: 34px; }
+@media (max-width: 600px) {
+  .unit.enemy { grid-template-columns: 72px 1fr; }
+  .unit.enemy .unit-art { width: 72px; height: 72px; }
+  .unit.enemy .mon-sprite { transform: scale(.72); }
+  .unit.enemy.boss { grid-template-columns: 100px 1fr; }
+  .unit.enemy.boss .unit-art { width: 100px; height: 100px; }
+  .unit.enemy.boss .mon-sprite { transform: scale(.65); }
+}
+
+/* Sidebar scrollbar on its left edge, thin and in the panel's own colours. */
+.sidebar { direction: rtl; scrollbar-width: thin; scrollbar-color: #262b36 transparent; }
+.sidebar > * { direction: ltr; }
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: #262b36; border-radius: 3px; }
+.sidebar::-webkit-scrollbar-thumb:hover { background: #343b49; }
+
+/* Taking damage: a shake and a quick red flash, like Minecraft. */
+.unit-art.shake { animation: shake-hurt .32s ease-out; }
+@keyframes shake-hurt {
+  0% { transform: translate(0, 0); filter: sepia(1) saturate(8) hue-rotate(-45deg) brightness(.95); }
+  20% { transform: translate(-4px, 1px); filter: sepia(1) saturate(8) hue-rotate(-45deg) brightness(.95); }
+  45% { transform: translate(4px, -1px); filter: sepia(1) saturate(6) hue-rotate(-45deg) brightness(1); }
+  70% { transform: translate(-2px, 0); filter: none; }
+  100% { transform: translate(0, 0); filter: none; }
+}
+@media (prefers-reduced-motion: reduce) { .unit-art.shake { animation: hurt-flash .3s; } @keyframes hurt-flash { 0%, 50% { filter: sepia(1) saturate(8) hue-rotate(-45deg); } 100% { filter: none; } } }
