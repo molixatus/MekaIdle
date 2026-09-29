@@ -799,6 +799,7 @@
 
   const PATCH_NOTES = [
     { v: '0.11', date: '2026-09-29', notes: [
+      'Skill pages show your level and XP bar full width under the title instead of squeezed into the corner.',
       'An off-hand from another class now trains that class too: it takes 30% of each fight’s XP, and the rest goes to your main class (split 60/40 if you multiclass).',
       'Fixed damage numbers near the edge of an enemy squashing into an empty box with the number spilling out.',
       'In parties, each pilot’s damage numbers pop up in their own spot on the enemy (a grid with a cell per pilot), so they no longer pile on top of each other.',

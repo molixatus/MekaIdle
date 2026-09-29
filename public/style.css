@@ -1468,3 +1468,7 @@ body.no-motion *, body.no-motion *::before, body.no-motion *::after { animation-
 .float { width: max-content; max-width: none; }
 .unit.enemy > .floats { width: 120px; }
 .unit.enemy.boss > .floats { width: 180px; }
+
+/* Skill pages: level and XP bar full width under the title. */
+.level-box.level-wide { width: 100%; margin: -8px 0 18px; padding: 10px 14px; background: var(--card); border-radius: 8px; }
+.level-wide .bar { height: 8px; }

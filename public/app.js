@@ -936,8 +936,11 @@
 
   function skillPage(id) {
     const sk = G.SKILL_BY_ID[id];
-    const head = pageHead(id, 'skill-' + id, sk.name, sk.desc, levelBox(id));
-    if (sk.group === 'combat') return [head, chainBar(id), ...combatSkillBody(sk)];
+    // The level and XP bar runs full width under the title.
+    const lv = levelBox(id);
+    lv.classList.add('level-wide');
+    const head = [pageHead(id, 'skill-' + id, sk.name, sk.desc), lv];
+    if (sk.group === 'combat') return [...head, chainBar(id), ...combatSkillBody(sk)];
     // Every tier on one screen, lowest level first, with a divider where each tier starts.
     const tierOf = a => (G.ITEMS[a.item] || {}).tier || 1;
     const all = G.ACTIONS.filter(a => a.skill === id).sort((x, y) => x.level - y.level || tierOf(x) - tierOf(y));
@@ -954,7 +957,7 @@
       lastTier = tn;
       cards.push(actionCard(a));
     });
-    return [head, chainBar(id), section(SKILL_SECTION[id] || 'Actions', 'Hover a card for details. Click it to start, or set a count and start or queue it.', h('div', { class: 'grid' }, cards))];
+    return [...head, chainBar(id), section(SKILL_SECTION[id] || 'Actions', 'Hover a card for details. Click it to start, or set a count and start or queue it.', h('div', { class: 'grid' }, cards))];
   }
 
   // A small item badge (icon and a number) with the item's details on hover.
