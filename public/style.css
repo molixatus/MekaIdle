@@ -1344,3 +1344,9 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 .tile-tier { position: absolute; left: 6px; top: 6px; padding: 0 5px; border-radius: 4px; font-size: 10px; font-weight: 800; line-height: 15px; color: #0d1016; background: var(--tier); }
 .tip-sources { display: grid; gap: 3px; margin-top: 6px; font-size: 12px; color: #c3c9d4; }
 .tip-sources b { color: var(--muted); }
+
+/* Sidebar queue: rows fit the box; long names end in an ellipsis. */
+.queue-box { grid-template-columns: minmax(0, 1fr); }
+.queue-head, .queue-row { min-width: 0; }
+.queue-row .grow { white-space: nowrap; }
+.queue-row small, .queue-row .icon-btn { flex: none; }
