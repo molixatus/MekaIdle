@@ -958,3 +958,7 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 .storage-warning { margin: 0 0 16px; padding: 10px 12px; border-radius: 8px; background: rgba(239, 90, 69, .15); border: 1px solid rgba(239, 90, 69, .5); color: #ffb3a8; font-size: 13px; font-weight: 600; }
 .topline .storage-warning { margin: 0; padding: 4px 10px; }
 .storage-note { margin: 0 0 16px; padding: 10px 12px; border-radius: 8px; background: rgba(91, 155, 255, .12); border: 1px solid rgba(91, 155, 255, .4); color: #b9d3ff; font-size: 13px; }
+
+/* Item icons from the pixel-art sprite sheet. */
+.item-sprite { background-repeat: no-repeat; image-rendering: pixelated; }
+.card-art .item-sprite { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--ic, #000) 45%, transparent)) drop-shadow(0 6px 8px rgba(0, 0, 0, .4)); }

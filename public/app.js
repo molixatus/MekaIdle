@@ -33,10 +33,20 @@
     const key = GI['sk_' + name] ? 'sk_' + name : GI['nav_' + name] ? 'nav_' + name : GI[name] ? name : null;
     return key ? gi(key, null, cls) : h('span', { class: `ico ${cls}`, 'aria-hidden': 'true', html: I.ui(name) });
   };
+  // Item icons come from the pixel-art sheet (itemsheet.js); anything unmapped falls back to game-icons.
+  const SHEET = window.ITEM_SHEET;
   const itemIco = (id, cls = '') => {
     const it = G.ITEMS[id];
     if (!it) return gi('ore', '#5d6575', cls);
-    return gi(it.icon, it.colour, `${cls}${it.rare ? ' rare' : ''}`);
+    const cell = SHEET && SHEET.map[id];
+    if (!cell) return gi(it.icon, it.colour, `${cls}${it.rare ? ' rare' : ''}`);
+    const [r, c, hue] = cell;
+    const el = h('span', { class: `ico item-sprite ${cls}${it.rare ? ' rare' : ''}`, 'aria-hidden': 'true' });
+    el.style.backgroundImage = `url(${SHEET.src})`;
+    el.style.backgroundSize = `${SHEET.cols * 100}% ${SHEET.rows * 100}%`;
+    el.style.backgroundPosition = `${(c / (SHEET.cols - 1)) * 100}% ${(r / (SHEET.rows - 1)) * 100}%`;
+    if (hue) el.style.filter = `hue-rotate(${hue}deg)`;
+    return el;
   };
   // Item names are coloured by the item's tier.
   const itemName = (id, tag = 'span') => {
@@ -758,7 +768,7 @@
           h('ul', { class: 'ability-mini' }, abilities.map(ab => h('li', { class: L >= ab.level ? 'ok' : 'muted' }, gi('ab_' + ab.id, null, 'sm'), `${ab.name} · level ${ab.level}`))))),
       section('Weapons', `Made with ${G.SKILL_BY_ID[kinds[0].maker].name}. Each tier needs the previous region’s raid material.`,
         h('div', { class: 'weapon-table' }, [...kinds, off].map(w => h('div', { class: 'weapon-kind' },
-          h('div', { class: 'weapon-kind-head' }, gi(G.ITEMS[`copper_${w.id}`].icon, null, 'md'),
+          h('div', { class: 'weapon-kind-head' }, itemIco(`copper_${w.id}`, 'md'),
             h('div', {}, h('b', {}, w.noun[0].toUpperCase() + w.noun.slice(1) + (w === off ? ' (off-hand)' : '')), h('small', { class: 'muted' }, w.note))),
           h('div', { class: 'tier-row' }, G.TIERS.map(t => {
             const id = `${t.id}_${w.id}`;
@@ -989,6 +999,8 @@
       h('p', {}, `Item, skill, ability, subclass and enemy icons are from game-icons.net, made by ${window.GAME_ICON_AUTHORS.join(', ')}. They are licensed under Creative Commons Attribution 3.0 and are recoloured and, for enemies, redrawn as pixel art in the game.`),
       h('p', {}, h('a', { href: 'https://game-icons.net', target: '_blank', rel: 'noopener' }, 'game-icons.net'), ' · ',
         h('a', { href: 'https://creativecommons.org/licenses/by/3.0/', target: '_blank', rel: 'noopener' }, 'CC BY 3.0 licence')),
+      h('h2', {}, 'Item art'),
+      h('p', {}, 'Item icons come from a pixel-art icon sprite sheet supplied for the game. Its artist and licence should be credited here.'),
       h('h2', {}, 'Fonts'),
       h('p', {}, 'Inter and Chakra Petch, from Google Fonts (SIL Open Font License).')),
   ];

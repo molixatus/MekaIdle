@@ -440,6 +440,29 @@
       heal: c.heal, mana: c.mana, potion: c.potion, boost: c.boost, desc: `${who}${what}` });
   });
 
+  // Traits: each crafted tier of a weapon or armour piece gets one, named in the item, so a lower
+  // tier can still be the better pick for its trait.
+  const WEAPON_TRAITS = [
+    ['Keen', { crit: 3 }], ['Swift', { haste: 4 }], ['Brutal', { critDmg: 12 }], ['Piercing', { pen: 8 }], ['Vampiric', { lifesteal: 2.5 }],
+    ['Serrated', { bleed: 8 }], ['Searing', { fire: 5, burn: 6 }], ['Frigid', { frost: 6 }], ['Thundering', { shock: 6 }], ['Venomous', { poison: 8 }],
+  ];
+  const HEALER_TRAITS = [['Blessed', { heal: 5 }], ['Serene', { regen: 1 }], ['Radiant', { power: 4 }], ['Swift', { haste: 4 }], ['Hallowed', { mana: 25 }], ['Surging', { crit: 3 }], ['Warded', { mres: 6 }]];
+  const ARMOUR_TRAITS = [['Sturdy', { defPct: 3 }], ['Vital', { hpPct: 3 }], ['Warded', { mres: 6 }], ['Insulated', { eres: 6 }], ['Nimble', { haste: 2 }],
+    ['Focused', { regen: 0.5 }], ['Deadly', { crit: 1.5 }], ['Mighty', { power: 2 }]];
+  const FLAT_TRAIT = ['mres', 'eres', 'mana'];
+  function addTrait(id, list, k) {
+    const it = ITEMS[id];
+    const [name, stats] = list[k % list.length];
+    const added = {};
+    Object.entries(stats).forEach(([s, v]) => {
+      added[s] = FLAT_TRAIT.includes(s) ? Math.round(v * TIERS[it.tier - 1].mult) : round1(v * (1 + 0.12 * (it.tier - 1)));
+      it.stats[s] = round1((it.stats[s] || 0) + added[s]);
+    });
+    it.trait = name;
+    it.name = `${name} ${it.name.charAt(0).toLowerCase()}${it.name.slice(1)}`;
+    it.desc += ` ${name}: ${describe(added)}.`;
+  }
+
   // Gear.
   TIERS.forEach(t => {
     const n = t.n;
@@ -463,6 +486,11 @@
       item(`${t.id}_${type}_${slot}`, { name: `${tierLabel(t, type)} ${a.nouns[slot]}`, type: 'gear', slot, armour: type, icon: iconFor(`${a.icon}_${slot}`, n), colour: t.colour, tier: n, stats,
         desc: `Tier ${n} ${a.name.toLowerCase()} armour. 3 ${a.name.toLowerCase()} pieces: ${a.bonus3.name}; all 5: ${a.bonus5.name}.` });
     }));
+    // Every crafted tier of a piece has its own trait, so tiers differ in more than size.
+    WEAPON_KINDS.forEach((w, wi) => addTrait(`${t.id}_${w.id}`, w.cls === 'healer' ? HEALER_TRAITS : WEAPON_TRAITS, n + wi));
+    OFFHAND_KINDS.forEach((o, oi) => addTrait(`${t.id}_${o.id}`, o.cls === 'healer' ? HEALER_TRAITS : ARMOUR_TRAITS, n + oi * 3));
+    Object.keys(ARMOUR_TYPES).forEach((type, ti) => ARMOUR_SLOTS.forEach((slot, si) =>
+      addTrait(`${t.id}_${type}_${slot}`, type === 'vestment' ? HEALER_TRAITS : ARMOUR_TRAITS, n + si * 2 + ti)));
     const reg = REGIONS[n - 1];
     item(`sigil_${n}`, { name: `${reg.mat.split(' ')[0]} sigil`, type: 'gear', slot: 'trinket', icon: iconFor('sigil', n), colour: t.colour, tier: n,
       stats: { power: 2 + 2 * n, hpPct: 2 + 2 * n }, desc: `A trinket carved from ${reg.mat.toLowerCase()}s with Runecrafting.` });
