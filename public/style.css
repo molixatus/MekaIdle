@@ -1612,3 +1612,8 @@ body.dock-open.on-raids .page-head { display: none; }
 @keyframes sbadge-in { from { transform: scale(.6); opacity: 0; } }
 /* Boss mechanics use the ability icon styles, with a red frame. */
 .kit-ab.foe-ab { border-color: rgba(239, 90, 69, .5); }
+/* Gear picker: a heading per class. */
+.picker-group { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding-bottom: 4px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--role, var(--muted)); border-bottom: 1px solid color-mix(in srgb, var(--role, #262c38) 45%, transparent); }
+.picker-group:first-child { margin-top: 0; }
+.picker-group small { color: var(--faint); font-weight: 600; }

@@ -799,6 +799,7 @@
 
   const PATCH_NOTES = [
     { v: '0.11', date: '2026-09-29', notes: [
+      'The gear picker on the Equipment page groups gear by class (your class first), with a coloured heading for each.',
       'Buffs and debuffs now show as icons above each unit’s name (buffs left, debuffs right) with the time left underneath and details on hover.',
       'Boss mechanics show as icons like your abilities: they pop when used, then count down to the next use.',
       'The damage meter, graph and raid log now share one panel pinned to the bottom of the raid screen (meter and graph on the left, log on the right). It opens upwards, remembers whether it’s open, and no longer makes the page jump when enemies are summoned. Units are more compact while it’s open.',

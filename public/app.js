@@ -1162,11 +1162,21 @@
     const ids = Object.keys(me.state.items).filter(id => G.ITEMS[id] && G.ITEMS[id].slot === slot.id && have(id) > 0 && me.state.equipment[slot.id] !== id)
       .sort((x, y) => (G.ITEMS[y].tier || 0) - (G.ITEMS[x].tier || 0) || (G.ITEMS[y].rare ? 1 : 0) - (G.ITEMS[x].rare ? 1 : 0));
     const fitted = me.state.equipment[slot.id];
-    const list = ids.length ? h('div', { class: 'picker-list' }, ids.map(id => h('div', { class: `picker-item${G.ITEMS[id].rare ? ' rare-slot' : ''}` },
+    // Grouped by class (armour by the class that wears it), your own class first.
+    const ARMOUR_CLS = { plate: 'melee', leather: 'ranged', cloth: 'magic', vestment: 'healer' };
+    const clsOf = id => G.ITEMS[id].cls || ARMOUR_CLS[G.ITEMS[id].armour] || null;
+    const groups = [myClass(), ...Object.keys(G.CLASSES).filter(c => c !== myClass()), null]
+      .map(c => [c, ids.filter(id => clsOf(id) === c || (c === null && !G.CLASSES[clsOf(id)]))]).filter(([, g]) => g.length);
+    const itemRow = id => h('div', { class: `picker-item${G.ITEMS[id].rare ? ' rare-slot' : ''}` },
       h('div', { class: 'picker-top' }, tip(h('span', {}, itemIco(id, 'md')), () => itemTip(id)),
         h('div', { class: 'slot-info' }, h('small', {}, `Tier ${G.ITEMS[id].tier || 0} · ${have(id)} owned`), itemName(id, 'b'), statsLine(G.ITEMS[id])),
         h('button', { type: 'button', class: 'btn small primary', onclick: async () => { close(); await act('/api/equip', { item: id }, `${G.ITEMS[id].name} fitted.`); } }, 'Fit')),
-      gearCompare(id))))
+      gearCompare(id));
+    const list = ids.length ? h('div', { class: 'picker-list' }, groups.map(([c, g]) => {
+      const head = h('h3', { class: 'picker-group' }, c ? classIco(c) : null, c ? G.CLASSES[c].name : 'Any class', h('small', {}, String(g.length)));
+      if (c) head.style.setProperty('--role', G.CLASSES[c].colour);
+      return [head, ...g.map(itemRow)];
+    }))
       : h('div', { class: 'empty' }, `No spare ${slot.name.toLowerCase()} gear. Craft it, trade for it, or win it from raids.`);
     const overlay = h('div', { class: 'modal picker-modal', onclick: e => { if (e.target === overlay) close(); } },
       h('div', { class: 'modal-card picker-card', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${slot.name} gear` },
