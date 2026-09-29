@@ -1394,11 +1394,9 @@
     function idle() {
       cancelAnimationFrame(raf);
       cur = null;
-      root.replaceChildren(
-        h('div', { class: 'battle-empty' },
-          h('div', { class: 'battle-empty-art' }, mechArt(me.state.equipment, 'Your mech'), h('span', { class: 'vs' }, 'VS'), h('span', { class: 'unknown' }, '?')),
-          h('div', {}, h('h2', {}, 'No fight running'), h('p', { class: 'muted' }, 'Choose a raid below and press Fight, or join a party. Your fights play out here.'))),
-        logItems.length ? logPanel() : '');
+      // No fight: nothing to show, except the log of earlier fights if there is one.
+      root.replaceChildren(logItems.length ? logPanel() : '');
+      root.hidden = !logItems.length;
     }
 
     async function sync(force) {
@@ -1491,6 +1489,7 @@
     // ----- Loading a fight -----
     function load(c) {
       cancelAnimationFrame(raf);
+      root.hidden = false;
       cur = c;
       idx = 0;
       asked = false;
