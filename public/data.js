@@ -782,6 +782,33 @@
   }
 
   const PATCH_NOTES = [
+    { v: '0.10', date: '2026-09-29', notes: [
+      'A bar at the bottom of the screen shows what you’re doing, with its progress, how many are left, your queue and a Stop button.',
+      'Crafted items appear the moment the bar fills, instead of a few seconds later.',
+      'Lots more animation: pages slide in, gains float up from the card at work, level-ups flash gold, the skill you’re training works away in the sidebar, rare and high-tier gear shines.',
+      'Hovering gear in storage or your inventory compares it with what you have fitted.',
+      'Inventory is grouped by type, with tier badges, names and hover details on every item.',
+      'Equipment storage and supplies are laid out in a grid.',
+      'Raid page: bigger rows with large boss portraits, loot split into materials and equipment, coloured difficulty buttons, filters to hide cleared or fully looted bosses, open parties only when there are some, and the raid log only during a raid.',
+      'Fixed pages flashing every few seconds.',
+    ] },
+    { v: '0.9', date: '2026-09-29', notes: [
+      'New monster art: every raid has its own boss, and enemies are drawn from a new sprite sheet.',
+      'Fights are livelier: characters bob, lunge when attacking and flash in colour when hit (red for hits, purple for poison, green for healing and more).',
+      'HP and damage are ten times bigger, so hits no longer show as a string of 1s. Fixed enemies attacking far too fast for tiny damage.',
+      'Parties have no size limit; enemies scale with every pilot.',
+      'Gear drops by difficulty: a boss’s best piece only drops on Mythic, the next two on Heroic or Mythic.',
+      'The raid log has a header and summary for each fight, icons, ability crits and filter counts.',
+    ] },
+    { v: '0.8', date: '2026-09-29', notes: [
+      'Your progress survives game updates: your browser keeps a backup of your save and restores it automatically, and saves are never deleted when content changes.',
+      'New pixel-art icons for every item, different for each tier.',
+      'Every crafted weapon and armour piece has a trait (Keen, Swift, Vampiric, Sturdy…) with its own bonus.',
+      'A region’s finale needs next-tier gear fitted: a weapon and at least 3 armour pieces.',
+      'Raid loot is coloured by the class that uses it.',
+      'Gathering cards show how many of each item you own.',
+      'Signing up and logging in are no longer blocked after a few attempts.',
+    ] },
     { v: '0.7', date: '2026-09-28', notes: [
       'Raids are harder and can be lost: if every pilot is down at the same time, the fight is a defeat (a quarter of the XP, no loot).',
       'Raids get tougher through each region. The first raids suit the region’s crafted gear; the last ones need next-tier gear, made with that region’s raid material.',
