@@ -79,6 +79,9 @@
     ironskin_tonic: [3, 12], vigour_tonic: [3, 13], fury_tonic: [3, 14], titan_elixir: [3, 15],
     whetstone: [13, 1], weapon_oil: [7, 8], balance_stone: [19, 10], tempering_oil: [24, 14], master_whetstone: [13, 5],
     weak_poison: [3, 8], barbed_tips: [24, 2], paralytic_venom: [3, 10], deadly_poison: [7, 9], hunters_draught: [16, 9],
+    sharpening_kit: [13, 1, 40], edge_polish: [7, 8, 200], war_oil: [24, 14, 300], runed_whetstone: [13, 5, 160], starforged_edge: [13, 5, 280],
+    stinging_tips: [24, 2, 60], numbing_toxin: [3, 10, 200], serrated_heads: [24, 2, 300], blackroot_venom: [7, 9, 120], widowmaker_toxin: [16, 9, 260],
+    stoneskin_draught: [3, 12, 120], swiftness_tonic: [3, 13, 180], major_mana_potion: [3, 11, 40], elixir_of_ascension: [3, 15, 200],
     rune_of_power: [20, 0], rune_of_clarity: [20, 1], rune_of_fire: [20, 2], rune_of_frost: [20, 3], rune_of_ruin: [20, 5],
   };
   const CLASS_ORDER = ['melee', 'ranged', 'magic', 'healer'];

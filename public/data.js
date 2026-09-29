@@ -216,6 +216,21 @@
     { id: 'rune_of_fire', name: 'Rune of fire', skill: 'runecrafting', level: 40, tier: 5, cls: 'magic', icon: 'rune_2', boost: { fire: 15, burn: 10 }, inputs: { essence: 3, branch: 1 } },
     { id: 'rune_of_frost', name: 'Rune of frost', skill: 'runecrafting', level: 60, tier: 7, cls: 'magic', icon: 'rune_3', boost: { enemyDmg: -12 }, inputs: { essence: 4 } },
     { id: 'rune_of_ruin', name: 'Rune of ruin', skill: 'runecrafting', level: 80, tier: 9, cls: 'magic', icon: 'rune_0', boost: { power: 15, crit: 5 }, inputs: { essence: 5 } },
+    // Filling the even tiers, so every tier of these skills has something to make.
+    { id: 'sharpening_kit', name: 'Sharpening kit', skill: 'honing', level: 10, tier: 2, cls: 'melee', icon: 'hone_1', boost: { power: 5, crit: 3 }, inputs: { ore: 3 } },
+    { id: 'edge_polish', name: 'Edge polish', skill: 'honing', level: 30, tier: 4, cls: 'melee', icon: 'hone_2', boost: { pen: 12 }, inputs: { ore: 4 } },
+    { id: 'war_oil', name: 'War oil', skill: 'honing', level: 50, tier: 6, cls: 'melee', icon: 'hone_3', boost: { power: 10, haste: 5 }, inputs: { ore: 5 } },
+    { id: 'runed_whetstone', name: 'Runed whetstone', skill: 'honing', level: 70, tier: 8, cls: 'melee', icon: 'hone_0', boost: { crit: 8, critDmg: 20 }, inputs: { ore: 6 } },
+    { id: 'starforged_edge', name: 'Starforged edge', skill: 'honing', level: 90, tier: 10, cls: 'melee', icon: 'hone_1', boost: { power: 18, pen: 12 }, inputs: { ore: 8 } },
+    { id: 'stinging_tips', name: 'Stinging tips', skill: 'poisoncraft', level: 10, tier: 2, cls: 'ranged', icon: 'poison_1', boost: { poison: 8, crit: 3 }, inputs: { venom: 2, bone: 1 } },
+    { id: 'numbing_toxin', name: 'Numbing toxin', skill: 'poisoncraft', level: 30, tier: 4, cls: 'ranged', icon: 'poison_2', boost: { poison: 8, enemyDmg: -6 }, inputs: { venom: 3 } },
+    { id: 'serrated_heads', name: 'Serrated heads', skill: 'poisoncraft', level: 50, tier: 6, cls: 'ranged', icon: 'poison_1', boost: { bleed: 18, pen: 6 }, inputs: { venom: 2, bone: 3 } },
+    { id: 'blackroot_venom', name: 'Blackroot venom', skill: 'poisoncraft', level: 70, tier: 8, cls: 'ranged', icon: 'poison_0', boost: { poison: 30 }, inputs: { venom: 5 } },
+    { id: 'widowmaker_toxin', name: 'Widowmaker toxin', skill: 'poisoncraft', level: 90, tier: 10, cls: 'ranged', icon: 'poison_3', boost: { poison: 30, power: 10 }, inputs: { venom: 6, hide: 2 } },
+    { id: 'stoneskin_draught', name: 'Stoneskin draught', skill: 'alchemy', level: 20, tier: 3, icon: 'tonic_0', boost: { defPct: 12 }, inputs: { herb: 2, reed: 2 } },
+    { id: 'swiftness_tonic', name: 'Swiftness tonic', skill: 'alchemy', level: 40, tier: 5, icon: 'tonic_1', boost: { haste: 10 }, inputs: { herb: 3, reed: 1 } },
+    { id: 'major_mana_potion', name: 'Major mana potion', skill: 'alchemy', level: 60, tier: 7, icon: 'potion_mp_1', potion: 'mp', mana: 180, inputs: { herb: 3, reed: 3 } },
+    { id: 'elixir_of_ascension', name: 'Elixir of ascension', skill: 'alchemy', level: 90, tier: 10, icon: 'tonic_3', boost: { power: 10, defPct: 10, hpPct: 10 }, inputs: { herb: 5, reed: 4 } },
   ];
   const CONSUMABLE_BY_ID = Object.fromEntries(CONSUMABLES.map(c => [c.id, c]));
 
@@ -808,6 +823,7 @@
 
   const PATCH_NOTES = [
     { v: '0.11', date: '2026-09-29', notes: [
+      'Honing, Poisoncraft and Alchemy have new recipes so every tier has something to make (14 new consumables), and every skill page with more than one tier shows tier sections.',
       'Change your pilot or mech name in Settings. Names are checked as you type; a new pilot name (your login name) needs your password.',
       'Fixed Multiclass: a borrowed subclass now actually applies (its bonuses, and Shadowmender’s shadow attacks on any class) and shows in the raid screen.',
       'Party raids survive updates: when pilots come back after an update, the party re-forms with its leader, members and who-can-join setting.',

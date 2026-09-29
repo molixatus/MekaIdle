@@ -787,7 +787,12 @@
   // When an action's bar completes, ask the server straight away so the item shows up then
   // (the regular check-in is only every few seconds).
   let doneKey = null;
+  // One error must never stop the loop (that froze every progress bar), so each frame is guarded.
   function frame() {
+    try { frameBody(); } catch (e) { /* skip this frame */ }
+    requestAnimationFrame(frame);
+  }
+  function frameBody() {
     const p = me && activityProgress();
     const w = p ? `${p.frac * 100}%` : '0%';
     const nf = document.getElementById('now-fill');
@@ -807,9 +812,8 @@
       const a = p && p.action && p.action.skill === ghost.dataset.skill ? p.action : null;
       const gain = a && !x.max ? Math.min(100 - x.pct, (a.xp / (x.to - x.from)) * 100) : 0;
       ghost.style.left = `${x.pct}%`;
-      ghost.style.width = `${gain * p.frac}%`;
+      ghost.style.width = `${gain && p ? gain * p.frac : 0}%`;
     }
-    requestAnimationFrame(frame);
   }
 
   // ---------- Pages ----------
@@ -978,7 +982,7 @@
     let lastTier = 0;
     all.forEach(a => {
       const tn = tierOf(a);
-      if (all.length > 12 && tn !== lastTier) {
+      if (new Set(all.map(tierOf)).size > 1 && tn !== lastTier) {
         const t = G.TIERS[tn - 1];
         const div = h('div', { class: 'tier-divider' }, h('span', {}, `Tier ${tn} · ${t.metal}`), h('small', {}, `from level ${a.level}`));
         div.style.setProperty('--tier', t.colour);
