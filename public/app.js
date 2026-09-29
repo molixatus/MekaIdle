@@ -830,6 +830,7 @@
     if (pageCleanup) pageCleanup();
     pageRefresh = pageTick = pageCleanup = null;
     const [kind, arg] = page.split(':');
+    document.body.classList.toggle('on-raids', kind === 'raids');
     const el = PAGES[kind](arg);
     // A refresh during the entrance would replay the fade-in and blink; end the entrance instead.
     if (!enterNext) { clearTimeout(renderPage.enterTimer); $('page').classList.remove('page-enter'); }

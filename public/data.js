@@ -797,6 +797,7 @@
 
   const PATCH_NOTES = [
     { v: '0.11', date: '2026-09-29', notes: [
+      'The Raids page drops the status line at the top, so the fight sits higher on screen.',
       'Harder progression: each boss is now beaten on Normal, Heroic and Mythic before the next one opens. Raids you had already opened stay open.',
       'Heroic and Mythic are smaller steps up, and raid gear drops far more often (set pieces 10–15%, raid weapons and trinkets 5–8%).',
       'Gear checks through every region: raids 9–16 need 2 pieces of raid gear fitted, raids 17–24 a next-tier weapon, and the finale next-tier weapon and armour. Progress alternates between crafting and farming raid gear.',

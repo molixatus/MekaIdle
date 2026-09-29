@@ -1434,3 +1434,6 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 .ability > .ico { grid-row: 1 / span 2; }
 .ability > .grow { grid-column: 2; }
 .ability > :last-child:not(.grow):not(.ico) { grid-column: 2; justify-self: start; }
+
+/* The Raids page shows the fight itself, so the top status line is hidden there (kept on phones for the menu button). */
+@media (min-width: 901px) { body.on-raids .topbar { display: none; } }
