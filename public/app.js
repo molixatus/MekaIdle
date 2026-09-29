@@ -2328,8 +2328,10 @@
         const pos = live.filter(([, b]) => !b.neg).map(badge), neg = live.filter(([, b]) => b.neg).map(badge);
         [...u.statusEls.keys()].forEach(n => { if (!keep.has(n)) u.statusEls.delete(n); });
         if (u.down && u.respawnAt && !u.enemy) pos.unshift(h('span', { class: 'status down' }, `Respawn in ${Math.max(0, Math.ceil((u.respawnAt - clock) / 1000))}s`));
-        u.statusPos.replaceChildren(...pos);
-        u.statusNeg.replaceChildren(...neg);
+        // Only touch the DOM when the badges change: re-inserting one replays its pop-in (a flash).
+        const same = (box, list) => box.childElementCount === list.length && list.every((el, k) => box.children[k] === el);
+        if (!same(u.statusPos, pos)) u.statusPos.replaceChildren(...pos);
+        if (!same(u.statusNeg, neg)) u.statusNeg.replaceChildren(...neg);
       });
     }
 
