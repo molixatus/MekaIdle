@@ -87,27 +87,31 @@
   const CLASS_ORDER = ['melee', 'ranged', 'magic', 'healer'];
 
   function cellFor(it) {
-    const t = (it.tier || 1) - 1;
+    // 80 tiers share their region's sprites (10 per list); grades are told apart by the tier-colour tint.
+    const tier = G.TIERS[(it.tier || 1) - 1] || G.TIERS[0];
+    const t = tier.region;
+    const regionOf = n => Math.floor((Number(n) - 1) / 8);
     if (it.id === 'gold') return [9, 15];
     if (it.id === 'reed') return [15, 3];
     if (CONSUMABLE[it.id]) return CONSUMABLE[it.id];
     let m = /^mat_(\d+)$/.exec(it.id);
-    if (m) return RAID_MATS[m[1] - 1];
-    m = /^[a-z]+_(ore|hide|bone|venom|branch|fibre|essence|herb)$/.exec(it.id);
+    if (m) return RAID_MATS[regionOf(m[1])];
+    m = /^[a-z]+\d*_(ore|hide|bone|venom|branch|fibre|essence|herb)$/.exec(it.id);
     if (m) return M[m[1]][t];
-    if ((m = /^sigil_(\d+)$/.exec(it.id))) return [132, m[1] - 1];
-    if ((m = /^trinket_(\d+)$/.exec(it.id))) return [115, 1 + Number(m[1])];
-    if ((m = /^charm_(\d+)$/.exec(it.id))) return [133, m[1] - 1];
+    if ((m = /^sigil_(\d+)$/.exec(it.id))) return [132, regionOf(m[1])];
+    if ((m = /^trinket_(\d+)$/.exec(it.id))) return [115, 2 + regionOf(m[1]), 40 * tier.grade];
+    if ((m = /^charm_(\d+)$/.exec(it.id))) return [133, regionOf(m[1]), 40 * tier.grade];
     // Raid weapons: the sheet's unique coloured weapons, a different one for every region and class.
     if ((m = /^u(\d+)_([a-z]+)$/.exec(it.id))) {
-      const i = (m[1] - 1) * 4 + CLASS_ORDER.indexOf(m[2]);
-      return [105 + Math.floor(i / 16), i % 16];
+      const i = regionOf(m[1]) * 4 + CLASS_ORDER.indexOf(m[2]);
+      return [105 + Math.floor(i / 16), i % 16, 40 * tier.grade];
     }
     // Raid set pieces: armour of the set's type in a colour no crafted tier uses.
     if ((m = /^set(\d+)_([a-z]+)_(head|body|legs)$/.exec(it.id))) {
       const list = A[it.armour][m[3]];
-      const [r, c, h] = list[(Number(m[1]) + 4) % list.length];
-      return [r, c, ((h || 0) + 35 * Number(m[1])) % 360];
+      const rn = regionOf(m[1]) + 1;
+      const [r, c, h] = list[(rn + 4) % list.length];
+      return [r, c, ((h || 0) + 35 * rn + 40 * tier.grade) % 360];
     }
     if (it.slot === 'weapon' && W[it.weapon]) return W[it.weapon][t];
     if (it.slot === 'offhand' && W[it.offhand]) return W[it.offhand][t];

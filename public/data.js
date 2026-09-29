@@ -44,13 +44,45 @@
   ];
   // Items are coloured by tier, like rarity colours: copper, steel, green, teal, blue, purple, pink, orange, gold, red.
   const TIER_COLOURS = ['#d08d5b', '#a9c1dd', '#5fd068', '#3fc1c9', '#4f8ff0', '#a86bff', '#ff6fb1', '#ff9a3c', '#ffd24a', '#ff4d4d'];
-  const TIERS = TIER_ROWS.map(([id, level, metal, ore, beast, hide, bone, bow, wood, fibre, cloth, herb, order], i) => ({
-    n: i + 1, id, level, mult: Math.pow(1.5, i), colour: TIER_COLOURS[i],
-    metal, ore, vein: `${metal} vein`, beast, hide, bone, venom: `${beast} venom`, leather: `${hide.split(' ')[0]}hide`.replace('Wolfhide', 'Wolfhide'),
+  const BASE_TIERS = TIER_ROWS.map(([id, level, metal, ore, beast, hide, bone, bow, wood, fibre, cloth, herb, order], i) => ({
+    id, level, colour: TIER_COLOURS[i],
+    metal, ore, vein: `${metal} vein`, beast, hide, bone, venom: `${beast} venom`, leather: hide.replace(/ (hide|pelt)$/, '') + 'hide',
     bow, wood, branch: `${wood} branch`, grove: `${wood} grove`, fibre, cloth, essence: `${wood} essence`, herb, patch: `${herb} patch`, order,
   }));
-  TIERS.forEach(t => { t.leather = t.hide.replace(/ (hide|pelt)$/, '') + 'hide'; });
+  // Each region's material comes in 8 grades, one per 3 bosses: 80 tiers in all. A grade's gear is
+  // TIER_STEP times stronger than the grade before (damage and HP; armour and resists grow by the
+  // old per-region curve), so every 3 bosses needs new gear: crafted, or the last tier's raid gear.
+  const GRADES = ['', 'Fine', 'Sturdy', 'Superior', 'Choice', 'Exquisite', 'Masterwork', 'Perfect'];
+  const GRADE_LEVEL = [0, 1, 2, 4, 5, 6, 7, 9];
+  const TIER_STEP = 1.25;
+  // A grade's colour: the region's colour, shifted in hue and lightness.
+  function gradeColour(hex, g) {
+    if (!g) return hex;
+    const n = parseInt(hex.slice(1), 16);
+    let [r, gr, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => v / 255);
+    const max = Math.max(r, gr, b), min = Math.min(r, gr, b), l0 = (max + min) / 2, d = max - min;
+    let h = 0;
+    const sat = d ? d / (1 - Math.abs(2 * l0 - 1)) : 0;
+    if (d) h = max === r ? ((gr - b) / d) % 6 : max === gr ? (b - r) / d + 2 : (r - gr) / d + 4;
+    h = (h * 60 + 360 + g * 6) % 360;
+    const l = Math.max(0.3, Math.min(0.82, l0 + [0, 0.07, -0.07, 0.11, -0.1, 0.14, -0.04, 0.17][g]));
+    const c = (1 - Math.abs(2 * l - 1)) * sat, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+    const [a, bb, cc] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+    return '#' + [a, bb, cc].map(v => Math.round((v + m) * 255).toString(16).padStart(2, '0')).join('');
+  }
+  const NAME_KEYS = ['metal', 'ore', 'vein', 'beast', 'hide', 'bone', 'venom', 'leather', 'bow', 'wood', 'branch', 'grove', 'fibre', 'cloth', 'essence', 'herb', 'patch', 'order'];
+  const TIERS = [];
+  BASE_TIERS.forEach((b, r) => GRADES.forEach((gname, g) => {
+    const n = r * 8 + g + 1;
+    const t = { ...b, n, id: g ? `${b.id}${g + 1}` : b.id, region: r, grade: g, p: (n - 1) / 8,
+      level: Math.max(1, r * 10 + GRADE_LEVEL[g]), mult: Math.pow(TIER_STEP, n - 1), armourMult: Math.pow(1.3, (n - 1) / 8), colour: gradeColour(b.colour, g) };
+    if (g) NAME_KEYS.forEach(k => { t[k] = `${gname} ${b[k].charAt(0).toLowerCase()}${b[k].slice(1)}`; });
+    TIERS.push(t);
+  }));
   const TIER_BY_ID = Object.fromEntries(TIERS.map(t => [t.id, t]));
+  // Damage and HP scale with the tier and mana gently; armour and resists stay flat, so their share
+  // of damage (and the balance between plate and cloth) is the same at every tier.
+  const scaleStat = (k, v, t) => v * (k === 'atk' || k === 'hp' ? t.mult : k === 'mana' ? t.armourMult : 1);
 
   // ---------- Classes ----------
   // Four classes, set by the main-hand weapon. They also colour the mech.
@@ -173,10 +205,10 @@
       total: { def: 30, hp: 900, mres: 6, eres: 10 }, pct: { block: [4, 0.4] },
       bonus3: { name: 'Fortified', defPct: 8 }, bonus5: { name: 'Bulwark', hpPct: 10, block: 6 } },
     leather: { name: 'Leather', maker: 'leatherworking', mat: 'hide', icon: 'leather', nouns: { head: 'hood', body: 'jerkin', legs: 'leggings', hands: 'bracers', feet: 'boots' },
-      total: { def: 22, hp: 800, mres: 10, eres: 14 }, pct: { crit: [5, 0.5], haste: [3, 0.3] },
+      total: { def: 22, hp: 980, mres: 10, eres: 14 }, pct: { crit: [5, 0.5], haste: [3, 0.3] },
       bonus3: { name: 'Keen eye', crit: 4 }, bonus5: { name: 'Stalker', haste: 8, crit: 4 } },
     cloth: { name: 'Cloth', maker: 'tailoring', mat: 'fibre', icon: 'cloth', nouns: { head: 'hat', body: 'robe', legs: 'trousers', hands: 'gloves', feet: 'slippers' },
-      total: { def: 15, hp: 720, mres: 24, eres: 10, mana: 30 }, pct: { power: [8, 1] }, flat: { regen: [1, 0.2] },
+      total: { def: 15, hp: 1000, mres: 24, eres: 10, mana: 30 }, pct: { power: [8, 1] }, flat: { regen: [1, 0.2] },
       bonus3: { name: 'Attuned', power: 6 }, bonus5: { name: 'Archmage', power: 8, regen: 2 } },
     vestment: { name: 'Vestment', maker: 'weaving', mat: 'reed', icon: 'vest', nouns: { head: 'circlet', body: 'vestment', legs: 'skirt', hands: 'prayer beads', feet: 'sandals' },
       total: { def: 17, hp: 760, mres: 18, eres: 12, mana: 25 }, pct: { heal: [10, 1] }, flat: { regen: [1.5, 0.25] },
@@ -232,6 +264,7 @@
     { id: 'major_mana_potion', name: 'Major mana potion', skill: 'alchemy', level: 60, tier: 7, icon: 'potion_mp_1', potion: 'mp', mana: 180, inputs: { herb: 3, reed: 3 } },
     { id: 'elixir_of_ascension', name: 'Elixir of ascension', skill: 'alchemy', level: 90, tier: 10, icon: 'tonic_3', boost: { power: 10, defPct: 10, hpPct: 10 }, inputs: { herb: 5, reed: 4 } },
   ];
+  CONSUMABLES.forEach(c => { c.tier = (c.tier - 1) * 8 + 1; });
   const CONSUMABLE_BY_ID = Object.fromEntries(CONSUMABLES.map(c => [c.id, c]));
 
   // ---------- Abilities ----------
@@ -355,16 +388,17 @@
   REGIONS.forEach((reg, i) => {
     reg.theme = THEMES[i];
     reg.charm = { name: `${THEMES[i]} charm`, stats: i % 2 ? { hpPct: 4 + i, mres: 8 + 4 * i } : { crit: 3 + Math.floor(i / 2), haste: 3 + Math.floor(i / 2) } };
-    reg.sets = {};
-    Object.entries(SET_KINDS).forEach(([cls, k]) => {
-      const pas = SET_PASSIVES[cls][i % SET_PASSIVES[cls].length];
-      const [base, step] = PASSIVE_SCALE[pas];
-      const set = { id: `${i + 1}_${cls}`, region: i, cls, name: THEMES[i] + k.suffix, type: k.type,
-        two: Object.fromEntries(Object.entries(SET_TWO[cls](i)).map(([s, v]) => [s, Math.round(v * 10) / 10])), three: { passives: { [pas]: Math.round((base + step * i) * 10) / 10 } } };
-      reg.sets[cls] = set;
-      SET_BY_ID[set.id] = set;
-    });
   });
+  // A tier's raid set for a class: its region's theme and passive, scaled to the tier.
+  function makeSet(t, cls) {
+    const k = SET_KINDS[cls], i = t.region;
+    const pas = SET_PASSIVES[cls][i % SET_PASSIVES[cls].length];
+    const [base, step] = PASSIVE_SCALE[pas];
+    const set = { id: `${t.n}_${cls}`, region: i, cls, name: `${t.grade ? GRADES[t.grade] + ' ' : ''}${THEMES[i]}${k.suffix}`, type: k.type,
+      two: Object.fromEntries(Object.entries(SET_TWO[cls](t.p)).map(([s, v]) => [s, Math.round(v * 10) / 10])), three: { passives: { [pas]: Math.round((base + step * t.p) * 10) / 10 } } };
+    SET_BY_ID[set.id] = set;
+    return set;
+  }
   // How trash enemies fight. Swarms come in bigger packs; healers mend their allies; archers
   // ignore taunts; brutes hit slowly and hard; elites lead packs on their own.
   const TRASH_ROLES = {
@@ -441,18 +475,18 @@
   };
   const DIFFICULTIES = [
     { id: 'normal', name: 'Normal', hp: 1, dmg: 1, xp: 1, drop: 1, mats: 1, colour: '#5fd068' },
-    { id: 'heroic', name: 'Heroic', hp: 1.3, dmg: 1.2, xp: 1.4, drop: 1.6, mats: 1.3, colour: '#4f8ff0' },
-    { id: 'mythic', name: 'Mythic', hp: 1.65, dmg: 1.4, xp: 1.9, drop: 2.3, mats: 1.7, colour: '#ff9a3c' },
+    { id: 'heroic', name: 'Heroic', hp: 1.1, dmg: 1.1, xp: 1.4, drop: 1.6, mats: 1.3, colour: '#4f8ff0' },
+    { id: 'mythic', name: 'Mythic', hp: 1.2, dmg: 1.2, xp: 1.9, drop: 2.3, mats: 1.7, colour: '#ff9a3c' },
   ];
   const DIFF_BY_ID = Object.fromEntries(DIFFICULTIES.map(d => [d.id, d]));
   // bossKillS / trashKillS: seconds a reference pilot (matching crafted gear) needs to kill a boss or
   // a trash wave at the start of a region. deathS: seconds of that enemy damage the pilot survives.
   // frenzyS: after this long in the boss wave (a third of it for a trash wave) enemies hit harder every 10 seconds.
-  const FIGHT = { respawnMs: 25000, waveGapMs: 1500, gapMs: 3000, safetyMs: 20 * 60000, bossKillS: 40, trashKillS: 9, deathS: 38, frenzyS: 100 };
+  const FIGHT = { respawnMs: 25000, waveGapMs: 1500, gapMs: 3000, safetyMs: 20 * 60000, bossKillS: 40, trashKillS: 9, deathS: 38, frenzyS: 100, enrageS: 115 };
   // Raid strength through a region, relative to the region's reference pilot: start + rise * (k/24)^shape.
   // region: extra strength per region (up to the 6th), since gear percentages (block, crit) grow with tier.
   // first: the first region is gentler while pilots learn the game.
-  const RAID_CURVE = { start: 0.75, rise: 0.82, shape: 1.3, finale: 1.0, region: 0.035, first: 0.95 };
+  const RAID_CURVE = { base: 1.5, step: 0.03, finale: 1.05 };
   // No size limit. Enemy HP grows with every pilot; enemy damage grows gently up to 4 pilots, then
   // by each extra pilot's share, so a big party isn't safer per pilot than a party of four.
   const PARTY = { max: Infinity, hpPerExtra: 0.75, dmgPerExtra: 0.22, dmgPerExtraBig: 0.42, extraFoesMax: 6 };
@@ -464,8 +498,10 @@
     scroll: 3, tome: 4, codex: 4, lantern: 4, shield: 9, quiver: 3, orb: 5, relic: 5, plate_head: 7, plate_body: 5, plate_legs: 3, plate_hands: 2, plate_feet: 2,
     leather_head: 4, leather_body: 4, leather_legs: 2, leather_hands: 3, leather_feet: 3, cloth_head: 4, cloth_body: 3, cloth_legs: 2, cloth_hands: 1, cloth_feet: 2,
     vest_head: 4, vest_body: 3, vest_legs: 1, vest_hands: 1, vest_feet: 1, sigil: 10, trinket: 10, mat: 10 };
+  // n here is the region (1-10): icons change shape by region, and grades are told apart by colour.
   const iconFor = (base, n) => `${base}_${Math.min(VARIANTS[base] - 1, Math.floor((n - 1) * VARIANTS[base] / 10))}`;
-  const scaleExtra = (extra, n, share = 1) => Object.fromEntries(Object.entries(extra || {}).map(([k, v]) => [k, round1(v * share * (1 + 0.1 * (n - 1)))]));
+  // p is progress in regions (0 to ~10), so percentage stats grow as they did over 10 tiers.
+  const scaleExtra = (extra, p, share = 1) => Object.fromEntries(Object.entries(extra || {}).map(([k, v]) => [k, round1(v * share * (1 + 0.05 * p))]));
 
   const ITEMS = {};
   const item = (id, o) => { ITEMS[id] = Object.assign({ id }, o); };
@@ -488,10 +524,10 @@
     const [name, icon, desc] = MAT_INFO[k](t);
     item(matId(k, t), { name, type: 'resource', icon, colour: t.colour, tier: t.n, desc: `Tier ${t.n}. ${desc}` });
   }));
-  REGIONS.forEach((reg, i) => {
-    const t = TIERS[i];
-    item(`mat_${t.n}`, { name: reg.mat, type: 'material', icon: `mat_${i}`, colour: t.colour, tier: t.n,
-      desc: `Dropped by raids in ${reg.name}. Needed for ${t.n < 10 ? `tier ${t.n + 1} gear and ` : ''}the tier ${t.n} sigil.` });
+  TIERS.forEach(t => {
+    const reg = REGIONS[t.region];
+    item(`mat_${t.n}`, { name: t.grade ? `${GRADES[t.grade]} ${reg.mat.toLowerCase()}` : reg.mat, type: 'material', icon: `mat_${t.region}`, colour: t.colour, tier: t.n,
+      desc: `Dropped by tier ${t.n} raids in ${reg.name}. Needed for ${t.n < TIERS.length ? `tier ${t.n + 1} gear and ` : ''}the tier ${t.n} sigil.` });
   });
 
   // Consumables.
@@ -520,7 +556,7 @@
     const [name, stats] = list[k % list.length];
     const added = {};
     Object.entries(stats).forEach(([s, v]) => {
-      added[s] = FLAT_TRAIT.includes(s) ? Math.round(v * TIERS[it.tier - 1].mult) : round1(v * (1 + 0.12 * (it.tier - 1)));
+      added[s] = FLAT_TRAIT.includes(s) ? Math.round(v * (s === 'mana' ? TIERS[it.tier - 1].armourMult : 1)) : round1(v * (1 + 0.06 * TIERS[it.tier - 1].p));
       it.stats[s] = round1((it.stats[s] || 0) + added[s]);
     });
     it.trait = name;
@@ -533,22 +569,22 @@
     const n = t.n;
     WEAPON_KINDS.forEach(w => {
       const name = w.cls === 'melee' ? `${t.metal} ${w.noun}` : w.cls === 'ranged' ? `${t.bow} ${w.noun}` : w.cls === 'magic' ? `${t.wood} ${w.noun}` : `${t.order} ${w.noun}`;
-      item(`${t.id}_${w.id}`, { name, type: 'gear', slot: 'weapon', weapon: w.id, cls: w.cls, icon: iconFor(w.id, n), colour: t.colour, tier: n, twoHanded: !!w.twoHanded,
-        stats: { atk: Math.round(100 * t.mult * (w.twoHanded ? 1.35 : 1)), ...scaleExtra(w.extra, n) }, desc: `Tier ${n} ${CLASSES[w.cls].name.toLowerCase()} weapon. ${w.note}` });
+      item(`${t.id}_${w.id}`, { name, type: 'gear', slot: 'weapon', weapon: w.id, cls: w.cls, icon: iconFor(w.id, t.region + 1), colour: t.colour, tier: n, twoHanded: !!w.twoHanded,
+        stats: { atk: Math.round(100 * t.mult * (w.twoHanded ? 1.35 : 1)), ...scaleExtra(w.extra, t.p) }, desc: `Tier ${n} ${CLASSES[w.cls].name.toLowerCase()} weapon. ${w.note}` });
     });
     OFFHAND_KINDS.forEach(o => {
       const name = o.cls === 'melee' ? `${t.metal} ${o.noun}` : o.cls === 'ranged' ? `${t.leather} ${o.noun}` : o.cls === 'magic' ? `${t.wood} ${o.noun}` : `${t.order} ${o.noun}`;
-      const stats = Object.fromEntries(Object.entries(o.stats).map(([k, v]) => [k, Math.round(v * t.mult)]));
-      item(`${t.id}_${o.id}`, { name, type: 'gear', slot: 'offhand', offhand: o.id, cls: o.cls, icon: iconFor(o.id, n), colour: t.colour, tier: n,
-        stats: { ...stats, ...scaleExtra(o.extra, n) }, desc: `Tier ${n} ${CLASSES[o.cls].name.toLowerCase()} off-hand. ${o.note} An off-hand from another class also lets you equip that class’s abilities.` });
+      const stats = Object.fromEntries(Object.entries(o.stats).map(([k, v]) => [k, Math.round(scaleStat(k, v, t))]));
+      item(`${t.id}_${o.id}`, { name, type: 'gear', slot: 'offhand', offhand: o.id, cls: o.cls, icon: iconFor(o.id, t.region + 1), colour: t.colour, tier: n,
+        stats: { ...stats, ...scaleExtra(o.extra, t.p) }, desc: `Tier ${n} ${CLASSES[o.cls].name.toLowerCase()} off-hand. ${o.note} An off-hand from another class also lets you equip that class’s abilities.` });
     });
     Object.entries(ARMOUR_TYPES).forEach(([type, a]) => ARMOUR_SLOTS.forEach(slot => {
       const share = SLOT_SHARE[slot];
       const stats = {};
-      Object.entries(a.total).forEach(([k, v]) => { stats[k] = Math.max(1, Math.round(v * t.mult * share)); });
-      Object.entries(a.pct || {}).forEach(([k, [base, per]]) => { stats[k] = round1((base + per * (n - 1)) * share * 1.6); });
-      Object.entries(a.flat || {}).forEach(([k, [base, per]]) => { stats[k] = round1((base + per * (n - 1)) * share * 1.6); });
-      item(`${t.id}_${type}_${slot}`, { name: `${tierLabel(t, type)} ${a.nouns[slot]}`, type: 'gear', slot, armour: type, icon: iconFor(`${a.icon}_${slot}`, n), colour: t.colour, tier: n, stats,
+      Object.entries(a.total).forEach(([k, v]) => { stats[k] = Math.max(1, Math.round(scaleStat(k, v, t) * share)); });
+      Object.entries(a.pct || {}).forEach(([k, [base, per]]) => { stats[k] = round1((base + per * t.p * 0.5) * share * 1.6); });
+      Object.entries(a.flat || {}).forEach(([k, [base, per]]) => { stats[k] = round1((base + per * t.p * 0.5) * share * 1.6); });
+      item(`${t.id}_${type}_${slot}`, { name: `${tierLabel(t, type)} ${a.nouns[slot]}`, type: 'gear', slot, armour: type, icon: iconFor(`${a.icon}_${slot}`, t.region + 1), colour: t.colour, tier: n, stats,
         desc: `Tier ${n} ${a.name.toLowerCase()} armour. 3 ${a.name.toLowerCase()} pieces: ${a.bonus3.name}; all 5: ${a.bonus5.name}.` });
     }));
     // Every crafted tier of a piece has its own trait, so tiers differ in more than size.
@@ -556,30 +592,34 @@
     OFFHAND_KINDS.forEach((o, oi) => addTrait(`${t.id}_${o.id}`, o.cls === 'healer' ? HEALER_TRAITS : ARMOUR_TRAITS, n + oi * 3));
     Object.keys(ARMOUR_TYPES).forEach((type, ti) => ARMOUR_SLOTS.forEach((slot, si) =>
       addTrait(`${t.id}_${type}_${slot}`, type === 'vestment' ? HEALER_TRAITS : ARMOUR_TRAITS, n + si * 2 + ti)));
-    const reg = REGIONS[n - 1];
-    item(`sigil_${n}`, { name: `${reg.mat.split(' ')[0]} sigil`, type: 'gear', slot: 'trinket', icon: iconFor('sigil', n), colour: t.colour, tier: n,
-      stats: { power: 2 + 2 * n, hpPct: 2 + 2 * n }, desc: `A trinket carved from ${reg.mat.toLowerCase()}s with Runecrafting.` });
+    const reg = REGIONS[t.region];
+    const pre = t.grade ? `${GRADES[t.grade]} ` : '';
+    const lowerFirst = x => x.charAt(0).toLowerCase() + x.slice(1);
+    item(`sigil_${n}`, { name: `${pre}${t.grade ? lowerFirst(reg.mat.split(' ')[0]) : reg.mat.split(' ')[0]} sigil`, type: 'gear', slot: 'trinket', icon: iconFor('sigil', t.region + 1), colour: t.colour, tier: n,
+      stats: { power: round1(4 + 2 * t.p), hpPct: round1(4 + 2 * t.p) }, desc: `A trinket carved from ${reg.mat.toLowerCase()}s with Runecrafting.` });
+    const sets = Object.keys(SET_KINDS).map(cls => makeSet(t, cls));
     // Raid set pieces: one set per class, a little stronger than crafted armour of the tier.
-    Object.values(reg.sets).forEach(set => {
+    sets.forEach(set => {
       const at = ARMOUR_TYPES[set.type];
       ['head', 'body', 'legs'].forEach(slot => {
         const base = ITEMS[`${t.id}_${set.type}_${slot}`].stats;
         const stats = Object.fromEntries(Object.entries(base).map(([k, v]) => [k, STATS[k] && STATS[k].pct ? round1(v * 1.3) : Math.round(v * 1.25)]));
-        item(`set${n}_${set.cls}_${slot}`, { name: `${set.name} ${at.nouns[slot]}`, type: 'gear', slot, armour: set.type, set: set.id, icon: iconFor(`${at.icon}_${slot}`, Math.min(10, n + 2)),
-          colour: t.colour, tier: n, rare: true, stats, desc: `Raid set piece from ${reg.name}, made for ${CLASSES[set.cls].name.toLowerCase()} pilots. Counts as ${at.name.toLowerCase()} armour.` });
+        item(`set${n}_${set.cls}_${slot}`, { name: `${set.name} ${at.nouns[slot]}`, type: 'gear', slot, armour: set.type, set: set.id, icon: iconFor(`${at.icon}_${slot}`, Math.min(10, t.region + 3)),
+          colour: t.colour, tier: n, rare: true, stats, desc: `Tier ${n} raid set piece from ${reg.name}, made for ${CLASSES[set.cls].name.toLowerCase()} pilots. Counts as ${at.name.toLowerCase()} armour.` });
       });
     });
     // Raid weapons: one per class, hitting like a weapon half a tier higher, with a passive.
     Object.entries(UNIQUE_KINDS).forEach(([cls, kinds]) => {
       const w = WEAPON_BY_ID[kinds[(n - 1) % kinds.length]];
       const base = ITEMS[`${t.id}_${w.id}`].stats;
-      item(`u${n}_${cls}`, { name: `${reg.theme}${UNIQUE_SUFFIX[cls]} ${w.noun}`, type: 'gear', slot: 'weapon', weapon: w.id, cls, icon: iconFor(w.id, Math.min(10, n + 3)),
-        colour: t.colour, tier: n, rare: true, twoHanded: !!w.twoHanded, stats: { atk: Math.round(base.atk * 1.3), ...scaleExtra(w.extra, n + 2) }, passives: UNIQUE_PASSIVE[cls](n - 1),
+      item(`u${n}_${cls}`, { name: `${pre}${t.grade ? lowerFirst(reg.theme) : reg.theme}${UNIQUE_SUFFIX[cls]} ${w.noun}`, type: 'gear', slot: 'weapon', weapon: w.id, cls, icon: iconFor(w.id, Math.min(10, t.region + 4)),
+        colour: t.colour, tier: n, rare: true, twoHanded: !!w.twoHanded, stats: { atk: Math.round(base.atk * 1.3), ...scaleExtra(w.extra, t.p + 0.25) },
+        passives: Object.fromEntries(Object.entries(UNIQUE_PASSIVE[cls](t.p)).map(([k, v]) => [k, round1(v)])),
         desc: `A rare ${CLASSES[cls].name.toLowerCase()} weapon from ${reg.name}. ${w.note}` });
     });
-    item(`trinket_${n}`, { name: reg.trinket.name, type: 'gear', slot: 'trinket', icon: `trinket_${n - 1}`, colour: t.colour, tier: n, rare: true,
+    item(`trinket_${n}`, { name: `${pre}${t.grade ? lowerFirst(reg.trinket.name) : reg.trinket.name}`, type: 'gear', slot: 'trinket', icon: `trinket_${t.region}`, colour: t.colour, tier: n, rare: true,
       stats: reg.trinket.stats, passives: reg.trinket.passives, desc: `A rare trinket from ${reg.name}.` });
-    item(`charm_${n}`, { name: reg.charm.name, type: 'gear', slot: 'trinket', icon: `trinket_${(n + 4) % 10}`, colour: t.colour, tier: n, rare: true,
+    item(`charm_${n}`, { name: `${pre}${t.grade ? lowerFirst(reg.charm.name) : reg.charm.name}`, type: 'gear', slot: 'trinket', icon: `trinket_${(t.region + 4) % 10}`, colour: t.colour, tier: n, rare: true,
       stats: reg.charm.stats, desc: `A rare trinket from ${reg.name}.` });
   });
 
@@ -590,10 +630,11 @@
   const action = o => ACTIONS.push(Object.assign({ inputs: {}, chance: [] }, o));
   const tierInputs = (t, mats) => Object.fromEntries(Object.entries(mats).map(([k, v]) => [matId(k, t), v]));
   const matCount = inputs => Object.values(inputs).reduce((a, v) => a + v, 0);
-  const craftXp = (t, inputs, time) => Math.round(XP_RATE[t.n - 1] * (time / 1000 + 3 * matCount(inputs)) * 0.9);
+  const xpRate = t => XP_RATE[t.region] * (1 + 0.05 * t.grade);
+  const craftXp = (t, inputs, time) => Math.round(xpRate(t) * (time / 1000 + 3 * matCount(inputs)) * 0.9);
 
-  TIERS.forEach((t, i) => {
-    const r = XP_RATE[i];
+  TIERS.forEach(t => {
+    const r = xpRate(t);
     action({ id: `mine_${t.id}`, skill: 'mining', name: t.vein, level: t.level, time: 3000, xp: Math.round(r * 3), item: matId('ore', t), outputs: { [matId('ore', t)]: [1, 1] } });
     action({ id: `hunt_${t.id}`, skill: 'hunting', name: t.beast, level: t.level, time: 3500, xp: Math.round(r * 3.5 * 1.1), item: matId('hide', t),
       outputs: { [matId('hide', t)]: [1, 1], [matId('bone', t)]: [1, 1] }, chance: [{ item: matId('venom', t), p: 0.4, qty: 1 }] });
@@ -604,7 +645,7 @@
   });
 
   // Gear recipes: tier materials, plus the previous region's raid material from tier 2 on.
-  const raidMat = t => (t.n > 1 ? { [`mat_${t.n - 1}`]: 1 + Math.floor(t.n / 3) } : {});
+  const raidMat = t => (t.n > 1 ? { [`mat_${t.n - 1}`]: 2 + Math.floor(t.region / 3) } : {});
   TIERS.forEach(t => {
     WEAPON_KINDS.forEach(w => {
       const id = `${t.id}_${w.id}`;
@@ -723,16 +764,22 @@
   const gearByDifficulty = drops => drops.map((d, i) => (i === 0 ? { ...d, minDiff: 'mythic' } : i <= 2 ? { ...d, minDiff: 'heroic' } : d));
   const COMBAT_XP = [32, 138, 280, 453, 651, 860, 1087, 1338, 1589, 1650];
   const CLASS_IDS = ['melee', 'ranged', 'magic', 'healer'];
+  // Every 3 bosses (the last 4 of a region) share a tier, and each is set against that tier's
+  // crafted gear at its crafting level.
+  const REFS = {};
+  const refFor = t => REFS[t.n] || (REFS[t.n] = mechStats(kit('melee', t.n), { melee: t.level + 3 }));
   REGIONS.forEach((reg, ri) => {
-    const t = TIERS[ri];
-    const ref = mechStats(kit('melee', t.n), { melee: t.level + 5 });
     const pickRand = rng(1000 + ri);
     for (let k = 0; k < 25; k++) {
       const g = ri * 25 + k;
+      const t = TIERS[ri * 8 + Math.min(7, Math.floor(k / 3))];
+      const ref = refFor(t);
       const rand = rng(7919 * (g + 1));
       const pick = list => list[Math.floor(rand() * list.length)];
       const finale = k === 24;
-      const f = (RAID_CURVE.start + RAID_CURVE.rise * Math.pow(k / 24, RAID_CURVE.shape)) * (finale ? RAID_CURVE.finale : 1) * (1 + RAID_CURVE.region * Math.min(ri, 5)) * (ri === 0 ? RAID_CURVE.first : 1);
+      // The first four tiers ease new pilots in (no potions or abilities yet).
+      const intro = t.n <= 4 ? 0.55 + 0.1 * t.n : 1;
+      const f = RAID_CURVE.base * intro * (1 + RAID_CURVE.step * (k - 3 * t.grade)) * (finale ? RAID_CURVE.finale : 1);
       const bossFoe = reg.bosses[0];
       // This raid's boss: the next monster from the shuffled roster (a region never repeats one).
       const pick0 = finale ? null : BOSS_DECK[(ri * 24 + k) % BOSS_DECK.length];
@@ -744,7 +791,7 @@
       const weak = styles[Math.floor(rand() * 3)];
       const resist = styles.filter(x => x !== weak)[Math.floor(rand() * 2)];
       const elements = ['fire', 'frost', 'shock', 'poison'];
-      const def = Math.round(10 * t.mult * (0.8 + rand() * 0.45));
+      const def = Math.round(10 * (0.8 + rand() * 0.45));
       const mres = Math.round(def * (0.5 + rand()));
       const eres = Math.round(def * (0.5 + rand()));
       const refDps = ref.atk * 100 / (100 + def);
@@ -774,9 +821,9 @@
         id: `r${g + 1}`, n: g + 1, region: ri, tier: t.n, k,
         name: finale ? reg.finale : `${adj} ${pick0[2].toLowerCase()}`, sprite, spriteHue,
         regionName: reg.name, foe: bossFoe, finale,
-        res: { [weak]: 1.15, [resist]: 0.88 }, weakElement: elements[Math.floor(rand() * 4)],
+        res: { [weak]: 1.07, [resist]: 0.94 }, weakElement: elements[Math.floor(rand() * 4)],
         boss: { hp: Math.round(refDps * FIGHT.bossKillS * f / cost / 10) * 10, def, mres, eres, dps: Math.round(dpsFor(dtype) / Math.sqrt(cost) * 10) / 10, dtype, mechs },
-        trash: { pool: reg.trash, maxWaves: 1 + Math.floor(k / 6), hp: Math.round(refDps * FIGHT.trashKillS * f), dps: Math.round(dpsFor('physical') * 0.6 * 10) / 10,
+        trash: { pool: reg.trash, maxWaves: finale ? 3 : 2, hp: Math.round(refDps * FIGHT.trashKillS * f), dps: Math.round(dpsFor('physical') * 0.6 * 10) / 10,
           def: Math.round(def * 0.7), mres: Math.round(mres * 0.7), eres: Math.round(eres * 0.7) },
         moves: { basic: finale ? 'Crushing blow' : 'Strike' },
         // Power needed per difficulty: the rating grows slower than fight difficulty (abilities,
@@ -785,8 +832,8 @@
         recommendedBy: Object.fromEntries(DIFFICULTIES.map(d => [d.id, Math.round(power(ref) * Math.pow(f * Math.sqrt(d.hp * d.dmg), 0.6))])),
         xp: Math.round(COMBAT_XP[ri] * (0.85 + 0.3 * k / 24) * (finale ? 1.5 : 1)),
         drops: [
-          { item: `mat_${t.n}`, qty: [1, 2 + Math.floor(k / 12)] },
-          { item: 'gold', qty: [Math.round(5 * t.mult), Math.round(12 * t.mult)] },
+          { item: `mat_${t.n}`, qty: [1, 3] },
+          { item: 'gold', qty: [Math.round(5 * t.armourMult), Math.round(12 * t.armourMult)] },
           { item: matId(res[0], t), qty: [2, 4] },
           { item: matId(res[1], t), qty: [1, 3] },
           { item: cons.id, qty: [1, 2], p: 0.3 },
@@ -805,6 +852,7 @@
   const FINALE_ARMOUR = 3, RAID_GEAR_NEED = 2;
   const GEAR_STAGE = k => (k >= 24 ? 'finale' : k >= 16 ? 'next' : k >= 8 ? 'raid' : null);
   function gearCheck(equipment, raid) {
+    if (raid) return { ok: true };
     const need = Math.min(10, raid.tier + 1);
     const stage = GEAR_STAGE(raid.k);
     const items = Object.values(equipment || {}).map(id => ITEMS[id]).filter(Boolean);
@@ -822,6 +870,15 @@
   const finaleGear = gearCheck;
 
   const PATCH_NOTES = [
+    { v: '0.12', date: '2026-09-29', notes: [
+      '80 gear tiers instead of 10: every region’s material now comes in 8 grades (Copper, Fine copper, Sturdy copper … Perfect copper), one for every 3 bosses, each with its own gathering, weapons, armour, raid sets, raid weapons, trinkets and sigils.',
+      'Much harder progression: each group of 3 bosses is balanced against its own tier’s gear. Gear a tier behind loses on Normal, so every 3 bosses you craft the next tier or farm the last tier’s raid gear. Heroic takes a little more, and Mythic needs this tier’s raid gear (which then carries you into the next tier).',
+      'Next-tier gear needs raid material from the previous tier’s bosses, so crafting and raiding alternate.',
+      'Fights now have an enrage timer: after about 2 minutes enemies go Berserk and their damage doubles every 5 seconds.',
+      'Armour and resists no longer grow with tier (HP does), so plate, leather and cloth stay balanced at every level. Leather and cloth have more HP.',
+      'Your old raid gear and materials move to the first tier of their region, so they keep their strength. Unlocked raids stay unlocked.',
+      'Big numbers are shortened (12.4M, 3.1B). Skill pages show the tiers near your level, with a button to show them all.',
+    ] },
     { v: '0.11', date: '2026-09-29', notes: [
       'Honing, Poisoncraft and Alchemy have new recipes so every tier has something to make (14 new consumables), and every skill page with more than one tier shows tier sections.',
       'Change your pilot or mech name in Settings. Names are checked as you type; a new pilot name (your login name) needs your password.',
@@ -925,7 +982,7 @@
   const GAME = {
     MAX_LEVEL, OFFLINE_CAP, TIERS, TIER_BY_ID, CLASSES, ROLES, CLASS_OF_SKILL, UNARMED_COLOUR, SKILLS, SKILL_BY_ID, COMBAT_SKILLS, STATS, describe,
     WEAPON_KINDS, WEAPON_BY_ID, OFFHAND_KINDS, OFFHAND_BY_ID, SLOTS, ARMOUR_SLOTS, ARMOUR_TYPES, CONSUMABLES, CONSUMABLE_BY_ID,
-    ABILITIES, ABILITY_BY_ID, ABILITY_SLOTS, SUBCLASSES, SUBCLASS_BY_ID, resolveSubclass, REGIONS, SET_BY_ID, TRASH_ROLES, FOE_ROLE, MECHANICS, RAID_CURVE, FOES, FOE_DAMAGE, PASSIVES, DIFFICULTIES, DIFF_BY_ID, FIGHT, PARTY,
+    GRADES, TIER_STEP, ABILITIES, ABILITY_BY_ID, ABILITY_SLOTS, SUBCLASSES, SUBCLASS_BY_ID, resolveSubclass, REGIONS, SET_BY_ID, TRASH_ROLES, FOE_ROLE, MECHANICS, RAID_CURVE, FOES, FOE_DAMAGE, PASSIVES, DIFFICULTIES, DIFF_BY_ID, FIGHT, PARTY,
     ITEMS, ACTIONS, ACTION_BY_ID, RAIDS, RAID_BY_ID, finaleGear, gearCheck, FINALE_ARMOUR, RAID_GEAR_NEED, OFFHAND_XP_SHARE, PATCH_NOTES, CLASS_KIT,
     xpForLevel, levelFromXp, skillMult, mechStats, power, combatLevel, kit, rng,
     PARTY_MAX: PARTY.max, partyDmg, POTIONS_PER_RAID: 3, GUILD_COST: 0, QUEUE_MAX: 5,

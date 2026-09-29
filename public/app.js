@@ -97,7 +97,8 @@
     while (n >= 1000 && i < units.length - 1) { n /= 1000; i++; }
     return (n < 100 ? n.toFixed(1) : Math.floor(n)) + units[i];
   }
-  const num = n => Math.floor(n).toLocaleString('en-GB');
+  // Exact below a million, then compact (12.4M, 3.1B, 1.2T), since high tiers hit very large numbers.
+  const num = n => (Math.abs(n) < 1e6 ? Math.floor(n).toLocaleString('en-GB') : fmt(n));
   function fmtTime(ms) {
     const s = Math.max(0, Math.round(ms / 1000));
     const hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60;
@@ -977,7 +978,11 @@
     if (sk.group === 'combat') return [...head, chainBar(id), ...combatSkillBody(sk)];
     // Every tier on one screen, lowest level first, with a divider where each tier starts.
     const tierOf = a => (G.ITEMS[a.item] || {}).tier || 1;
-    const all = G.ACTIONS.filter(a => a.skill === id).sort((x, y) => x.level - y.level || tierOf(x) - tierOf(y));
+    const every = G.ACTIONS.filter(a => a.skill === id).sort((x, y) => tierOf(x) - tierOf(y) || x.level - y.level);
+    // With 80 tiers, show the ones near your level (a few below, the next few above) unless asked for all.
+    const L = lvl(id);
+    const near = a => a.level >= L - 12 && a.level <= L + 8;
+    const all = showAllTiers ? every : every.filter(near);
     const cards = [];
     let lastTier = 0;
     all.forEach(a => {
@@ -991,8 +996,12 @@
       lastTier = tn;
       cards.push(actionCard(a));
     });
-    return [...head, chainBar(id), section(SKILL_SECTION[id] || 'Actions', 'Hover a card for details. Click it to start, or set a count and start or queue it.', h('div', { class: 'grid' }, cards))];
+    const hidden = every.length - all.length;
+    const toggle = hidden || showAllTiers ? h('button', { type: 'button', class: 'btn small', onclick: () => { showAllTiers = !showAllTiers; renderPage(); } },
+      showAllTiers ? 'Show tiers near my level' : `Show all tiers (${hidden} more)`) : null;
+    return [...head, chainBar(id), section(SKILL_SECTION[id] || 'Actions', 'Hover a card for details. Click it to start, or set a count and start or queue it.', toggle, h('div', { class: 'grid' }, cards))];
   }
+  let showAllTiers = false;
 
   // A small item badge (icon and a number) with the item's details on hover.
   const needChip = (id, main, sub, cls = '') => tip(h('span', { class: `need ${cls}` }, itemIco(id, 'sm'), main, sub ? h('small', {}, sub) : null), () => itemTip(id));
@@ -1058,11 +1067,11 @@
           h('p', { class: 'big-number' }, `+${L - 1}% ${cls === 'healer' ? 'healing and smite' : `${sk.name.toLowerCase()} damage`}`),
           h('h3', {}, 'Abilities'),
           h('ul', { class: 'ability-mini' }, abilities.map(ab => h('li', { class: L >= ab.level ? 'ok' : 'muted' }, gi('ab_' + ab.id, null, 'sm'), `${ab.name} · level ${ab.level}`))))),
-      section('Weapons', `Made with ${G.SKILL_BY_ID[kinds[0].maker].name}. Each tier needs the previous region’s raid material.`,
+      section('Weapons', `Made with ${G.SKILL_BY_ID[kinds[0].maker].name}. Each tier needs raid material from the previous tier’s bosses.`,
         h('div', { class: 'weapon-table' }, [...kinds, off].map(w => h('div', { class: 'weapon-kind' },
           h('div', { class: 'weapon-kind-head' }, itemIco(`copper_${w.id}`, 'md'),
             h('div', {}, h('b', {}, w.noun[0].toUpperCase() + w.noun.slice(1) + (w === off ? ' (off-hand)' : '')), h('small', { class: 'muted' }, w.note))),
-          h('div', { class: 'tier-row' }, G.TIERS.map(t => {
+          h('div', { class: 'tier-row' }, G.TIERS.filter(t => t.level <= L + 8).slice(-10).map(t => {
             const id = `${t.id}_${w.id}`;
             const recipe = G.ACTION_BY_ID['craft_' + id];
             const on = me.state.equipment.weapon === id || me.state.equipment.offhand === id;
@@ -1622,8 +1631,8 @@
         const unlocked = raidOpen(raids[0], 'normal');
         const cleared = raids.filter(r => clearsOf(r.id) >= 1).length;
         const head = h('div', { class: 'region-head' }, h('span', { class: 'region-title' }, bossIcon(raids[24]), reg.name),
-          h('small', {}, unlocked ? `Tier ${ri + 1} \u00b7 ${cleared}/25 cleared` : `Locked \u00b7 beat ${G.REGIONS[ri - 1].finale} (#${ri * 25}) on Mythic to open`));
-        head.style.setProperty('--tier', G.TIERS[ri].colour);
+          h('small', {}, unlocked ? `Tiers ${ri * 8 + 1}\u2013${ri * 8 + 8} \u00b7 ${cleared}/25 cleared` : `Locked \u00b7 beat ${G.REGIONS[ri - 1].finale} (#${ri * 25}) on Mythic to open`));
+        head.style.setProperty('--tier', G.TIERS[ri * 8].colour);
         list.push(head);
         const shown = raids.filter(r => !(hideCleared && clearsOf(r.id) >= diffRank) && !(hideLooted && looted(r)));
         hidden += raids.length - shown.length;
