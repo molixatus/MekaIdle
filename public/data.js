@@ -799,6 +799,7 @@
 
   const PATCH_NOTES = [
     { v: '0.11', date: '2026-09-29', notes: [
+      'Damage meter and graph update much faster and look better: numbers count up smoothly, pilots slide up and down as their rank changes (gold, silver and bronze badges), bars glow in class colours, and the graph draws smooth filled curves with a pulsing marker at the live end.',
       'Raid screen abilities pop when used, then grey out with a clock sweep and a countdown underneath, and flash green when they’re ready again.',
       'Fixed raids and skills sometimes stopping after an update: your browser now refreshes its backup right after every action (and every 15 seconds), and a raid opened to friends or everyone carries on as a solo raid after an update instead of stopping.',
       'Skill pages show your level and XP bar full width under the title instead of squeezed into the corner.',

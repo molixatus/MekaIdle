@@ -1725,7 +1725,8 @@
     const self = { el: root, sync, destroy, onStop: null, onChange: null, onLeave: null };
     let cur = null, raf = 0, fetching = false, idx = 0, quiet = false, asked = false;
     let party = [], foes = {}, foeBox, waveEl, clockEl, statusEl, meterList, meterRows = [], graphBox, graphSvg, graphAxisY, graphAxisX, graphCursor, graphTip;
-    let stats = [], buckets = {}, lastMeter = 0, lastSec = -1, graphData = null;
+    let stats = [], buckets = {}, lastMeter = 0, lastSec = -1, graphData = null, lastGraph = 0, meterOrder = '', graphEls = null, graphTop = 0, graphFinal = false;
+    const graphUid = Math.random().toString(36).slice(2, 8);
     const expanded = new Set();
     const logItems = BLOG.items;
     if (!BLOG.list) BLOG.list = h('ol', { class: 'log-list', 'aria-live': 'off' });
@@ -1955,6 +1956,8 @@
       idx = 0;
       asked = false;
       lastSec = -1;
+      lastGraph = 0;
+      graphFinal = false;
       const f = c.fight;
       const raid = G.RAID_BY_ID[f.raid];
       const info = c.partyInfo;
@@ -1997,16 +2000,21 @@
 
       // Damage meter.
       meterRows = f.fighters.map((p, i) => {
-        const fill = h('span'), val = h('span', { class: 'meter-val' }), detail = h('div', { class: 'meter-detail', hidden: true });
+        const fill = h('span'), val = h('span', { class: 'meter-val' }), detail = h('div', { class: 'meter-detail', hidden: true }), rank = h('span', { class: 'meter-rank' }, String(i + 1));
         fill.style.background = party[i].colour;
         const btn = h('button', { type: 'button', class: 'meter-row', 'aria-expanded': String(expanded.has(p.id)), onclick: () => {
           if (expanded.has(p.id)) expanded.delete(p.id); else expanded.add(p.id);
           btn.setAttribute('aria-expanded', String(expanded.has(p.id)));
           drawMeter(Math.min(now() - cur.start, cur.fight.ms));
-        } }, h('div', { class: 'meter-name' }, classIco(p.cls), h('span', { class: 'grow' }, p.name), val), h('div', { class: 'meter-bar' }, fill));
-        return { item: h('div', { class: 'meter-item' }, btn, detail), btn, fill, val, detail, i, id: p.id };
+        } }, h('div', { class: 'meter-name' }, rank, classIco(p.cls), h('span', { class: 'grow' }, p.name), val), h('div', { class: 'meter-bar' }, fill));
+        const item = h('div', { class: 'meter-item' }, btn, detail);
+        item.style.setProperty('--series', party[i].colour);
+        return { item, btn, fill, val, detail, rank, i, id: p.id, disp: 0 };
       });
       meterList = h('div', { class: 'meter' }, meterRows.map(r => r.item));
+      meterOrder = '';
+      graphEls = null;
+      graphTop = 0;
       const modeTabs = h('div', { class: 'chips small', role: 'group', 'aria-label': 'Meter mode' }, METER_MODES.map(([id, label]) =>
         h('button', { type: 'button', class: 'chip', 'aria-pressed': String(meterMode === id), onclick: e => {
           meterMode = id;
@@ -2242,10 +2250,28 @@
       const shown = vals.map(v => (rate ? v / s : v));
       const top = Math.max(1, ...shown);
       const total = vals.reduce((a, b) => a + b, 0) || 1;
-      meterRows.slice().sort((a, b) => shown[b.i] - shown[a.i]).forEach(r => {
-        meterList.append(r.item);
+      const sorted = meterRows.slice().sort((a, b) => shown[b.i] - shown[a.i]);
+      const order = sorted.map(r => r.i).join();
+      if (order !== meterOrder) {
+        // Slide rows from where they were to their new place.
+        const before = new Map(meterRows.map(r => [r, r.item.getBoundingClientRect().top]));
+        sorted.forEach((r, k) => { meterList.append(r.item); r.rank.textContent = String(k + 1); r.item.dataset.rank = String(k + 1); });
+        if (meterOrder && !reduced) sorted.forEach(r => {
+          const dy = before.get(r) - r.item.getBoundingClientRect().top;
+          if (!dy) return;
+          r.item.style.transition = 'none';
+          r.item.style.transform = `translateY(${dy}px)`;
+          void r.item.offsetWidth;
+          r.item.style.transition = '';
+          r.item.style.transform = '';
+        });
+        meterOrder = order;
+      }
+      sorted.forEach(r => {
+        const target = rate ? shown[r.i] : vals[r.i];
+        r.disp = quiet || Math.abs(target - r.disp) < 0.05 ? target : r.disp + (target - r.disp) * 0.35;
         r.fill.style.width = `${(shown[r.i] / top) * 100}%`;
-        r.val.textContent = `${rate ? shown[r.i].toFixed(1) : num(vals[r.i])}${unit} · ${Math.round((vals[r.i] / total) * 100)}%`;
+        r.val.replaceChildren(h('b', {}, `${rate ? r.disp.toFixed(1) : num(Math.round(r.disp))}${unit}`), h('small', {}, `${Math.round((vals[r.i] / total) * 100)}%`));
         const open = expanded.has(r.id);
         r.detail.hidden = !open;
         if (open) {
@@ -2262,32 +2288,75 @@
       });
     }
 
+    const GW = 1000, GH = 300, SVGNS = 'http://www.w3.org/2000/svg';
+    const svgEl = (tag, attrs) => { const e = document.createElementNS(SVGNS, tag); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); return e; };
+    // Built once per fight: a gradient, filled area and line per pilot, plus a glowing head marker.
+    function buildGraph() {
+      const svg = svgEl('svg', { viewBox: `0 0 ${GW} ${GH}`, preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+      const defs = svgEl('defs', {});
+      svg.append(defs);
+      [0.25, 0.5, 0.75].forEach(f => svg.append(svgEl('line', { x1: 0, x2: GW, y1: GH * f, y2: GH * f, class: 'gl', 'vector-effect': 'non-scaling-stroke' })));
+      const seen = {};
+      const series = party.map((u, i) => {
+        const id = `gg-${graphUid}-${i}`;
+        const grad = svgEl('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 });
+        grad.append(svgEl('stop', { offset: '0%', 'stop-color': u.colour, 'stop-opacity': '0.32' }), svgEl('stop', { offset: '100%', 'stop-color': u.colour, 'stop-opacity': '0' }));
+        defs.append(grad);
+        const area = svgEl('path', { fill: `url(#${id})`, class: 'g-area' });
+        const line = svgEl('path', { fill: 'none', stroke: u.colour, 'stroke-width': 2.2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke', class: 'g-line' });
+        if (seen[u.colour]) line.setAttribute('stroke-dasharray', '6 4');
+        seen[u.colour] = true;
+        svg.append(area, line);
+        const head = h('span', { class: 'g-head' });
+        head.style.setProperty('--series', u.colour);
+        return { area, line, head };
+      });
+      graphSvg.replaceChildren(svg);
+      graphSvg.parentElement.querySelectorAll('.g-head').forEach(x => x.remove());
+      series.forEach(x => graphSvg.parentElement.append(x.head));
+      graphEls = { series, mode: meterMode };
+    }
+    // A smooth curve through the points that never overshoots between them.
+    const curve = pts => pts.map(([x, y], k) => {
+      if (!k) return `M${x.toFixed(1)},${y.toFixed(1)}`;
+      const [px, py] = pts[k - 1];
+      const mx = (px + x) / 2;
+      return `C${mx.toFixed(1)},${py.toFixed(1)} ${mx.toFixed(1)},${y.toFixed(1)} ${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
     function drawGraph(clock) {
-      const sec = Math.floor(clock / 1000);
-      const span = Math.max(20, sec + 1);
+      if (!graphEls || graphEls.mode !== meterMode) { buildGraph(); graphTop = 0; }
+      const tf = Math.max(0, clock / 1000);
+      const sec = Math.floor(tf);
+      const span = Math.max(20, tf);
+      // 5-second rolling average per second, plus a live point for the second in progress.
       const series = buckets[meterMode].map(b => {
         const pts = [];
-        for (let x = 0; x <= sec; x++) {
+        for (let x = 0; x < sec; x++) {
           let sum = 0;
           for (let k = Math.max(0, x - 4); k <= x; k++) sum += b[k] || 0;
           pts.push(sum / Math.min(5, x + 1));
         }
+        let sum = 0;
+        for (let k = Math.max(0, sec - 4); k <= sec; k++) sum += b[k] || 0;
+        pts.push(sum / Math.max(1, Math.min(5, tf)));
         return pts;
       });
-      const top = niceMax(Math.max(10, ...series.flat()) * 1.05);
-      graphData = { series, span, sec, top };
-      const W = 1000, H = 300;
-      const X = x => (x / span) * W, Y = v => H - (v / top) * H;
-      const grid = [0.25, 0.5, 0.75].map(f => `<line x1="0" x2="${W}" y1="${H * f}" y2="${H * f}" class="gl" vector-effect="non-scaling-stroke"/>`).join('');
-      const seen = {};
-      const lines = series.map((pts, i) => {
-        const colour = party[i].colour;
-        const dash = seen[colour] ? ' stroke-dasharray="6 4"' : '';
-        seen[colour] = true;
-        return `<polyline fill="none" stroke="${colour}" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"${dash} points="${pts.map((v, x) => `${X(x).toFixed(1)},${Y(v).toFixed(1)}`).join(' ')}"/>`;
-      }).join('');
-      graphSvg.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${grid}${lines}</svg>`;
-      graphAxisY.replaceChildren(...[1, 0.75, 0.5, 0.25, 0].map(f => h('span', {}, fmt(top * f))));
+      const target = niceMax(Math.max(10, ...series.flat()) * 1.05);
+      graphTop = !graphTop || quiet || reduced ? target : graphTop + (target - graphTop) * 0.3;
+      graphData = { series, span, sec, top: graphTop };
+      const X = x => (x / span) * GW, Y = v => GH - Math.min(1, v / graphTop) * GH;
+      series.forEach((pts, i) => {
+        const el = graphEls.series[i];
+        const xy = pts.map((v, x) => [X(x === pts.length - 1 ? tf : x), Y(v)]);
+        const d = curve(xy);
+        el.line.setAttribute('d', d);
+        el.area.setAttribute('d', xy.length ? `${d} L${xy[xy.length - 1][0].toFixed(1)},${GH} L${xy[0][0].toFixed(1)},${GH} Z` : '');
+        const last = xy[xy.length - 1];
+        el.head.style.left = `${(last[0] / GW) * 100}%`;
+        el.head.style.top = `${(last[1] / GH) * 100}%`;
+        el.head.classList.toggle('done', clock >= cur.fight.ms);
+      });
+      graphAxisY.replaceChildren(...[1, 0.75, 0.5, 0.25, 0].map(f => h('span', {}, fmt(graphTop * f))));
       graphAxisX.replaceChildren(...[0, 0.25, 0.5, 0.75, 1].map(f => h('span', {}, fmtClock(span * f * 1000))));
     }
 
@@ -2356,9 +2425,10 @@
         statusEl.className = 'battle-status live';
         statusEl.textContent = 'Fighting';
       }
-      if (t - lastMeter > 250) { lastMeter = t; drawMeter(clock); drawStatuses(clock); }
-      const sec = Math.floor(clock / 1000);
-      if (sec !== lastSec) { lastSec = sec; drawGraph(clock); }
+      if (t - lastMeter > 100) { lastMeter = t; drawMeter(clock); }
+      if (t - lastSec > 250) { lastSec = t; drawStatuses(clock); }
+      // After the fight ends, the graph is drawn once more and then left alone.
+      if (t - lastGraph > 200 && !graphFinal) { lastGraph = t; drawGraph(clock); graphFinal = clock >= f.ms; }
       raf = requestAnimationFrame(tick);
     }
 

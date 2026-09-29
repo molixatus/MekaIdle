@@ -1496,3 +1496,39 @@ body.no-motion *, body.no-motion *::before, body.no-motion *::after { animation-
   0% { transform: scale(1.18); border-color: #6effaa; box-shadow: 0 0 0 0 rgba(110, 255, 170, .85); }
   100% { transform: scale(1); box-shadow: 0 0 0 9px rgba(110, 255, 170, 0); }
 }
+
+/* Damage meter: rank badges, glowing class-coloured bars with a sheen, rows that slide into place. */
+.meter { gap: 5px; }
+.meter-item { transition: transform .45s cubic-bezier(.2, .8, .2, 1); will-change: transform; }
+.meter-row { padding: 7px 9px; background: rgba(255, 255, 255, .02); border: 1px solid #1e232d; transition: background .2s, border-color .2s; }
+.meter-row:hover, .meter-row[aria-expanded="true"] { background: var(--card); border-color: color-mix(in srgb, var(--series) 40%, #1e232d); }
+.meter-rank { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 5px; font-size: 11px; font-weight: 800; color: var(--muted); background: #0f1218; flex: none; }
+.meter-item[data-rank="1"] .meter-rank { color: #1a1406; background: #f2c14e; }
+.meter-item[data-rank="2"] .meter-rank { color: #14161b; background: #c3c9d4; }
+.meter-item[data-rank="3"] .meter-rank { color: #1a0f08; background: #d08d5b; }
+.meter-val { display: inline-flex; align-items: baseline; gap: 6px; }
+.meter-val b { color: var(--text); font-weight: 700; font-size: 13px; }
+.meter-val small { color: var(--faint); font-size: 11px; min-width: 30px; text-align: right; }
+.meter-bar { height: 8px; border-radius: 4px; background: #0d1015; overflow: hidden; }
+.meter-bar > span { position: relative; border-radius: 4px; overflow: hidden; transition: width .35s cubic-bezier(.2, .8, .2, 1);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--series) 55%, #000), var(--series)) !important;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--series) 45%, transparent); }
+.meter-bar > span::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .28), transparent);
+  transform: translateX(-100%); animation: meter-sheen 2.4s ease-in-out infinite; }
+@keyframes meter-sheen { 60%, 100% { transform: translateX(100%); } }
+.meter-detail { animation: meter-open .25s ease-out; }
+@keyframes meter-open { from { opacity: 0; transform: translateY(-4px); } }
+.src-bar > span { transition: width .35s ease; }
+
+/* Graph: smooth filled curves with a glowing, pulsing head on each line. */
+.graph { grid-template-rows: 170px auto; }
+.graph-area { overflow: hidden; background: linear-gradient(#141821, #0f1218); border: 1px solid #1e232d; border-radius: 6px; }
+.graph .g-line { filter: drop-shadow(0 0 3px rgba(0, 0, 0, .6)); }
+.graph .g-area { transition: opacity .3s; }
+.g-head { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--series); pointer-events: none;
+  box-shadow: 0 0 8px var(--series); transition: left .2s linear, top .2s ease-out; }
+.g-head::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--series); animation: g-pulse 1.4s ease-out infinite; }
+.g-head.done::after { animation: none; opacity: 0; }
+@keyframes g-pulse { from { transform: scale(.5); opacity: .9; } to { transform: scale(1.8); opacity: 0; } }
+.graph-y span, .graph-x span { transition: color .2s; }
+@media (prefers-reduced-motion: reduce) { .meter-bar > span::after, .g-head::after { animation: none; } }
