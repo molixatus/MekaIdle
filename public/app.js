@@ -972,6 +972,7 @@
     const next = { ...eq, [it.slot]: id };
     if (it.slot === 'weapon' && it.twoHanded) next.offhand = null;
     if (it.slot === 'offhand' && G.ITEMS[eq.weapon] && G.ITEMS[eq.weapon].twoHanded) return h('p', { class: 'bad tip-desc' }, 'Your two-handed weapon leaves no room for an off-hand.');
+    if (eq[it.slot] === id) return h('p', { class: 'ok tip-desc' }, 'You have this fitted.');
     const cur = myStats();
     const nextStats = G.mechStats(next, myLevels(), { subclass: mySubclass(it.cls && it.slot === 'weapon' ? it.cls : myClass()) });
     const worn = eq[it.slot] && G.ITEMS[eq[it.slot]];
@@ -1060,6 +1061,26 @@
   const TYPE_ORDER = { resource: 0, material: 1, consumable: 2, gear: 3 };
   const TYPE_NAME = { resource: 'Resource', material: 'Raid material', consumable: 'Consumable', gear: 'Gear' };
 
+  const INV_GROUP = { resource: 'Resources', material: 'Raid materials', consumable: 'Consumables', gear: 'Gear' };
+  // Where an item comes from and what uses it, in a line or two (for tooltips).
+  function itemSources(id) {
+    const from = G.ACTIONS.filter(a => a.outputs[id] || a.chance.some(c => c.item === id)).map(a => `${G.SKILL_BY_ID[a.skill].name} (${a.name})`);
+    const raids = G.RAIDS.filter(r => r.drops.some(d => d.item === id));
+    if (raids.length) from.push(raids.length === 1 ? `Raid #${raids[0].n} ${raids[0].name}` : `${raids.length} raids in ${[...new Set(raids.map(r => r.regionName))].slice(0, 2).join(', ')}`);
+    const uses = G.ACTIONS.filter(a => a.inputs[id]);
+    return h('div', { class: 'tip-sources' },
+      from.length ? h('p', {}, h('b', {}, 'From: '), from.slice(0, 3).join(', ')) : null,
+      uses.length ? h('p', {}, h('b', {}, 'Used in: '), `${uses.slice(0, 3).map(a => a.name).join(', ')}${uses.length > 3 ? ` and ${uses.length - 3} more` : ''}`) : null);
+  }
+  function invTile(id) {
+    const it = G.ITEMS[id];
+    const tile = h('button', {
+      type: 'button', class: `tile${it.rare ? ' rare-tile' : ''}`, 'aria-label': `${it.name}, ${have(id)}`,
+      'aria-pressed': String(invSelected === id), onclick: () => { invSelected = id; renderPage(); },
+    }, it.tier ? h('span', { class: 'tile-tier' }, `T${it.tier}`) : null, itemIco(id), h('span', { class: 'qty' }, fmt(have(id))), itemName(id, 'span'));
+    tile.style.setProperty('--tier', it.colour);
+    return tip(tile, () => itemTip(id, h('div', {}, it.type === 'gear' ? gearCompare(id) : null, itemSources(id))));
+  }
   function inventoryPage() {
     const ids = Object.keys(me.state.items).filter(id => G.ITEMS[id] && id !== 'gold')
       .sort((a, b) => TYPE_ORDER[G.ITEMS[a].type] - TYPE_ORDER[G.ITEMS[b].type] || (G.ITEMS[a].tier || 0) - (G.ITEMS[b].tier || 0));
@@ -1073,13 +1094,13 @@
         h('button', { type: 'button', class: 'chip', 'aria-pressed': String(invFilter === id), onclick: () => { invFilter = id; renderPage(); } }, name))),
       h('div', { class: 'inv section' },
         shown.length
-          ? h('div', { class: 'tiles' }, shown.map(id => {
-            const tile = h('button', {
-              type: 'button', class: `tile${G.ITEMS[id].rare ? ' rare-tile' : ''}`, title: G.ITEMS[id].name, 'aria-label': `${G.ITEMS[id].name}, ${have(id)}`,
-              'aria-pressed': String(invSelected === id), onclick: () => { invSelected = id; renderPage(); },
-            }, itemIco(id), h('span', { class: 'qty' }, fmt(have(id))));
-            tile.style.setProperty('--tier', G.ITEMS[id].colour);
-            return tile;
+          // Grouped by type, each under its own heading in the All view.
+          ? h('div', { class: 'inv-groups' }, Object.keys(TYPE_ORDER).map(type => {
+            const ofType = shown.filter(id => G.ITEMS[id].type === type);
+            if (!ofType.length) return null;
+            return h('div', { class: 'inv-group' },
+              invFilter === 'all' ? h('h3', { class: 'inv-head' }, INV_GROUP[type], h('small', {}, String(ofType.length))) : null,
+              h('div', { class: 'tiles' }, ofType.map(invTile)));
           }))
           : h('div', { class: 'empty' }, 'Nothing here yet. Start with a gathering skill: Mining, Hunting, Foraging or Herbalism.'),
         itemDetail(invSelected)),
