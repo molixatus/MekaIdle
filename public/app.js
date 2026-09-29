@@ -1233,8 +1233,10 @@
               !leader ? h('span', { class: 'muted' }, p.running ? 'Fighting with the party.' : 'Waiting for the leader to start.') : null,
               h('button', { type: 'button', class: 'btn danger', onclick: () => partyAct('/api/party/leave', {}, p.members.length > 1 && leader ? 'You left the party. The next pilot now leads it.' : p.members.length > 1 ? 'You left the party.' : 'Party disbanded.') }, p.members.length > 1 ? 'Leave party' : 'Disband')))));
       }
-      openBox.replaceChildren(collapsible('open-parties', 'Open parties', data.open.length ? `${data.open.length} open` : 'none right now',
-        data.open.length ? h('div', { class: 'list' }, data.open.map(o => {
+      // Only shown when there's a party you can join.
+      if (!data.open.length) { openBox.replaceChildren(); return; }
+      openBox.replaceChildren(section('Open parties', `${data.open.length} you can join`,
+        h('div', { class: 'list' }, data.open.map(o => {
           const raid = G.RAID_BY_ID[o.raid];
           const lead = o.members.find(m => m.id === o.leader) || o.members[0];
           return h('div', { class: 'row' },
@@ -1242,7 +1244,7 @@
             h('div', { class: 'grow' }, h('div', { class: 'name' }, `${lead ? lead.name : 'Someone'}’s party `, diffTag(o.diff)),
               h('small', {}, `#${raid.n} ${raid.name} · ${plural(o.members.length, 'pilot')}${o.running ? ' · raiding now' : ''}${o.visibility === 'public' ? ' · open to everyone' : ''}`)),
             h('button', { type: 'button', class: 'btn small primary', disabled: !!data.party, onclick: () => partyAct('/api/party/join', { id: o.id }, 'Joined the party.') }, 'Join'));
-        })) : h('div', { class: 'empty' }, 'No open parties. Form one from a raid below, open your running raid to others, or add friends and join a guild to see theirs.'), true));
+        }))));
     }
 
     async function load() {
