@@ -51,9 +51,19 @@
     inner.style.left = `${-(c + m) * k * 100}%`;
     inner.style.top = `${-(r + m) * k * 100}%`;
     if (hue) inner.style.filter = `hue-rotate(${hue}deg)`;
-    // Rare gear shimmers; high-tier gear glints now and then.
-    const shine = it.type === 'gear' && (it.tier || 0) >= 7 ? ' shiny' : '';
-    return h('span', { class: `ico item-sprite ${cls}${it.rare ? ' rare' : ''}${shine}`, 'aria-hidden': 'true' }, inner);
+    // Rare gear and tier 7+ gear shine: a light sweep drawn only on the item's own pixels (masked by
+    // the same sheet cell), gold for rare gear, tinted with the tier colour otherwise.
+    // Raid materials shine too, in their tier colour.
+    const shiny = (it.type === 'gear' && (it.rare || (it.tier || 0) >= 7)) || it.type === 'material';
+    const box = h('span', { class: `ico item-sprite ${cls}${it.rare ? ' rare' : ''}${shiny ? ' shiny' : ''}`, 'aria-hidden': 'true' }, inner);
+    if (shiny) {
+      const shineEl = h('span', { class: 'item-shine' });
+      ['width', 'height', 'left', 'top'].forEach(p => { shineEl.style[p] = inner.style[p]; });
+      shineEl.style.maskImage = shineEl.style.webkitMaskImage = `url(${SHEET.src})`;
+      shineEl.style.setProperty('--shine', it.rare ? '#ffd86b' : it.colour);
+      box.append(shineEl);
+    }
+    return box;
   };
   // Item names are coloured by the item's tier.
   const itemName = (id, tag = 'span') => {
@@ -1237,7 +1247,7 @@
   const itemClass = it => it && (it.cls || (it.set && G.SET_BY_ID[it.set] && G.SET_BY_ID[it.set].cls) || TYPE_CLASS[it.armour]) || null;
   // Drops shown as chips; `only` picks 'gear' or 'materials' (everything else), or all when unset.
   const isGearDrop = x => G.ITEMS[x.item] && G.ITEMS[x.item].type === 'gear';
-  const lootGroup = (label, r, diff, only) => h('div', { class: 'loot-group' }, h('small', { class: 'loot-label' }, label), lootIcons(r, diff, only));
+  const lootGroup = (label, r, diff, only) => h('div', { class: `loot-group loot-${only}` }, h('small', { class: 'loot-label' }, label), lootIcons(r, diff, only));
   function lootIcons(r, diff, only) {
     const drops = r.drops.filter(x => !only || (only === 'gear') === isGearDrop(x));
     return h('div', { class: 'loot-icons', 'aria-label': 'Drops on a win' }, drops.map(x => {
