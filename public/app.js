@@ -490,7 +490,7 @@
       me = data;
       offset = data.now - Date.now();
       renderChrome();
-      if (isLivePage()) renderPage();
+      if (isLivePage() && pageChanged()) renderPage();
       else if (pageRefresh && ++polls % 2 === 0) pageRefresh();
       try { celebrate(before, data.state); } catch (err) { console.error(err); }
       if (pageTick) pageTick();
@@ -728,6 +728,25 @@
   // ---------- Pages ----------
   const LIVE = ['skill', 'equipment', 'inventory', 'abilities', 'subclass'];
   const isLivePage = () => LIVE.includes(page.split(':')[0]) && !document.querySelector('.page input:focus, .page select:focus');
+  // What each live page shows, as a string: the refresh only rebuilds the page when this changes,
+  // so animations aren't restarted (which looked like a flash) every few seconds.
+  const levelsSig = st => G.SKILLS.map(sk => G.levelFromXp(st.skills[sk.id].xp)).join(',');
+  const itemsSig = (st, keep) => Object.entries(st.items).filter(([id]) => !keep || (G.ITEMS[id] && keep(G.ITEMS[id]))).sort().join(';');
+  const PAGE_SIG = {
+    skill: st => JSON.stringify([st.skills, st.items, st.activity && [st.activity.id, st.activity.left, st.activity.type], st.queue]),
+    equipment: st => JSON.stringify([st.equipment, st.supplies, st.subclasses, levelsSig(st), itemsSig(st, it => it.type === 'gear' || it.supply)]),
+    inventory: st => JSON.stringify([itemsSig(st), st.equipment]),
+    abilities: st => JSON.stringify([st.abilities, st.subclasses, st.multi, st.equipment, levelsSig(st)]),
+    subclass: st => JSON.stringify([st.subclasses, st.multi, st.equipment, levelsSig(st)]),
+  };
+  let lastSig = null;
+  function pageChanged() {
+    const f = PAGE_SIG[page.split(':')[0]];
+    const sig = f ? f(me.state) : null;
+    if (sig !== null && sig === lastSig) return false;
+    lastSig = sig;
+    return true;
+  }
 
   function go(id) {
     const kind = id.split(':')[0];
@@ -746,6 +765,8 @@
   // Pages animate in when you go to them; the refresh every few seconds doesn't replay it.
   let enterNext = true;
   function renderPage() {
+    const sigF = PAGE_SIG[page.split(':')[0]];
+    lastSig = sigF && me ? sigF(me.state) : null;
     if (pageCleanup) pageCleanup();
     pageRefresh = pageTick = pageCleanup = null;
     const [kind, arg] = page.split(':');
