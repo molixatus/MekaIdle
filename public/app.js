@@ -1197,7 +1197,7 @@
         bossBox.replaceChildren(h('p', { class: 'muted small boss-hidden' }, 'The boss list comes back when you leave this fight.'));
         return;
       }
-      bossBox.replaceChildren(collapsible('bosses', 'Bosses', hidden ? `${hidden} hidden by filters` : '250 raids in 10 regions', h('div', {}, diffBar, filters, list), true));
+      bossBox.replaceChildren(section('Bosses', hidden ? `${hidden} hidden by filters` : '250 raids in 10 regions', diffBar, filters, list));
     }
 
     function visibilityPicker(current, disabled) {
