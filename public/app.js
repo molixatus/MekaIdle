@@ -295,6 +295,8 @@
   }
 
   function setupAuth() {
+    // Warn before anyone makes an account the server can't keep.
+    api('/api/health').then(h0 => { $('auth-storage').hidden = !!h0.persistentStorage; }).catch(() => {});
     const tabs = { create: $('tab-create'), login: $('tab-login') };
     const forms = { create: $('form-create'), login: $('form-login') };
     const pick = which => {
@@ -496,7 +498,8 @@
     }
     renderQueue();
 
-    $('topline').replaceChildren(h('span', { class: 'topline-now' }, activityText()),
+    $('topline').replaceChildren(me.persistent === false ? h('span', { class: 'storage-warning small' }, 'Progress is not being saved permanently on this server.') : '',
+      h('span', { class: 'topline-now' }, activityText()),
       (me.state.queue || []).length ? h('span', { class: 'topline-queue' }, `Queue: ${me.state.queue.length}/${G.QUEUE_MAX}`) : '');
     const cls = myClass();
     const dot = h('span', { class: 'pilot-dot' });

@@ -255,6 +255,7 @@ route('GET', '/api/me', async ctx => {
   return {
     now: Date.now(),
     player: { id: p.id, name: p.name, mech: p.mech, colour: classColour(p.state) },
+    persistent,
     state: await clientState(p.state),
     away,
     guild: p.guild_id ? await db.get('SELECT id, name, tag FROM guilds WHERE id = ?', p.guild_id) : null,
