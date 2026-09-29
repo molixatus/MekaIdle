@@ -320,7 +320,7 @@
   const myLevels = () => Object.fromEntries(G.SKILLS.map(s => [s.id, lvl(s.id)]));
   const myClass = () => { const it = G.ITEMS[me.state.equipment.weapon]; return it ? it.cls : 'melee'; };
   const classColour = eq => { const it = G.ITEMS[eq.weapon]; return it ? G.CLASSES[it.cls].colour : G.UNARMED_COLOUR; };
-  const mySubclass = (cls = myClass()) => (me.state.subclasses || {})[cls] || null;
+  const mySubclass = (cls = myClass()) => G.resolveSubclass(me.state.subclasses, me.state.multi, cls);
   const myStats = () => G.mechStats(me.state.equipment, myLevels(), { subclass: mySubclass() });
   const myCombat = () => G.combatLevel(myLevels());
   const raiding = () => !!(me && me.state.activity && me.state.activity.type);
@@ -1038,7 +1038,7 @@
     const kinds = G.WEAPON_KINDS.filter(w => w.cls === cls);
     const off = G.OFFHAND_KINDS.find(o => o.cls === cls);
     const offCls = (G.ITEMS[me.state.equipment.offhand] || {}).cls;
-    const trains = myClass() === cls || (mySubclass() === 'multiclass' && (me.state.multi || {})[myClass()] === cls) || (offCls === cls && myClass() !== cls);
+    const trains = myClass() === cls || (offCls === cls && myClass() !== cls);
     const abilities = G.ABILITIES.filter(a => a.cls === cls);
     return [
       h('div', { class: 'two-col' },
@@ -1270,7 +1270,6 @@
   function abilityClasses() {
     const cls = myClass();
     const set = new Set([cls]);
-    if (mySubclass(cls) === 'multiclass' && (me.state.multi || {})[cls]) set.add(me.state.multi[cls]);
     const off = G.ITEMS[me.state.equipment.offhand];
     if (off && off.cls) set.add(off.cls);
     return set;
@@ -1307,7 +1306,7 @@
     return [
       pageHead('abilities', 'skill-magic', 'Abilities', 'Equip up to two class abilities and one generic ability. Your mech uses them by itself in raids when they’re ready and useful.'),
       h('div', { class: 'ab-slots' }, slot(loadout.cls[0], 'Class ability'), slot(loadout.cls[1], 'Class ability'), slot(loadout.generic, 'Generic ability')),
-      h('p', { class: 'muted' }, `You can use abilities from: ${[...usable].map(c => G.CLASSES[c].name).join(', ')}. A multiclass or an off-hand from another class adds that class.`),
+      h('p', { class: 'muted' }, `You can use abilities from: ${[...usable].map(c => G.CLASSES[c].name).join(', ')}. An off-hand from another class adds that class.`),
       ...Object.values(G.CLASSES).map(c => collapsible(`ab-${c.id}`, `${c.name} abilities`, `level ${lvl(c.skill)}${usable.has(c.id) ? '' : ' · not usable now'}`,
         h('div', { class: 'ability-list' }, G.ABILITIES.filter(a => a.cls === c.id).map(abilityCard)), usable.has(c.id))),
       collapsible('ab-generic', 'Generic abilities', `combat level ${myCombat()}`, h('div', { class: 'ability-list' }, G.ABILITIES.filter(a => a.cls === 'generic').map(abilityCard)), true),
@@ -1319,16 +1318,22 @@
     const subs = me.state.subclasses || {};
     const multi = me.state.multi || {};
     return [
-      pageHead('subclass', 'skill-healing', 'Subclasses', 'At level 5 in a combat class, pick one of its two subclasses. At level 10 you can instead multiclass: train a second class alongside it and use both classes’ abilities.'),
+      pageHead('subclass', 'skill-healing', 'Subclasses', 'At level 5 in a combat class, pick one of its two subclasses. At level 10 you can instead multiclass: take a subclass from another class you have at level 5.'),
       ...Object.values(G.CLASSES).map(c => {
         const L = lvl(c.skill);
         const current = subs[c.id];
         const options = G.SUBCLASSES.filter(s => s.cls === c.id);
-        const secondSel = h('select', { 'aria-label': 'Second class' }, Object.values(G.CLASSES).filter(o => o.id !== c.id).map(o => h('option', { value: o.id, selected: multi[c.id] === o.id || null }, o.name)));
+        // Multiclass picks one subclass from another class (level 5 in that class).
+        const borrowable = G.SUBCLASSES.filter(s => s.cls && s.cls !== c.id);
+        const secondSel = h('select', { 'aria-label': 'Subclass to borrow' }, borrowable.map(s => {
+          const ok = lvl(G.CLASSES[s.cls].skill) >= s.level;
+          return h('option', { value: s.id, selected: multi[c.id] === s.id || null, disabled: !ok || null }, `${s.name} (${G.CLASSES[s.cls].name}${ok ? '' : `, needs level ${s.level}`})`);
+        }));
         const card = (sub, extra) => h('div', { class: `sub-card${current === sub.id ? ' chosen' : ''}${L < sub.level ? ' locked' : ''}` },
           gi('sub_' + sub.id, c.colour, 'xl'),
           h('div', { class: 'grow' }, h('h3', {}, sub.name, current === sub.id ? h('span', { class: 'ok small' }, ' · chosen') : null), h('p', {}, sub.desc),
-            sub.id === 'multiclass' && current === 'multiclass' ? h('p', { class: 'ok small' }, `Also training ${G.CLASSES[multi[c.id]].name}.`) : null),
+            sub.id === 'multiclass' && current === 'multiclass' ? h('p', { class: G.resolveSubclass(subs, multi, c.id) ? 'ok small' : 'warn small' },
+              G.resolveSubclass(subs, multi, c.id) ? `Using ${G.SUBCLASS_BY_ID[multi[c.id]].name} from ${G.CLASSES[G.SUBCLASS_BY_ID[multi[c.id]].cls].name}.` : 'Pick a subclass to borrow.') : null),
           L < sub.level ? h('span', { class: 'lock-note' }, ui('lock', 'sm'), `Level ${sub.level}`) : h('div', { class: 'actions' }, extra,
             h('button', { type: 'button', class: 'btn small primary', disabled: current === sub.id && sub.id !== 'multiclass',
               onclick: () => act('/api/subclass', { cls: c.id, sub: sub.id, second: secondSel.value }, `${c.name}: ${sub.name}.`) }, current === sub.id ? (sub.id === 'multiclass' ? 'Update' : 'Chosen') : 'Choose')));

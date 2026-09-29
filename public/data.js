@@ -276,9 +276,17 @@
     { id: 'arcanist', cls: 'magic', name: 'Arcanist', level: 5, stats: { regen: 2 }, costCut: 0.3, abilityPower: 0.2, desc: 'Abilities cost 30% less mana and deal 20% more. +2 mana regen.' },
     { id: 'cleric', cls: 'healer', name: 'Cleric', level: 5, stats: { heal: 20 }, smite: 0.3, desc: '+20% healing and 30% stronger smites.' },
     { id: 'shadowmender', cls: 'healer', name: 'Shadowmender', level: 5, shadow: true, desc: 'Your attacks become shadow damage over time on every enemy in the wave, and every tick heals your whole party.' },
-    { id: 'multiclass', cls: null, name: 'Multiclass', level: 10, desc: 'Instead of a subclass, train a second combat class alongside this one: fights give XP to both, and you can equip abilities from both.' },
+    { id: 'multiclass', cls: null, name: 'Multiclass', level: 10, desc: 'Instead of one of this class’s subclasses, take a subclass from another class (you need level 5 in that class).' },
   ];
   const SUBCLASS_BY_ID = Object.fromEntries(SUBCLASSES.map(s => [s.id, s]));
+  // The subclass in effect for a class: its own pick, or with Multiclass, the borrowed subclass
+  // from another class (state.multi[cls] holds that subclass's id).
+  const resolveSubclass = (subclasses, multi, cls) => {
+    const s = subclasses && subclasses[cls];
+    if (s !== 'multiclass') return s || null;
+    const b = SUBCLASS_BY_ID[multi && multi[cls]];
+    return b && b.cls && b.cls !== cls ? b.id : null;
+  };
 
   // ---------- Regions and raids ----------
   // 10 regions of 25 raids each: 250 raids. Each raid is a few trash waves and a boss, at one of
@@ -799,6 +807,7 @@
 
   const PATCH_NOTES = [
     { v: '0.11', date: '2026-09-29', notes: [
+      'Multiclass (level 10) now lets you take a subclass from another class, if you have level 5 in that class. Off-hands already give you another class’s abilities, so Multiclass no longer does, and it no longer splits XP. Pick your borrowed subclass again on the Subclasses page.',
       'The gear picker on the Equipment page groups gear by class (your class first), with a coloured heading for each.',
       'Buffs and debuffs now show as icons above each unit’s name (buffs left, debuffs right) with the time left underneath and details on hover.',
       'Boss mechanics show as icons like your abilities: they pop when used, then count down to the next use.',
@@ -808,7 +817,7 @@
       'Raid screen abilities pop when used, then grey out with a clock sweep and a countdown underneath, and flash green when they’re ready again.',
       'Fixed raids and skills sometimes stopping after an update: your browser now refreshes its backup right after every action (and every 15 seconds), and a raid opened to friends or everyone carries on as a solo raid after an update instead of stopping.',
       'Skill pages show your level and XP bar full width under the title instead of squeezed into the corner.',
-      'An off-hand from another class now trains that class too: it takes 30% of each fight’s XP, and the rest goes to your main class (split 60/40 if you multiclass).',
+      'An off-hand from another class now trains that class too: it takes 30% of each fight’s XP, and the rest goes to your main class .',
       'Fixed damage-over-time numbers (bleed, burn, poison, shadow and others) squashing into a tiny box, and numbers near the edge of an enemy doing the same.',
       'In parties, each pilot’s damage numbers pop up in their own spot on the enemy (a grid with a cell per pilot), so they no longer pile on top of each other.',
       'New Settings page (above Log out): turn damage numbers, hit flashes, item shine and animations on or off, download a backup of your save, or reset your progress and start again.',
@@ -894,7 +903,7 @@
   const GAME = {
     MAX_LEVEL, OFFLINE_CAP, TIERS, TIER_BY_ID, CLASSES, ROLES, CLASS_OF_SKILL, UNARMED_COLOUR, SKILLS, SKILL_BY_ID, COMBAT_SKILLS, STATS, describe,
     WEAPON_KINDS, WEAPON_BY_ID, OFFHAND_KINDS, OFFHAND_BY_ID, SLOTS, ARMOUR_SLOTS, ARMOUR_TYPES, CONSUMABLES, CONSUMABLE_BY_ID,
-    ABILITIES, ABILITY_BY_ID, ABILITY_SLOTS, SUBCLASSES, SUBCLASS_BY_ID, REGIONS, SET_BY_ID, TRASH_ROLES, FOE_ROLE, MECHANICS, RAID_CURVE, FOES, FOE_DAMAGE, PASSIVES, DIFFICULTIES, DIFF_BY_ID, FIGHT, PARTY,
+    ABILITIES, ABILITY_BY_ID, ABILITY_SLOTS, SUBCLASSES, SUBCLASS_BY_ID, resolveSubclass, REGIONS, SET_BY_ID, TRASH_ROLES, FOE_ROLE, MECHANICS, RAID_CURVE, FOES, FOE_DAMAGE, PASSIVES, DIFFICULTIES, DIFF_BY_ID, FIGHT, PARTY,
     ITEMS, ACTIONS, ACTION_BY_ID, RAIDS, RAID_BY_ID, finaleGear, gearCheck, FINALE_ARMOUR, RAID_GEAR_NEED, OFFHAND_XP_SHARE, PATCH_NOTES, CLASS_KIT,
     xpForLevel, levelFromXp, skillMult, mechStats, power, combatLevel, kit, rng,
     PARTY_MAX: PARTY.max, partyDmg, POTIONS_PER_RAID: 3, GUILD_COST: 0, QUEUE_MAX: 5,
