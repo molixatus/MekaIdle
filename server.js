@@ -273,13 +273,20 @@ route('POST', '/api/login', async ctx => {
 }, false);
 
 // A signed copy of the pilot's save, which the browser keeps. Raid timelines are left out (the
-// next fight is simulated again), and a party raid becomes idle, since parties aren't restored.
+// next fight is simulated again). Parties aren't restored, so a running party raid is saved as a
+// solo raid of the same boss and difficulty: after a wipe the pilot keeps fighting instead of idling.
 route('GET', '/api/backup', async ctx => {
   const p = await fresh(ctx.me);
   await savePlayer(p);
   const state = { ...p.state };
   if (state.activity && state.activity.type === 'raid') state.activity = { ...state.activity, fight: null };
-  if (state.activity && state.activity.type === 'party') state.activity = null;
+  if (state.activity && state.activity.type === 'party') {
+    const party = await db.get('SELECT session FROM parties WHERE id = ?', state.activity.party);
+    const session = party && party.session ? JSON.parse(party.session) : null;
+    state.activity = session && G.RAID_BY_ID[session.raid]
+      ? { type: 'raid', raid: session.raid, diff: session.diff || 'normal', start: Date.now(), began: session.began || session.start, n: session.n || 1, fight: null }
+      : null;
+  }
   const g = p.guild_id ? await db.get('SELECT name, tag, leader_id FROM guilds WHERE id = ?', p.guild_id) : null;
   return {
     backup: sign({

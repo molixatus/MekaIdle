@@ -144,6 +144,13 @@
       if (r.backup) store(backupKey(me.player.name), r.backup);
     } catch (e) { /* try again later */ }
   }
+  // After anything you do, the browser's copy is refreshed shortly, so a redeploy right after
+  // starting a skill or raid doesn't lose it.
+  let backupSoonTimer = null;
+  function backupSoon() {
+    clearTimeout(backupSoonTimer);
+    backupSoonTimer = setTimeout(saveBackup, 1500);
+  }
   async function restoreFromBrowser(name, password) {
     const backup = store(backupKey(name));
     if (!backup) return false;
@@ -177,6 +184,7 @@
       const r = await api(path, body);
       if (r.state) setState(r.state);
       if (r.message || okMsg) toast(r.message || okMsg);
+      backupSoon();
       return r;
     } catch (e) {
       toast(e.message, 'error');
@@ -514,7 +522,7 @@
     pollTimer = setInterval(poll, POLL_MS);
     saveBackup();
     clearInterval(backupTimer);
-    backupTimer = setInterval(saveBackup, 30000);
+    backupTimer = setInterval(saveBackup, 15000);
   }
   let backupTimer = null;
   document.addEventListener('visibilitychange', () => { if (document.hidden) saveBackup(); });

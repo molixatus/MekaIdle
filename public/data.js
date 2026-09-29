@@ -799,6 +799,7 @@
 
   const PATCH_NOTES = [
     { v: '0.11', date: '2026-09-29', notes: [
+      'Fixed raids and skills sometimes stopping after an update: your browser now refreshes its backup right after every action (and every 15 seconds), and a raid opened to friends or everyone carries on as a solo raid after an update instead of stopping.',
       'Skill pages show your level and XP bar full width under the title instead of squeezed into the corner.',
       'An off-hand from another class now trains that class too: it takes 30% of each fight’s XP, and the rest goes to your main class (split 60/40 if you multiclass).',
       'Fixed damage-over-time numbers (bleed, burn, poison, shadow and others) squashing into a tiny box, and numbers near the edge of an enemy doing the same.',
