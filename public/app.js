@@ -340,7 +340,7 @@
       // Scale the monster so its own outline (not its cell) fills the space: bosses 150px, enemies
       // in a fight 96px, small portraits 36px.
       const [bx, by, bw, bh] = box;
-      const target = size === 48 ? 150 : size === 32 ? 96 : 36;
+      const target = size === 48 ? 150 : size === 32 ? 96 : size || 36;
       const sc = target / Math.max(bw, bh);
       const el = h('span', { class: `sprite foe-sprite mon-sprite${boss ? ' boss-art' : ''} ${cls}`, 'aria-hidden': 'true' });
       el.style.width = `${Math.round(bw * sc)}px`;
@@ -353,7 +353,7 @@
     return h('span', { class: `sprite foe-sprite${boss ? ' boss-art' : ''} ${cls}`, 'aria-hidden': 'true', html: foeSprite(foe, boss, size) });
   }
   // Raid list portraits use the plain icon in the boss's colour.
-  const bossIcon = (raid, cls = '') => (MONSTERS.map[raid.foe] ? foeArt(raid.foe, false, `boss-ico-mon ${cls}`) : gi(`foe_${raid.foe}`, hslToHex(foeColour(raid.foe, true)), `boss-ico-svg ${cls}`));
+  const bossIcon = (raid, cls = '', px) => (MONSTERS.map[raid.foe] ? foeArt(raid.foe, false, `boss-ico-mon ${cls}`, px) : gi(`foe_${raid.foe}`, hslToHex(foeColour(raid.foe, true)), `boss-ico-svg ${cls}`));
 
   // ---------- Auth ----------
   function showAuth() {
@@ -1125,7 +1125,7 @@
     }
     return h('div', { class: `raid-row${here ? ' fighting' : ''}${open ? '' : ' locked'}${r.finale ? ' finale' : ''}` },
       h('span', { class: 'raid-n' }, `#${r.n}`),
-      h('span', { class: 'boss-ico' }, bossIcon(r)),
+      h('span', { class: 'boss-ico' }, bossIcon(r, '', 58)),
       h('div', { class: 'raid-info' }, h('b', {}, r.name, r.finale ? h('span', { class: 'finale-tag' }, 'Finale') : null), h('div', { class: 'raid-chips' }, weakChips(r), mechChips(r.boss.mechs))),
       h('div', { class: 'raid-power', title: 'Your power / recommended' }, h('small', {}, 'Power'), h('b', { class: pClass }, `${fmt(ctx.power)} / ${fmt(rec)}`)),
       lootIcons(r, diff),
