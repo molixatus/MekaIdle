@@ -105,6 +105,7 @@
     guild: '<path d="M6 3v18M6 4h12l-3 4.5L18 13H6"/>',
     social: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14c2.8.2 4.5 2.2 4.5 5"/>',
     logout: '<path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/><circle cx="12" cy="12" r="6.5"/>',
     menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
     close: '<path d="M6 6l12 12M18 6 6 18"/>',
     lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',

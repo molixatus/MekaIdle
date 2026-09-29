@@ -1451,3 +1451,14 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 .status.debuff.ty-bleed { color: #ff8a8a; background: rgba(230, 60, 60, .16); }
 .status.debuff.ty-shadow { color: #b9a4ff; background: rgba(120, 90, 230, .18); }
 .status.debuff.ty-frost { color: #9fe4ff; background: rgba(80, 190, 255, .16); }
+
+/* Settings page. */
+.settings { max-width: 760px; }
+.setting { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; background: var(--card); border-radius: 8px; cursor: pointer; }
+.setting input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent, #6cb4ff); }
+.setting div { display: grid; gap: 2px; }
+.danger-zone { border: 1px solid rgba(239, 90, 69, .45); }
+.danger-zone h2 { color: #ff8f7a; }
+.danger-zone .inline-field input { max-width: 240px; }
+body.no-shine .item-shine { display: none; }
+body.no-motion *, body.no-motion *::before, body.no-motion *::after { animation-duration: 0s !important; animation-iteration-count: 1 !important; transition-duration: 0s !important; }

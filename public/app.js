@@ -116,6 +116,15 @@
   const plural = (n, word) => `${num(n)} ${word}${n === 1 ? '' : 's'}`;
   const pct = v => `${Math.round(v * 1000) / 10}%`;
 
+  // Display settings, kept in this browser.
+  const SETTINGS_KEY = 'mekaidle-settings';
+  const SETTINGS = { floats: true, flashes: true, shine: true, motion: true };
+  try { Object.assign(SETTINGS, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch (e) { /* defaults */ }
+  function applySettings() {
+    document.body.classList.toggle('no-motion', !SETTINGS.motion);
+    document.body.classList.toggle('no-shine', !SETTINGS.shine);
+  }
+  applySettings();
   function store(key, value) {
     try {
       if (value === undefined) return localStorage.getItem(key);
@@ -634,6 +643,8 @@
     });
     $('logout').replaceChildren(ui('logout'), h('span', { class: 'label' }, 'Log out'));
     $('credits-link').replaceChildren(ui('credits'), h('span', { class: 'label' }, 'Credits'));
+    $('settings-link').replaceChildren(ui('settings'), h('span', { class: 'label' }, 'Settings'));
+    $('settings-link').onclick = () => { go('settings'); closeMenu(); };
     $('credits-link').onclick = () => { go('credits'); closeMenu(); };
     $('menu-btn').replaceChildren(ui('menu'));
     $('modal-close').replaceChildren(ui('close'));
@@ -1310,6 +1321,50 @@
     pageHead('patch', 'skill-scribing', 'Patch notes', 'What changed in each update.'),
     ...G.PATCH_NOTES.map(p => h('section', { class: 'panel patch' }, h('h2', {}, `Version ${p.v}`, h('small', { class: 'muted' }, ` · ${p.date}`)), h('ul', {}, p.notes.map(n => h('li', {}, n))))),
   ];
+  function settingsPage() {
+    const toggle = (key, label, desc) => h('label', { class: 'setting' },
+      h('input', { type: 'checkbox', checked: SETTINGS[key], onchange: e => {
+        SETTINGS[key] = e.target.checked;
+        store(SETTINGS_KEY, JSON.stringify(SETTINGS));
+        applySettings();
+        toast('Setting saved.');
+      } }),
+      h('div', {}, h('b', {}, label), h('small', { class: 'muted' }, desc)));
+    const confirmBox = h('input', { type: 'text', placeholder: me.player.name, 'aria-label': 'Type your pilot name to confirm', autocomplete: 'off' });
+    const reset = async () => {
+      if (confirmBox.value.trim().toLowerCase() !== me.player.name.toLowerCase()) { toast('Type your pilot name exactly to confirm.', 'error'); return; }
+      if (!confirm('Reset all your progress? Skills, items, gear and raid clears go back to the start. This can’t be undone.')) return;
+      if (await act('/api/reset', { confirm: confirmBox.value }, 'Progress reset. A fresh start!')) { await saveBackup(); go('skill:mining'); }
+    };
+    const download = async () => {
+      try {
+        const r = await api('/api/backup');
+        const a = h('a', { href: URL.createObjectURL(new Blob([r.backup], { type: 'text/plain' })), download: `mekaidle-${me.player.name}.save` });
+        document.body.append(a);
+        a.click();
+        a.remove();
+      } catch (e) { toast('Couldn’t make a backup just now.', 'error'); }
+    };
+    return [
+      pageHead('settings', 'skill-scribing', 'Settings', 'Display options are saved in this browser.'),
+      h('section', { class: 'panel stack settings' },
+        h('h2', {}, 'Display'),
+        toggle('floats', 'Damage and healing numbers', 'Numbers that float up from units in raids.'),
+        toggle('flashes', 'Hit flashes', 'Units flash red when hit, green when healed, and so on.'),
+        toggle('shine', 'Item shine', 'The light sweep across rare and high-tier items.'),
+        toggle('motion', 'Animations', 'Page transitions, bobbing sprites and other movement.')),
+      h('section', { class: 'panel stack settings' },
+        h('h2', {}, 'Account'),
+        h('p', {}, 'Pilot ', h('b', {}, me.player.name), ' · mech ', h('b', {}, me.player.mech), me.guild ? [' · guild ', h('b', {}, `[${me.guild.tag}] ${me.guild.name}`)] : ''),
+        h('p', { class: 'muted' }, 'Your save is backed up in this browser automatically. You can also download a copy to keep.'),
+        h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn', onclick: download }, 'Download save backup'))),
+      h('section', { class: 'panel stack settings danger-zone' },
+        h('h2', {}, 'Reset progress'),
+        h('p', {}, 'Start again from scratch: all skills back to level 1, and your items, gear, abilities, subclasses and raid clears are cleared. Your name, mech, guild and friends stay. Open trade offers are withdrawn.'),
+        h('label', { class: 'inline-field' }, 'Type your pilot name to confirm', confirmBox),
+        h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn danger', onclick: reset }, 'Reset stats'))),
+    ];
+  }
   const creditsPage = () => [
     pageHead('credits', 'skill-ranged', 'Credits', null),
     h('section', { class: 'panel stack' },
@@ -1807,7 +1862,7 @@
       u.manaFill.style.width = `${Math.max(0, Math.min(1, u.mana / u.maxMana)) * 100}%`;
     }
     function float(u, value, label, colour, big, kind) {
-      if (quiet) return;
+      if (quiet || !SETTINGS.floats) return;
       if (u.floats.childElementCount > 7) u.floats.firstElementChild.remove();
       const s = h('span', { class: `float ${kind || ''}${big ? ' big' : ''}` }, h('b', {}, value), label ? h('small', {}, label) : null);
       s.style.left = `${10 + Math.random() * 70}%`;
@@ -1820,7 +1875,7 @@
     const FX_OF_TYPE = { Poison: 'poison', Venom: 'poison', Fire: 'burn', Burn: 'burn', Prismatic: 'burn', Frost: 'frost', Shock: 'shock',
       Bleed: 'bleed', Shadow: 'shadow', Drain: 'mana', Holy: 'holy', Magic: 'shadow' };
     function flash(u, kind) {
-      if (quiet || reduced || !u || !u.fxEl) return;
+      if (quiet || reduced || !SETTINGS.flashes || !u || !u.fxEl) return;
       const t0 = performance.now();
       if (u.lastFlash && t0 - u.lastFlash < 600) return;
       u.lastFlash = t0;
@@ -2521,7 +2576,7 @@
 
   const PAGES = {
     skill: skillPage, equipment: equipmentPage, inventory: inventoryPage, abilities: abilitiesPage, subclass: subclassPage, raids: raidsPage,
-    fights: fightsPage, trade: tradePage, guild: guildPage, social: socialPage, patch: patchPage, credits: creditsPage,
+    fights: fightsPage, trade: tradePage, guild: guildPage, social: socialPage, patch: patchPage, credits: creditsPage, settings: settingsPage,
   };
 
   // ---------- Wiring ----------

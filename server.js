@@ -327,6 +327,22 @@ route('POST', '/api/restore', async ctx => {
   return { ok: true, restored };
 }, false);
 
+// Starts a pilot over from scratch (skills, items, gear, raid clears). The pilot's name, mech,
+// guild and friends stay. The old save is kept in save_backups first, and their open trade
+// offers are withdrawn (the escrowed items went with the old save).
+route('POST', '/api/reset', async ctx => {
+  const p = await fresh(ctx.me);
+  if (str(ctx.body.confirm).trim().toLowerCase() !== p.name_key) bad('Type your pilot name exactly to confirm.');
+  await db.backupSave(p.id, p.state.v || game.STATE_VERSION, 'before a reset by the player', JSON.stringify(p.state));
+  await leaveRaid(p);
+  const party = await partyOf(p.id);
+  if (party) await leaveParty(p, party);
+  await db.run(`UPDATE trades SET status = 'cancelled' WHERE from_id = ? AND status = 'open'`, p.id);
+  p.state = game.migrate(game.newState(Date.now()), Date.now());
+  await savePlayer(p);
+  return { state: await clientState(p.state) };
+});
+
 route('POST', '/api/logout', async ctx => {
   sessionCookie(ctx, '', 0);
 }, false);
