@@ -1472,3 +1472,27 @@ body.no-motion *, body.no-motion *::before, body.no-motion *::after { animation-
 /* Skill pages: level and XP bar full width under the title. */
 .level-box.level-wide { width: 100%; margin: -8px 0 18px; padding: 10px 14px; background: var(--card); border-radius: 8px; }
 .level-wide .bar { height: 8px; }
+
+/* Ability cooldowns in the raid panel: greyed out with a clock sweep and the time left below. */
+.unit-kit { padding-bottom: 13px; }
+.kit-ab { position: relative; transition: transform .2s ease; }
+.kit-ab .ico { transition: filter .3s ease, opacity .3s ease; }
+.kit-ab .cd-sweep { position: absolute; inset: 0; border-radius: 5px; pointer-events: none; opacity: 0; transition: opacity .25s ease;
+  background: conic-gradient(rgba(6, 8, 12, .78) calc(var(--cd, 0) * 360deg), transparent 0); }
+.kit-ab .cd-time { position: absolute; top: calc(100% + 1px); left: 50%; transform: translate(-50%, -3px); font-size: 10px; font-weight: 700; line-height: 1;
+  color: #c3c9d4; font-variant-numeric: tabular-nums; white-space: nowrap; opacity: 0; transition: opacity .25s ease, transform .25s ease; pointer-events: none; }
+.kit-ab.on-cd { border-color: #1c2029; }
+.kit-ab.on-cd .ico { filter: grayscale(1) brightness(.55); }
+.kit-ab.on-cd .cd-sweep { opacity: 1; }
+.kit-ab.on-cd .cd-time { opacity: 1; transform: translate(-50%, 0); }
+.kit-ab.cd-fire { animation: ab-fire .5s cubic-bezier(.2, .9, .3, 1.3); }
+.kit-ab.cd-ready { animation: ab-ready .7s ease-out; }
+@keyframes ab-fire {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 201, 138, .9); }
+  35% { transform: scale(1.28); box-shadow: 0 0 14px 4px rgba(255, 201, 138, .55); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 201, 138, 0); }
+}
+@keyframes ab-ready {
+  0% { transform: scale(1.18); border-color: #6effaa; box-shadow: 0 0 0 0 rgba(110, 255, 170, .85); }
+  100% { transform: scale(1); box-shadow: 0 0 0 9px rgba(110, 255, 170, 0); }
+}

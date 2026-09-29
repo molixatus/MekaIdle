@@ -1702,13 +1702,17 @@
     ];
   }
   // Under a pilot's bars: fitted gear (left), abilities and subclass (right), each with a hover card.
-  function pilotKit(p) {
+  function pilotKit(p, abRefs) {
     const gear = G.SLOTS.map(sl => p.gear && p.gear[sl.id]).filter(id => id && G.ITEMS[id])
       .map(id => tip(h('span', { class: 'kit-item' }, itemIco(id, 'sm')), () => itemTip(id)));
-    const abs = (p.abilities || []).map(id => G.ABILITY_BY_ID[id]).filter(Boolean).map(ab =>
-      tip(h('span', { class: 'kit-ab' }, gi('ab_' + ab.id, ab.cls === 'generic' ? '#c3c9d4' : G.CLASSES[ab.cls].colour, 'sm')),
+    const abs = (p.abilities || []).map(id => G.ABILITY_BY_ID[id]).filter(Boolean).map(ab => {
+      const time = h('small', { class: 'cd-time', 'aria-hidden': 'true' });
+      const el = h('span', { class: 'kit-ab' }, gi('ab_' + ab.id, ab.cls === 'generic' ? '#c3c9d4' : G.CLASSES[ab.cls].colour, 'sm'), h('span', { class: 'cd-sweep' }), time);
+      if (abRefs) abRefs[ab.id] = { el, time, shown: '' };
+      return tip(el,
         () => [h('b', {}, ab.name), h('p', { class: 'tip-desc' }, ab.desc),
-          h('small', { class: 'muted' }, `${ab.cd ? `${ab.cd}s cooldown` : 'Once per fight'}${ab.mana ? ` · ${ab.mana} mana` : ''}`)]));
+          h('small', { class: 'muted' }, `${ab.cd ? `${ab.cd}s cooldown` : 'Once per fight'}${ab.mana ? ` · ${ab.mana} mana` : ''}`)]);
+    });
     const sub = p.subclass && G.SUBCLASS_BY_ID[p.subclass];
     const subEl = sub ? tip(h('span', { class: 'kit-sub' }, gi('sub_' + sub.id, G.CLASSES[p.cls].colour, 'sm')),
       () => [h('b', {}, sub.name), p.multi ? h('small', { class: 'muted' }, ` · also ${G.CLASSES[p.multi].name}`) : null, h('p', { class: 'tip-desc' }, sub.desc)]) : null;
@@ -1959,11 +1963,12 @@
       const newFight = BLOG.fight !== c.start;
       if (newFight) { BLOG.fight = c.start; BLOG.upTo = 0; }
       party = f.fighters.map((p, i) => {
+        const abRefs = {};
         const colour = G.CLASSES[p.cls].colour;
         const kick = c.party && leader && p.id !== me.player.id
           ? h('button', { type: 'button', class: 'icon-btn tiny kick', title: 'Remove from party', 'aria-label': `Remove ${p.name} from the party`, onclick: () => kick_(p) }, ui('close', 'sm')) : null;
         return makeUnit({ i, id: p.id, name: p.name, cls: p.cls, colour, max: p.max, maxMana: p.mana, art: mechArt(p.gear || {}, `${p.name}’s mech`), kick,
-          sub: p.subclass ? h('small', { class: 'unit-sub' }, G.SUBCLASS_BY_ID[p.subclass].name) : null, kit: pilotKit(p), tipFn: () => pilotTip(p) });
+          sub: p.subclass ? h('small', { class: 'unit-sub' }, G.SUBCLASS_BY_ID[p.subclass].name) : null, kit: pilotKit(p, abRefs), tipFn: () => pilotTip(p), abRefs, cds: {} });
       });
       stats = f.fighters.map(() => ({ dps: 0, hps: 0, taken: 0, mit: 0, src: { dps: {}, hps: {}, taken: {}, mit: {} } }));
       buckets = Object.fromEntries(METER_MODES.map(([m]) => [m, f.fighters.map(() => [])]));
@@ -2097,6 +2102,7 @@
         u.castBar.className = `castbar k-${e.k}`;
         if (e.k !== 'attack' && e.k !== 'enemy') pulse(u, 'cast-flash');
         if (e.m != null && u.maxMana) { u.mana = e.m; drawMana(u); }
+        if (typeof e.a === 'number' && ABILITY_NAMES.has(e.n)) startCooldown(u, ABILITY_ID[e.n], e.t);
         if (typeof e.a === 'number' && ABILITY_NAMES.has(e.n)) addLog(at, 'abilities', [who(e.a), ' casts ', h('b', { class: 'log-ab' }, e.n), castTarget(e)], 'ability', gi('ab_' + ABILITY_ID[e.n], '#ffc98a', 'sm'));
         else if (e.k === 'danger') addLog(at, 'abilities', [foeName(e.a), ` begins ${e.n}!`], 'danger');
       } else if (e.e === 'hit') hit(e);
@@ -2127,6 +2133,7 @@
         const u = party[e.tg];
         u.down = false;
         u.hp = e.hp != null ? e.hp : u.max;
+        if (ABILITY_NAMES.has(e.n)) startCooldown(u, ABILITY_ID[e.n], e.t);
         u.el.classList.remove('down');
         u.castText.textContent = '';
         drawHp(u);
@@ -2302,6 +2309,32 @@
       graphTip.style.left = `${Math.min(left + 10, rect.width - 150)}px`;
     }
 
+    function startCooldown(u, id, at) {
+      const ab = G.ABILITY_BY_ID[id];
+      const ref = u && u.abRefs && u.abRefs[id];
+      if (!ab || !ref) return;
+      u.cds[id] = { from: at, until: at + (ab.cd || 300) * 1000 };
+      if (!quiet && !reduced) { ref.el.classList.remove('cd-fire', 'cd-ready'); void ref.el.offsetWidth; ref.el.classList.add('cd-fire'); }
+    }
+    // Greys out abilities on cooldown with a clock sweep and the time left; a flash when ready again.
+    function drawCooldowns(clock) {
+      party.forEach(u => Object.entries(u.abRefs || {}).forEach(([id, ref]) => {
+        const c = u.cds[id];
+        const left = c ? c.until - clock : 0;
+        const on = left > 0;
+        if (on) {
+          ref.el.style.setProperty('--cd', String(left / (c.until - c.from)));
+          const txt = left >= 10000 ? `${Math.ceil(left / 1000)}s` : `${(left / 1000).toFixed(1)}s`;
+          if (txt !== ref.shown) { ref.time.textContent = txt; ref.shown = txt; }
+        }
+        if (on !== !!ref.on) {
+          ref.on = on;
+          ref.el.classList.toggle('on-cd', on);
+          if (!on && c && !quiet && !reduced) { ref.el.classList.remove('cd-fire'); void ref.el.offsetWidth; ref.el.classList.add('cd-ready'); }
+        }
+      }));
+    }
+
     function tick(t) {
       if (!cur) return;
       const f = cur.fight;
@@ -2312,6 +2345,7 @@
         else if (!u.cast) u.castFill.style.width = '0';
       });
       clockEl.textContent = fmtClock(clock);
+      drawCooldowns(now() - cur.start);
       if (now() - cur.start >= f.ms) {
         const next = cur.start + f.ms + G.FIGHT.gapMs - now();
         statusEl.className = `battle-status ${f.win ? 'ok' : 'bad'}`;
