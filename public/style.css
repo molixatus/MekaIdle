@@ -1276,3 +1276,11 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 .gain-line { display: inline-flex; align-items: center; gap: 4px; }
 .gain-line.xp { color: #9cc4ff; }
 .gain-line .ico { width: 16px; height: 16px; }
+
+/* Gear comparison in tooltips. */
+.cmp { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.cmp-head { font-size: 12px; color: var(--muted); }
+.cmp-rows { display: grid; gap: 2px; }
+.cmp-row { display: grid; grid-template-columns: 1fr auto 14px auto; gap: 8px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.cmp-row > :nth-child(2), .cmp-row > :nth-child(4) { text-align: right; }
+.tooltip { max-width: 340px; }

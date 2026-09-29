@@ -932,6 +932,37 @@
     ];
   }
 
+  // What fitting an item would change: what it replaces, and your mech's stats before and after
+  // (set bonuses, traits, subclass and a two-hander freeing the off-hand all included).
+  function gearCompare(id) {
+    const it = G.ITEMS[id];
+    if (!it || !it.slot) return null;
+    const eq = me.state.equipment;
+    const next = { ...eq, [it.slot]: id };
+    if (it.slot === 'weapon' && it.twoHanded) next.offhand = null;
+    if (it.slot === 'offhand' && G.ITEMS[eq.weapon] && G.ITEMS[eq.weapon].twoHanded) return h('p', { class: 'bad tip-desc' }, 'Your two-handed weapon leaves no room for an off-hand.');
+    const cur = myStats();
+    const nextStats = G.mechStats(next, myLevels(), { subclass: mySubclass(it.cls && it.slot === 'weapon' ? it.cls : myClass()) });
+    const worn = eq[it.slot] && G.ITEMS[eq[it.slot]];
+    const ROWS = [
+      ['Power', s0 => G.power(s0), v => num(v)], ['Damage/s', s0 => s0.atk, v => num(v)], ['Armour', s0 => s0.def, v => num(v)], ['HP', s0 => s0.hp, v => num(v)],
+      ['Mana', s0 => s0.mana, v => num(v)], ['Mana regen', s0 => s0.regen, v => `${v}/s`], ['Magic resist', s0 => s0.mres, v => num(v)], ['Elemental resist', s0 => s0.eres, v => num(v)],
+      ['Crit', s0 => s0.crit, pct], ['Attack speed', s0 => s0.haste, pct], ['Armour pen', s0 => s0.pen, pct], ['Block', s0 => s0.block, pct], ['Healing', s0 => s0.heal, pct],
+      ['Double hit', s0 => s0.double, pct], ['Lifesteal', s0 => s0.lifesteal, pct], ['Bleed', s0 => s0.bleed, pct], ['Burn', s0 => s0.burn, pct], ['Poison', s0 => s0.poison, pct],
+    ];
+    const rows = ROWS.map(([label, get, show]) => {
+      const a = get(cur) || 0, b = get(nextStats) || 0;
+      if (Math.abs(b - a) < 1e-6) return null;
+      return h('div', { class: 'cmp-row' }, h('span', {}, label), h('span', { class: 'muted' }, show(a)), h('span', {}, '\u2192'), h('b', { class: b > a ? 'ok' : 'bad' }, show(b)));
+    }).filter(Boolean);
+    const classNote = it.slot === 'weapon' && it.cls !== myClass() ? h('p', { class: 'warn tip-desc' }, `Switches your class to ${G.CLASSES[it.cls].name}.`) : null;
+    const offNote = it.slot === 'weapon' && it.twoHanded && eq.offhand ? h('p', { class: 'warn tip-desc' }, `Two-handed: takes off your ${G.ITEMS[eq.offhand].name}.`) : null;
+    return h('div', { class: 'cmp' },
+      h('div', { class: 'cmp-head' }, 'Compared with ', worn ? itemName(worn.id, 'b') : h('b', {}, 'an empty slot')),
+      classNote, offNote,
+      rows.length ? h('div', { class: 'cmp-rows' }, rows) : h('p', { class: 'muted tip-desc' }, 'No change to your stats.'));
+  }
+
   // ---------- Equipment ----------
   function equipmentPage() {
     const s = myStats();
@@ -984,9 +1015,10 @@
             gear.length ? G.SLOTS.filter(sl => slotsBy[sl.id]).map(sl => collapsible(`gear-${sl.id}`, sl.name, `${slotsBy[sl.id].length}`,
               h('div', { class: 'slot-list slot-grid' }, slotsBy[sl.id].sort((x, y) => G.ITEMS[y].tier - G.ITEMS[x].tier).map(id => {
                 const it = G.ITEMS[id];
-                return h('div', { class: `slot${it.rare ? ' rare-slot' : ''}` }, itemIco(id),
+                return tip(h('div', { class: `slot${it.rare ? ' rare-slot' : ''}` }, itemIco(id),
                   h('div', { class: 'slot-info' }, h('small', {}, `Tier ${it.tier} · ${have(id)} owned`), itemName(id, 'b'), statsLine(it)),
-                  h('button', { type: 'button', class: 'btn small primary', onclick: () => act('/api/equip', { item: id }) }, 'Fit'));
+                  h('button', { type: 'button', class: 'btn small primary', onclick: () => act('/api/equip', { item: id }) }, 'Fit')),
+                () => itemTip(id, gearCompare(id)));
               })), true)) : h('div', { class: 'empty' }, 'No spare gear yet.')))),
     ];
   }
