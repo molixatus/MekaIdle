@@ -51,7 +51,9 @@
     inner.style.left = `${-(c + m) * k * 100}%`;
     inner.style.top = `${-(r + m) * k * 100}%`;
     if (hue) inner.style.filter = `hue-rotate(${hue}deg)`;
-    return h('span', { class: `ico item-sprite ${cls}${it.rare ? ' rare' : ''}`, 'aria-hidden': 'true' }, inner);
+    // Rare gear shimmers; high-tier gear glints now and then.
+    const shine = it.type === 'gear' && (it.tier || 0) >= 7 ? ' shiny' : '';
+    return h('span', { class: `ico item-sprite ${cls}${it.rare ? ' rare' : ''}${shine}`, 'aria-hidden': 'true' }, inner);
   };
   // Item names are coloured by the item's tier.
   const itemName = (id, tag = 'span') => {
@@ -242,10 +244,12 @@
   }
 
   function setState(state) {
+    const before = me.state;
     me.state = state;
     offset = state.lastTick - Date.now();
     renderChrome();
     if (isLivePage()) renderPage();
+    celebrate(before, state);
   }
 
   function activityProgress() {
@@ -432,15 +436,52 @@
   let backupTimer = null;
   document.addEventListener('visibilitychange', () => { if (document.hidden) saveBackup(); });
 
+  // Shows what just changed: "+1 Copper ore" rising from the card at work, and level-ups.
+  function celebrate(before, after) {
+    if (!before || !after || document.hidden) return;
+    const a = after.activity;
+    const action = a && !a.type && G.ACTION_BY_ID[a.id];
+    if (action) {
+      const art = document.querySelector('.card.action.active .card-art');
+      const ids = [...Object.keys(action.outputs), ...action.chance.map(c => c.item)];
+      let k = 0;
+      ids.forEach(id => {
+        const gain = (after.items[id] || 0) - (before.items[id] || 0);
+        if (gain <= 0) return;
+        if (art) {
+          const f = h('span', { class: 'gain-float' }, itemIco(id, 'sm'), `+${num(gain)} ${G.ITEMS[id].name}`);
+          f.style.animationDelay = `${k++ * 180}ms`;
+          art.append(f);
+          setTimeout(() => f.remove(), 2000 + k * 180);
+        }
+      });
+      if (art && after.skills[action.skill].xp > before.skills[action.skill].xp) {
+        const x = h('span', { class: 'gain-float xp' }, `+${num(after.skills[action.skill].xp - before.skills[action.skill].xp)} XP`);
+        x.style.animationDelay = `${k * 180}ms`;
+        art.append(x);
+        setTimeout(() => x.remove(), 2400);
+      }
+    }
+    G.SKILLS.forEach(sk => {
+      const was = G.levelFromXp(before.skills[sk.id].xp), is = G.levelFromXp(after.skills[sk.id].xp);
+      if (is <= was) return;
+      toast(`${sk.name} is now level ${is}!`, 'levelup');
+      const ref = navRefs['skill:' + sk.id];
+      if (ref) { ref.btn.classList.remove('levelup'); void ref.btn.offsetWidth; ref.btn.classList.add('levelup'); }
+    });
+  }
+
   async function poll() {
     if (!me || document.hidden) return;
     try {
       const data = await api('/api/me');
+      const before = me && me.state;
       me = data;
       offset = data.now - Date.now();
       renderChrome();
       if (isLivePage()) renderPage();
       else if (pageRefresh && ++polls % 2 === 0) pageRefresh();
+      try { celebrate(before, data.state); } catch (err) { console.error(err); }
       if (pageTick) pageTick();
     } catch (e) { /* keep polling; errors surface on actions */ }
   }
@@ -552,6 +593,7 @@
         fill.style.width = x.pct + '%';
         btn.title = x.max ? `${item.name}: ${num(x.xp)} XP (max level)` : `${item.name}: ${num(x.xp)} XP, ${num(x.toGo)} to level ${x.level + 1}`;
         spin.hidden = item.skill !== activeSkill;
+        btn.classList.toggle('training', item.skill === activeSkill);
       } else if (item.alert) {
         const n = me.alerts[item.alert];
         right.className = n ? 'badge' : 'lvl';
@@ -579,6 +621,7 @@
       card.replaceChildren(h('span', {}, 'Idle. Pick a skill action or a raid to start.'));
     }
     renderQueue();
+    renderActionBar();
 
     $('topline').replaceChildren('',
       h('span', { class: 'topline-now' }, activityText()),
@@ -587,6 +630,47 @@
     const dot = h('span', { class: 'pilot-dot' });
     dot.style.background = classColour(me.state.equipment);
     $('pilot').replaceChildren(dot, h('div', {}, h('b', {}, me.player.name), h('small', {}, `${me.guild ? `[${me.guild.tag}] ` : ''}${me.player.mech} · ${G.CLASSES[cls].name}`)));
+  }
+
+  // The bar pinned to the bottom of the screen: what you're doing, a Queue button that opens your
+  // queued actions, and Stop on the right.
+  let queueOpen = false;
+  function renderActionBar() {
+    const bar = $('action-bar');
+    const a = me.state.activity;
+    const q = me.state.queue || [];
+    if (!a && !q.length) { bar.hidden = true; bar.replaceChildren(); return; }
+    bar.hidden = false;
+    const parts = [];
+    if (a && a.type) {
+      const raid = G.RAID_BY_ID[a.raid];
+      parts.push(raid ? h('span', { class: 'ab-art' }, bossIcon(raid, '', 34)) : '',
+        h('div', { class: 'ab-info' }, h('b', {}, raid ? raid.name : 'Raid'), h('small', {}, `${a.type === 'party' ? 'Party raid' : 'Solo raid'}${a.diff && a.diff !== 'normal' ? ` \u00b7 ${G.DIFF_BY_ID[a.diff].name}` : ''} \u00b7 fight ${a.n || 1}`)),
+        h('div', { class: 'ab-bar' }, h('span', { id: 'action-fill', class: 'raid' })),
+        h('button', { type: 'button', class: 'btn small', onclick: () => go('raids') }, 'Watch'));
+    } else if (a && G.ACTION_BY_ID[a.id]) {
+      const action = G.ACTION_BY_ID[a.id];
+      const sk = G.SKILL_BY_ID[action.skill];
+      parts.push(h('span', { class: 'ab-art' }, itemIco(action.item, 'md')),
+        h('div', { class: 'ab-info' }, h('b', {}, action.name), h('small', {}, `${sk.name} ${lvl(action.skill)} \u00b7 ${action.xp} XP each \u00b7 ${secs(action.time)}`)),
+        h('div', { class: 'ab-bar' }, h('span', { id: 'action-fill' })),
+        h('span', { class: 'ab-left' }, a.left ? `${num(a.left)} left` : 'Repeating'));
+    } else {
+      parts.push(h('div', { class: 'ab-info' }, h('b', {}, 'Idle'), h('small', {}, 'Your queue starts with the next action.')), h('div', { class: 'ab-bar' }));
+    }
+    // Queue button and its panel.
+    const panel = h('div', { class: 'ab-queue', hidden: !queueOpen },
+      h('div', { class: 'queue-head' }, h('b', {}, `Queue ${q.length}/${G.QUEUE_MAX}`),
+        q.length ? h('button', { type: 'button', class: 'link-btn', onclick: () => act('/api/queue', { queue: [] }, 'Queue cleared.') }, 'Clear') : ''),
+      q.length ? q.map((e, i) => {
+        const action = G.ACTION_BY_ID[e.id];
+        return h('div', { class: 'queue-row' }, action ? itemIco(action.item, 'sm') : '', h('span', { class: 'grow' }, action ? action.name : e.id), h('small', {}, `\u00d7${num(e.count)}`),
+          h('button', { type: 'button', class: 'icon-btn tiny', 'aria-label': `Remove ${action ? action.name : ''} from the queue`, onclick: () => act('/api/queue', { queue: q.filter((_, k) => k !== i) }) }, ui('close', 'sm')));
+      }) : h('p', { class: 'muted small' }, 'Nothing queued. Use Queue on any skill card to line up to five actions.'));
+    const qBtn = h('button', { type: 'button', class: `btn small${queueOpen ? ' on' : ''}`, 'aria-expanded': String(queueOpen), onclick: () => { queueOpen = !queueOpen; renderActionBar(); } },
+      'Queue', q.length ? h('span', { class: 'chip-count' }, String(q.length)) : '');
+    const stop = a ? h('button', { type: 'button', class: 'btn small danger', onclick: () => (a.type === 'party' ? act('/api/party/leave', {}) : act('/api/action/stop', {})) }, a.type === 'party' ? 'Leave' : 'Stop') : '';
+    bar.replaceChildren(panel, ...parts, qBtn, stop);
   }
 
   // The action queue: up to five entries that start in order once the current action ends.
@@ -610,11 +694,22 @@
   function closeMenu() { $('sidebar').classList.remove('open'); $('scrim').hidden = true; }
 
   // Progress bars run smoothly between polls.
+  // When an action's bar completes, ask the server straight away so the item shows up then
+  // (the regular check-in is only every few seconds).
+  let doneKey = null;
   function frame() {
     const p = me && activityProgress();
     const w = p ? `${p.frac * 100}%` : '0%';
     const nf = document.getElementById('now-fill');
     if (nf) nf.style.width = w;
+    const af = document.getElementById('action-fill');
+    if (af) af.style.width = w;
+    if (p && p.action) {
+      const a = me.state.activity;
+      const done = Math.floor((a.progress + (now() - me.state.lastTick)) / p.action.time);
+      const key = `${me.state.lastTick}:${done}`;
+      if (done > 0 && key !== doneKey) { doneKey = key; setTimeout(poll, 150); }
+    }
     document.querySelectorAll('.card.active .card-fill').forEach(el => { el.style.width = w; });
     requestAnimationFrame(frame);
   }
@@ -630,18 +725,33 @@
     if (pageCleanup) pageCleanup();
     page = id;
     store(PAGE_KEY, id);
+    enterNext = true;
     pageRefresh = pageTick = pageCleanup = null;
     renderChrome();
     renderPage();
     window.scrollTo(0, 0);
   }
 
+  // Pages animate in when you go to them; the refresh every few seconds doesn't replay it.
+  let enterNext = true;
   function renderPage() {
     if (pageCleanup) pageCleanup();
     pageRefresh = pageTick = pageCleanup = null;
     const [kind, arg] = page.split(':');
     const el = PAGES[kind](arg);
     if (el) $('page').replaceChildren(...[].concat(el).filter(Boolean));
+    if (enterNext) {
+      enterNext = false;
+      const pg = $('page');
+      pg.classList.remove('page-enter');
+      void pg.offsetWidth;
+      pg.classList.add('page-enter');
+      // Drop the entrance class afterwards, so later refreshes don't replay it and nothing can stay hidden.
+      clearTimeout(renderPage.enterTimer);
+      renderPage.enterTimer = setTimeout(() => pg.classList.remove('page-enter'), 1100);
+      // Stagger cards, tiles and rows as they come in.
+      pg.querySelectorAll('.card, .tile, .raid-row, .slot, .ability, .sub-card, .row, .history-row').forEach((el2, i) => { el2.style.animationDelay = `${Math.min(i, 24) * 22}ms`; });
+    }
   }
 
   function pageHead(icon, iconCls, title, lead, right) {
@@ -861,7 +971,7 @@
               it ? h('button', { type: 'button', class: 'btn small', onclick: () => act('/api/unequip', { slot: slot.id }) }, 'Remove') : null);
           }))),
           section('Raid supplies', supplies.length ? 'Ticked supplies go into every fight while you have them. Potions are only drunk when needed; buffs are used up each fight. Class buffs only apply to their class.' : null,
-            supplies.length ? h('div', { class: 'slot-list' }, supplies.map(it => {
+            supplies.length ? h('div', { class: 'slot-list slot-grid' }, supplies.map(it => {
               const on = me.state.supplies[it.id] !== false;
               const box = h('input', { type: 'checkbox', checked: on, 'aria-label': `Bring ${it.name}`, onchange: e => act('/api/supplies', { item: it.id, on: e.target.checked }) });
               return h('label', { class: `slot supply${on ? '' : ' off'}` }, box, itemIco(it.id),
@@ -869,7 +979,7 @@
             })) : h('div', { class: 'empty' }, 'No potions or buffs yet. Brew them with Alchemy, Honing, Poisoncraft or Runecrafting.')),
           section('Gear in storage', gear.length ? null : 'Craft weapons and armour, trade for them, or win set pieces from raids.',
             gear.length ? G.SLOTS.filter(sl => slotsBy[sl.id]).map(sl => collapsible(`gear-${sl.id}`, sl.name, `${slotsBy[sl.id].length}`,
-              h('div', { class: 'slot-list' }, slotsBy[sl.id].sort((x, y) => G.ITEMS[y].tier - G.ITEMS[x].tier).map(id => {
+              h('div', { class: 'slot-list slot-grid' }, slotsBy[sl.id].sort((x, y) => G.ITEMS[y].tier - G.ITEMS[x].tier).map(id => {
                 const it = G.ITEMS[id];
                 return h('div', { class: `slot${it.rare ? ' rare-slot' : ''}` }, itemIco(id),
                   h('div', { class: 'slot-info' }, h('small', {}, `Tier ${it.tier} · ${have(id)} owned`), itemName(id, 'b'), statsLine(it)),

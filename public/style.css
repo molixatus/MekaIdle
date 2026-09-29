@@ -1144,3 +1144,131 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
   .raid-row { grid-template-columns: 88px minmax(0, 1fr); }
   .raid-row .loot-group { grid-column: 1 / -1 !important; }
 }
+
+/* The current action, pinned to the bottom of the screen. */
+.action-bar {
+  position: sticky; bottom: 0; z-index: 15; display: flex; align-items: center; gap: 14px;
+  margin-top: auto; padding: 10px 28px; background: rgba(17, 20, 27, .96); backdrop-filter: blur(6px);
+  border-top: 1px solid #262c38; box-shadow: 0 -8px 24px rgba(0, 0, 0, .35);
+}
+.ab-art { display: grid; place-items: center; width: 40px; height: 40px; }
+.ab-info { display: grid; min-width: 160px; }
+.ab-info b { font-size: 14px; }
+.ab-info small { color: var(--muted); font-size: 12px; }
+.ab-bar { flex: 1; height: 8px; border-radius: 4px; background: #0f1218; overflow: hidden; min-width: 80px; }
+.ab-bar > span { display: block; height: 100%; width: 0; background: var(--green); border-radius: 4px; }
+.ab-bar > span.raid { background: var(--red); }
+.ab-left { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.action-bar .btn.on { background: #343b49; border-color: #4a5263; }
+.ab-queue {
+  position: absolute; right: 28px; bottom: calc(100% + 8px); width: 320px; display: grid; gap: 6px; padding: 12px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, .5); font-size: 13px;
+}
+.main { min-height: 100vh; }
+@media (max-width: 600px) {
+  .action-bar { padding: 8px 12px; gap: 10px; flex-wrap: wrap; }
+  .ab-info { min-width: 0; flex: 1; }
+  .ab-bar { flex-basis: 100%; order: 5; }
+  .ab-queue { right: 12px; left: 12px; width: auto; }
+}
+
+/* The icon of the skill being trained works away in the sidebar. */
+.nav-item.training > .ico { animation: skill-work 1.1s ease-in-out infinite; transform-origin: 50% 80%; }
+@keyframes skill-work {
+  0%, 100% { transform: rotate(0) translateY(0) scale(1); }
+  25% { transform: rotate(-14deg) translateY(-1px) scale(1.08); }
+  50% { transform: rotate(0) translateY(1px) scale(1); }
+  75% { transform: rotate(10deg) translateY(-1px) scale(1.05); }
+}
+@media (prefers-reduced-motion: reduce) { .nav-item.training > .ico { animation: none; } }
+
+/* ================= Motion throughout the game ================= */
+/* Pages come in with a fade and a small rise; cards, tiles and rows follow one after another. */
+.page-enter .page-head { animation: rise-in .45s ease-out backwards; }
+.page-enter .section, .page-enter .fold, .page-enter .panel, .page-enter .battle, .page-enter .chain { animation: rise-in .45s ease-out backwards; }
+.page-enter .card, .page-enter .tile, .page-enter .raid-row, .page-enter .slot, .page-enter .ability, .page-enter .sub-card,
+.page-enter .row, .page-enter .history-row { animation: pop-in .35s ease-out backwards; }
+@keyframes rise-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+
+/* Cards: lift on hover, the icon hops; the card at work breathes. */
+.card.action { transition: transform .15s ease, box-shadow .15s ease, border-color .15s; }
+.card.action:not(.locked):hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0, 0, 0, .35); }
+.card.action:not(.locked):hover .card-art .ico { animation: hop .5s ease-out; }
+.card.action.active .card-art .ico { animation: work 1.4s ease-in-out infinite; }
+@keyframes hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-7px) scale(1.06); } 70% { transform: translateY(1px); } }
+@keyframes work { 0%, 100% { transform: scale(1) rotate(0); } 30% { transform: scale(1.06) rotate(-4deg); } 60% { transform: scale(.98) rotate(3deg); } }
+.card.active .card-fill, .ab-bar > span, .now-card .bar > span { background-image: linear-gradient(90deg, transparent 0, rgba(255, 255, 255, .35) 50%, transparent 100%); background-size: 60px 100%; background-repeat: no-repeat; animation: shine 1.6s linear infinite; background-color: var(--green); }
+.ab-bar > span.raid { background-color: var(--red); }
+@keyframes shine { from { background-position: -60px 0; } to { background-position: calc(100% + 60px) 0; } }
+
+/* Things you gain float up from the card doing the work. */
+.card-art { position: relative; }
+.gain-float {
+  position: absolute; left: 50%; top: 40%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  padding: 2px 8px; border-radius: 10px; background: rgba(8, 10, 14, .85); color: #d7f8e4; font-size: 12px; font-weight: 700; pointer-events: none;
+  animation: gain-up 1.8s ease-out both;
+}
+.gain-float.xp { color: #9cc4ff; }
+.gain-float .ico { width: 16px; height: 16px; }
+@keyframes gain-up { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.9); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -46px); } }
+
+/* Level-ups. */
+.toast.levelup { border-left-color: var(--gold); background: linear-gradient(90deg, rgba(242, 193, 78, .18), #2a303c 60%); font-weight: 700; }
+.nav-item.levelup { animation: level-flash 1.6s ease-out; }
+@keyframes level-flash { 0%, 100% { background: transparent; box-shadow: none; } 20%, 60% { background: rgba(242, 193, 78, .18); box-shadow: inset 3px 0 0 var(--gold); } }
+.nav-bar > span, .level-box .bar > span, .bar > span { transition: width .6s ease-out; }
+
+/* Buttons press in; primary buttons shine on hover. */
+.btn { transition: transform .08s ease, background .15s, box-shadow .15s; }
+.btn:active:not(:disabled) { transform: scale(.95); }
+.btn.primary:hover:not(:disabled) { box-shadow: 0 0 0 3px rgba(61, 220, 132, .18); }
+.chip, .chain-step, .tier-cell, .loot-ico, .mech-chip { transition: transform .12s ease, background .15s; }
+.chip:hover, .chain-step:hover, .loot-ico:hover { transform: translateY(-1px); }
+
+/* Sidebar: icons nudge on hover. */
+.nav-item > .ico { transition: transform .15s ease; }
+.nav-item:hover > .ico { transform: translateX(2px) scale(1.08); }
+
+/* Tiles and slots: the icon wiggles on hover. */
+.tile, .slot, .raid-row, .ability, .sub-card { transition: transform .15s ease, background .15s, box-shadow .15s; }
+.tile:hover .ico, .slot:hover > .ico { animation: wiggle .45s ease-in-out; }
+.raid-row:not(.locked):hover { transform: translateX(3px); box-shadow: inset 3px 0 0 var(--green); }
+.ability:hover, .sub-card:not(.locked):hover { transform: translateY(-2px); }
+@keyframes wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-8deg) scale(1.08); } 75% { transform: rotate(7deg) scale(1.05); } }
+
+/* Rare loot shimmers; boss portraits and the mech breathe. */
+.loot-ico.rare:not(.off-diff), .rare-loot, .tile.rare-tile { animation: rare-glow 2.4s ease-in-out infinite; }
+@keyframes rare-glow { 0%, 100% { box-shadow: inset 0 0 0 1px rgba(242, 193, 78, .3); } 50% { box-shadow: inset 0 0 0 1px rgba(242, 193, 78, .7), 0 0 10px rgba(242, 193, 78, .35); } }
+.raid-row .boss-ico .mon-sprite, .now-card .foe-sprite, .hangar-stage .mech-sprite, .ab-art .foe-sprite { animation: bob 3s ease-in-out infinite; }
+.raid-row.fighting .boss-ico { animation: danger-pulse 1.6s ease-in-out infinite; }
+@keyframes danger-pulse { 0%, 100% { box-shadow: none; } 50% { box-shadow: 0 0 0 2px rgba(239, 90, 69, .5), 0 0 14px rgba(239, 90, 69, .35); } }
+.now-card { animation: rise-in .3s ease-out; }
+
+/* Toasts slide in, the modal pops, panels open smoothly. */
+.toast { animation: toast-in .3s cubic-bezier(.2, .9, .3, 1.2) forwards; }
+@keyframes toast-in { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+.modal:not([hidden]) .modal-card { animation: modal-pop .28s cubic-bezier(.2, .9, .3, 1.2); }
+@keyframes modal-pop { from { opacity: 0; transform: scale(.94) translateY(10px); } to { opacity: 1; transform: none; } }
+.fold[open] > :not(summary) { animation: rise-in .25s ease-out; }
+.ab-queue:not([hidden]) { animation: rise-in .2s ease-out; }
+.action-bar { animation: bar-up .3s ease-out; }
+@keyframes bar-up { from { transform: translateY(100%); } to { transform: none; } }
+.tooltip:not([hidden]) { animation: fade-in .12s ease-out forwards; opacity: 0; }
+
+/* Equipment: storage and supplies as a grid of compact cards. */
+.slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+.slot-grid .slot { align-items: flex-start; padding: 10px; }
+.slot-grid .slot-info .stats-line { gap: 4px 8px; font-size: 11px; }
+.slot-grid .slot .btn { align-self: center; }
+
+/* Animated gear: rare pieces shimmer gold, tier 7+ gear catches the light. */
+.item-sprite.rare { animation: rare-item 2.6s ease-in-out infinite; }
+@keyframes rare-item { 0%, 100% { filter: drop-shadow(0 0 2px rgba(242, 193, 78, .5)); } 50% { filter: drop-shadow(0 0 7px rgba(242, 193, 78, .95)) brightness(1.12); } }
+.item-sprite.shiny::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, .55) 50%, transparent 65%);
+  background-size: 250% 100%; animation: glint 3.2s ease-in-out infinite; mix-blend-mode: overlay;
+}
+@keyframes glint { 0%, 55% { background-position: 150% 0; } 100% { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .item-sprite.rare, .item-sprite.shiny::after { animation: none; } }
