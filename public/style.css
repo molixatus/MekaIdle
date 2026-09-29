@@ -1390,3 +1390,47 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 @media (max-width: 900px) {
   .side.pilots, .foe-list { grid-template-columns: 1fr; }
 }
+
+/* Tier tint over crafted gear and materials, and a constant, gentle shine. */
+.item-sprite { isolation: isolate; }
+.item-tint { position: absolute; pointer-events: none; mask-size: 100% 100%; -webkit-mask-size: 100% 100%; mask-repeat: no-repeat; -webkit-mask-repeat: no-repeat; mix-blend-mode: color; }
+.item-shine {
+  background: linear-gradient(115deg, transparent 38%, color-mix(in srgb, var(--shine) 40%, #fff) 50%, transparent 62%);
+  background-size: 300% 100%; opacity: .38; animation: shine-flow 5s linear infinite;
+}
+.item-sprite.rare .item-shine { opacity: .5; animation: shine-flow 4s linear infinite; }
+@keyframes shine-flow { from { background-position: 100% 0; } to { background-position: -50% 0; } }
+
+/* Gear hover card. */
+.gear-tip-head { align-items: flex-start; }
+.gear-tip-head .grow { flex: 1; min-width: 0; }
+.tip-pill { margin-left: 10px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap;
+  color: var(--pill); background: color-mix(in srgb, var(--pill) 16%, transparent); border: 1px solid color-mix(in srgb, var(--pill) 45%, transparent); }
+.tip-sets { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 3px; font-size: 12.5px; color: var(--faint, #7c8494); }
+.tip-sets li.on { color: #3ddc84; }
+.tip-foot { margin: 8px 0 0; padding-top: 6px; border-top: 1px solid #262c38; font-size: 12px; color: var(--muted); }
+.stat-passive { color: #d7b8ff; }
+
+/* Equipment: click a slot to pick gear. */
+.slot-pick { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding: 0; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.slot-pick:hover .iname, .slot-pick:hover b { text-decoration: underline; }
+.slot-spare { color: var(--accent, #6cb4ff); }
+.picker-card { width: min(640px, 100%); display: grid; gap: 12px; align-content: start; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; }
+.modal-head h2 { margin: 0; }
+.picker-now { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.picker-list { display: grid; gap: 8px; }
+.picker-item { padding: 10px 12px; background: var(--card); border-radius: 8px; display: grid; gap: 6px; }
+.picker-top { display: flex; align-items: center; gap: 12px; }
+.picker-top .slot-info { flex: 1; min-width: 0; }
+
+/* Inventory: gear split by slot. */
+.inv-sub { display: grid; gap: 6px; margin-bottom: 10px; }
+.inv-subhead { margin: 4px 0 0; font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; display: flex; gap: 6px; align-items: baseline; }
+.inv-subhead small { color: var(--faint, #7c8494); font-weight: 600; }
+
+/* Ability cards: icon, then text, with the button or requirement underneath so text never squashes. */
+.ability { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; row-gap: 8px; align-items: start; }
+.ability > .ico { grid-row: 1 / span 2; }
+.ability > .grow { grid-column: 2; }
+.ability > :last-child:not(.grow):not(.ico) { grid-column: 2; justify-self: start; }

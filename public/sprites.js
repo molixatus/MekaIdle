@@ -237,6 +237,42 @@
     orb(c) { c.disc(7, 27, 3.2, 'V'); c.disc(7, 27, 1.4, 'X'); c.px(3, 22, 'X'); c.px(11, 23, 'X'); c.px(4, 32, 'X'); },
     relic(c) { c.rect(6, 25, 8, 34, 'V'); c.rect(4, 27, 10, 28, 'V'); c.disc(7, 23, 1.6, 'X'); c.px(7, 23, 'Y'); },
   };
+  // Ornaments that set tiers and pieces apart: higher tiers add crests, spikes, emblems and trims,
+  // drawn in each piece's trim colour (gold on raid gear). band: 0 tiers 1-3, 1 tiers 4-6, 2 tiers 7-9, 3 tier 10.
+  const bandOf = p => { const t = (p && p.tier) || 1; return t <= 3 ? 0 : t <= 6 ? 1 : t <= 9 ? 2 : 3; };
+  const DECOR = {
+    head(c, p, t) {
+      const b = bandOf(p);
+      if (b === 1 || p.rare) c.srect(19, 0, 19, 3, t);
+      if (b >= 2) { c.sline(15, 6, 13, 2, t); c.spx(13, 1, t); }
+      if (b === 3) { c.srect(16, 4, 19, 4, t); c.spx(16, 3, t); c.spx(18, 2, t); c.spx(19, 1, t); }
+      if ((p.tier || 1) % 2 === 0) c.srect(17, 8, 19, 8, 'X');
+    },
+    body(c, p, t) {
+      const b = bandOf(p);
+      if (b >= 1) { c.spx(9, 10, t); c.spx(10, 9, t); c.spx(8, 11, t); }
+      if (b >= 2) c.srect(18, 16, 19, 18, t);
+      if (b === 3 || p.rare) c.srect(15, 22, 19, 22, t);
+      if (p.type === 'vestment') for (let i = 0; i < 9; i++) { c.px(15 + i, 14 + i, t); c.px(16 + i, 14 + i, t); }
+    },
+    legs(c, p, t) {
+      const b = bandOf(p);
+      if (b >= 1 || p.rare) c.srect(14, 41, 17, 42, t);
+      if (b >= 2) c.srect(16, 32, 16, 39, t);
+      if (b === 3) c.srect(16, 44, 16, 50, t);
+    },
+  };
+  const HANDS = {
+    plate(c) { c.srect(10, 31, 14, 34, 'I'); c.spx(10, 30, 'M'); },
+    leather(c) { c.srect(11, 32, 13, 34, 'I'); c.srect(11, 31, 13, 31, 'M'); },
+    cloth(c) { c.srect(11, 31, 13, 31, 'I'); c.srect(11, 33, 13, 33, 'I'); c.srect(11, 32, 13, 32, 'M'); },
+  };
+  const FEET = {
+    plate(c) { c.srect(13, 51, 18, 53, 'F'); c.srect(13, 53, 18, 53, 'f'); c.spx(13, 50, 'N'); },
+    leather(c) { c.srect(14, 51, 18, 53, 'F'); c.srect(14, 51, 18, 51, 'N'); },
+    cloth(c) { c.srect(14, 52, 18, 53, 'F'); c.srect(14, 53, 18, 53, 'f'); c.spx(18, 52, 'N'); },
+  };
+  const trim = p => (!p ? '#8d95a5' : p.rare ? '#ffd86b' : bandOf(p) === 3 ? '#9ff6ff' : mix(p.colour, bandOf(p) >= 2 ? 0.55 : 0.38));
   const GLOW = { melee: '#ffe08a', ranged: '#fff3c4', magic: '#c58cff', healer: '#6dffb0' };
 
   function mech(opts) {
@@ -249,10 +285,13 @@
     if (o.legs && LEGS[shape(o.legs)]) LEGS[shape(o.legs)](c);
     if (o.body && BODIES[shape(o.body)]) BODIES[shape(o.body)](c);
     if (o.head && HEADS[shape(o.head)]) HEADS[shape(o.head)](c);
+    if (o.legs && LEGS[shape(o.legs)]) DECOR.legs(c, o.legs, 'Z');
+    if (o.body && BODIES[shape(o.body)]) DECOR.body(c, o.body, 'U');
+    if (o.head && HEADS[shape(o.head)]) DECOR.head(c, o.head, 'T');
     c.srect(19, 16, 19, 17, 'R');
     // Vestments share the robed silhouette with cloth.
-    if (o.hands) c.srect(11, 32, 13, 33, 'I');
-    if (o.feet) { c.srect(14, 52, 18, 53, 'F'); c.srect(14, 53, 18, 53, 'f'); }
+    if (o.hands) (HANDS[shape(o.hands)] || HANDS.leather)(c);
+    if (o.feet) (FEET[shape(o.feet)] || FEET.leather)(c);
     if (o.weapon && WEAPONS[o.weapon]) WEAPONS[o.weapon](c);
     if (o.offhand && OFFHANDS[o.offhand]) OFFHANDS[o.offhand](c);
     c.outline('K');
@@ -265,6 +304,7 @@
       K: '#07080c', P: paint, p: mix(paint, -0.32), H: mix(paint, 0.35), G: accent, E: '#ffdf4d', D: '#1b1e26',
       R: o.core || '#b3261e', A, a: mix(A, -0.32), B, b: mix(B, -0.32), C, c: mix(C, -0.32),
       W: wc, w: mix(wc, -0.35), X: GLOW[o.role] || accent, Y: '#f4efe0', V: vc, v: mix(vc, -0.35), I: hc, F: fc, f: mix(fc, -0.35),
+      T: trim(o.head), U: trim(o.body), Z: trim(o.legs), M: trim(o.hands), N: trim(o.feet),
     }, 'Mech');
   }
 

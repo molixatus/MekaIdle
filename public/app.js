@@ -56,10 +56,25 @@
     // Raid materials shine too, in their tier colour.
     const shiny = (it.type === 'gear' && (it.rare || (it.tier || 0) >= 7)) || it.type === 'material';
     const box = h('span', { class: `ico item-sprite ${cls}${it.rare ? ' rare' : ''}${shiny ? ' shiny' : ''}`, 'aria-hidden': 'true' }, inner);
+    // A layer drawn only on the item's own pixels (masked by the same sheet cell).
+    const layer = klass => {
+      const el = h('span', { class: klass });
+      ['width', 'height', 'left', 'top'].forEach(p => { el.style[p] = inner.style[p]; });
+      el.style.maskImage = el.style.webkitMaskImage = `url(${SHEET.src})`;
+      return el;
+    };
+    // Crafted gear and gathered or crafted materials take their tier's colour, strongly enough to
+    // tell tiers apart while keeping some of the sprite's own accents (varied a little per item).
+    if (!it.rare && it.tier && (it.type === 'gear' || it.type === 'resource')) {
+      const tint = layer('item-tint');
+      let hash = 0;
+      for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) % 997;
+      tint.style.backgroundColor = it.colour;
+      tint.style.opacity = String(0.42 + (hash % 20) / 100);
+      box.append(tint);
+    }
     if (shiny) {
-      const shineEl = h('span', { class: 'item-shine' });
-      ['width', 'height', 'left', 'top'].forEach(p => { shineEl.style[p] = inner.style[p]; });
-      shineEl.style.maskImage = shineEl.style.webkitMaskImage = `url(${SHEET.src})`;
+      const shineEl = layer('item-shine');
       shineEl.style.setProperty('--shine', it.rare ? '#ffd86b' : it.colour);
       box.append(shineEl);
     }
@@ -215,6 +230,7 @@
   function itemTip(id, extra) {
     const it = G.ITEMS[id];
     if (!it) return [];
+    if (it.type === 'gear') return gearTip(id, extra);
     const kind = it.slot ? (G.SLOTS.find(s => s.id === it.slot) || {}).name : { resource: 'Resource', material: 'Raid material', consumable: 'Consumable' }[it.type];
     return [
       h('div', { class: 'tip-head' }, itemIco(id, 'md'), h('div', {}, itemName(id, 'b'), h('small', {}, `${it.rare ? 'Rare ' : ''}${kind}${it.tier ? ` · tier ${it.tier}` : ''} · ${num(have(id))} owned`))),
@@ -223,6 +239,50 @@
         h('span', { class: it.potion ? 'stat-hp' : 'stat-atk' }, it.boost ? G.describe(it.boost) : it.potion === 'hp' ? `Restores ${Math.round(it.heal * 100)}% HP` : `Restores ${it.mana} mana`)) : null,
       it.passives ? h('ul', { class: 'passive-list' }, passiveText(it.passives).map(p => h('li', {}, p))) : null,
       h('p', { class: 'tip-desc' }, it.desc),
+      extra || null,
+    ];
+  }
+
+  // Gear hover card: name and type pill, slot and tier, one stat per line, description, set bonuses
+  // (with how many pieces you have fitted), and where it comes from.
+  function gearTip(id, extra) {
+    const it = G.ITEMS[id];
+    const slot = (G.SLOTS.find(s => s.id === it.slot) || {}).name || 'Gear';
+    const eq = me ? me.state.equipment : {};
+    const w = it.slot === 'weapon' ? G.WEAPON_BY_ID[it.weapon] : null;
+    const pillText = it.armour ? G.ARMOUR_TYPES[it.armour].name : it.set ? 'Raid set' : w ? `${G.CLASSES[it.cls].name}${it.twoHanded ? ' · two-handed' : ''}`
+      : it.slot === 'offhand' ? `${G.CLASSES[it.cls].name} off-hand` : it.rare ? 'Raid gear' : slot;
+    const pill = h('span', { class: 'tip-pill' }, pillText);
+    pill.style.setProperty('--pill', it.cls && !it.armour ? G.CLASSES[it.cls].colour : it.colour);
+    const st = it.stats || {};
+    const lines = STAT_ORDER.filter(k => st[k] && G.STATS[k]).map(k => h('li', { class: k === 'atk' && it.cls === 'healer' ? 'stat-hp' : statClass(k) },
+      k === 'atk' && it.cls === 'healer' ? `+${st[k]} healing/s` : G.STATS[k].fmt(st[k])));
+    if (w) lines.unshift(h('li', { class: 'stat-muted' }, `${secs(w.cast)} per hit`));
+    passiveText(it.passives).forEach(p => lines.push(h('li', { class: 'stat-passive' }, p)));
+    const bonusLine = (have, need, name, text) => h('li', { class: have >= need ? 'on' : '' }, `Set bonus (${Math.min(have, need)}/${need}): `, h('b', {}, name), text ? ` (${text})` : '');
+    const bonuses = [];
+    if (it.armour) {
+      const a = G.ARMOUR_TYPES[it.armour];
+      const n = G.SLOTS.filter(s => G.ITEMS[eq[s.id]] && G.ITEMS[eq[s.id]].armour === it.armour).length;
+      bonuses.push(bonusLine(n, 3, a.bonus3.name, G.describe(a.bonus3)), bonusLine(n, 5, a.bonus5.name, G.describe(a.bonus5)));
+    }
+    if (it.set) {
+      const set = G.SET_BY_ID[it.set];
+      const n = G.SLOTS.filter(s => G.ITEMS[eq[s.id]] && G.ITEMS[eq[s.id]].set === it.set).length;
+      bonuses.push(bonusLine(n, 2, set.name, G.describe(set.two)), bonusLine(n, 3, set.name, passiveText(set.three.passives).join(' ')));
+    }
+    const craft = G.ACTIONS.find(a => a.outputs[id]);
+    const raids = craft ? [] : G.RAIDS.filter(r => r.drops.some(d => d.item === id));
+    const foot = craft ? `${G.SKILL_BY_ID[craft.skill].name} level ${craft.level} · ${Object.entries(craft.inputs).map(([i, q]) => `${q} ${G.ITEMS[i] ? G.ITEMS[i].name : i}`).join(', ')}`
+      : raids.length ? `Drops from ${raids.length === 1 ? `#${raids[0].n} ${raids[0].name}` : `${raids.length} raids`} in ${[...new Set(raids.map(r => r.regionName))].slice(0, 2).join(', ')}` : null;
+    const showDesc = it.desc && !(it.armour && !it.set);
+    return [
+      h('div', { class: 'tip-head gear-tip-head' }, itemIco(id, 'md'), h('div', { class: 'grow' }, itemName(id, 'b'),
+        h('small', {}, `${slot} · tier ${it.tier || 0}${me ? ` · ${num(have(id))} owned` : ''}`)), pill),
+      lines.length ? h('ul', { class: 'tip-stats' }, lines) : null,
+      showDesc ? h('p', { class: 'tip-desc' }, it.desc) : null,
+      bonuses.length ? h('ul', { class: 'tip-sets' }, bonuses) : null,
+      foot ? h('p', { class: 'tip-foot' }, foot) : null,
       extra || null,
     ];
   }
@@ -282,7 +342,7 @@
   function mechArt(equipment = {}, label = 'Mech') {
     const piece = slot => {
       const it = G.ITEMS[equipment[slot]];
-      return it && it.armour ? { type: it.armour, colour: it.colour } : null;
+      return it && it.armour ? { type: it.armour, colour: it.colour, tier: it.tier, rare: !!it.rare } : null;
     };
     const weapon = G.ITEMS[equipment.weapon];
     const off = G.ITEMS[equipment.offhand];
@@ -1027,13 +1087,16 @@
           s.bonuses.length || pas.length ? h('div', { class: 'bonus-list' }, h('b', {}, 'Active bonuses'),
             h('ul', {}, s.bonuses.map(b => h('li', {}, b)), pas.map(p => h('li', { class: 'passive' }, p)))) : null),
         h('div', {},
-          section('Fitted gear', raiding() ? 'Changes take effect from your next fight.' : null, h('div', { class: 'slot-list' }, G.SLOTS.map(slot => {
+          section('Fitted gear', `Click a slot to see the gear you can fit there.${raiding() ? ' Changes apply to your current fight straight away.' : ''}`, h('div', { class: 'slot-list' }, G.SLOTS.map(slot => {
             const it = eq[slot.id] && G.ITEMS[eq[slot.id]];
             const blocked = slot.id === 'offhand' && G.ITEMS[eq.weapon] && G.ITEMS[eq.weapon].twoHanded;
             const empty = { weapon: 'sword_0', offhand: 'shield_0', head: 'plate_head_0', body: 'plate_body_0', legs: 'plate_legs_0', hands: 'plate_hands_0', feet: 'plate_feet_0', trinket: 'sigil_0' }[slot.id];
-            return h('div', { class: `slot${it ? '' : ' empty-slot'}` },
+            const spare = (slotsBy[slot.id] || []).length;
+            const pick = h('button', { type: 'button', class: 'slot-pick', 'aria-label': `Choose ${slot.name.toLowerCase()} gear`, onclick: () => gearPicker(slot) },
               it ? itemIco(it.id) : gi(empty, '#4a5160'),
-              h('div', { class: 'slot-info' }, h('small', {}, slot.name), it ? itemName(it.id, 'b') : h('b', {}, blocked ? 'Used by your two-handed weapon' : 'Empty'), statsLine(it)),
+              h('div', { class: 'slot-info' }, h('small', {}, slot.name, spare ? h('span', { class: 'slot-spare' }, ` · ${spare} in storage`) : null),
+                it ? itemName(it.id, 'b') : h('b', {}, blocked ? 'Used by your two-handed weapon' : 'Empty'), statsLine(it)));
+            return h('div', { class: `slot${it ? '' : ' empty-slot'}` }, it ? tip(pick, () => itemTip(it.id)) : pick,
               it ? h('button', { type: 'button', class: 'btn small', onclick: () => act('/api/unequip', { slot: slot.id }) }, 'Remove') : null);
           }))),
           section('Raid supplies', supplies.length ? 'Ticked supplies go into every fight while you have them. Potions are only drunk when needed; buffs are used up each fight. Class buffs only apply to their class.' : null,
@@ -1042,17 +1105,30 @@
               const box = h('input', { type: 'checkbox', checked: on, 'aria-label': `Bring ${it.name}`, onchange: e => act('/api/supplies', { item: it.id, on: e.target.checked }) });
               return h('label', { class: `slot supply${on ? '' : ' off'}` }, box, itemIco(it.id),
                 h('div', { class: 'slot-info' }, h('small', {}, `${num(have(it.id))} owned${it.cls ? ` · ${G.CLASSES[it.cls].name} only` : ''}`), itemName(it.id, 'b'), h('span', { class: 'muted small' }, it.desc)));
-            })) : h('div', { class: 'empty' }, 'No potions or buffs yet. Brew them with Alchemy, Honing, Poisoncraft or Runecrafting.')),
-          section('Gear in storage', gear.length ? null : 'Craft weapons and armour, trade for them, or win set pieces from raids.',
-            gear.length ? G.SLOTS.filter(sl => slotsBy[sl.id]).map(sl => collapsible(`gear-${sl.id}`, sl.name, `${slotsBy[sl.id].length}`,
-              h('div', { class: 'slot-list slot-grid' }, slotsBy[sl.id].sort((x, y) => G.ITEMS[y].tier - G.ITEMS[x].tier).map(id => {
-                const it = G.ITEMS[id];
-                return tip(h('div', { class: `slot${it.rare ? ' rare-slot' : ''}` }, itemIco(id),
-                  h('div', { class: 'slot-info' }, h('small', {}, `Tier ${it.tier} · ${have(id)} owned`), itemName(id, 'b'), statsLine(it)),
-                  h('button', { type: 'button', class: 'btn small primary', onclick: () => act('/api/equip', { item: id }) }, 'Fit')),
-                () => itemTip(id, gearCompare(id)));
-              })), true)) : h('div', { class: 'empty' }, 'No spare gear yet.')))),
+            })) : h('div', { class: 'empty' }, 'No potions or buffs yet. Brew them with Alchemy, Honing, Poisoncraft or Runecrafting.')))),
     ];
+  }
+
+  // A pop-up listing the stored gear for one slot, best first, each compared with what's fitted.
+  function gearPicker(slot) {
+    const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = e => { if (e.key === 'Escape') close(); };
+    const ids = Object.keys(me.state.items).filter(id => G.ITEMS[id] && G.ITEMS[id].slot === slot.id && have(id) > 0 && me.state.equipment[slot.id] !== id)
+      .sort((x, y) => (G.ITEMS[y].tier || 0) - (G.ITEMS[x].tier || 0) || (G.ITEMS[y].rare ? 1 : 0) - (G.ITEMS[x].rare ? 1 : 0));
+    const fitted = me.state.equipment[slot.id];
+    const list = ids.length ? h('div', { class: 'picker-list' }, ids.map(id => h('div', { class: `picker-item${G.ITEMS[id].rare ? ' rare-slot' : ''}` },
+      h('div', { class: 'picker-top' }, tip(h('span', {}, itemIco(id, 'md')), () => itemTip(id)),
+        h('div', { class: 'slot-info' }, h('small', {}, `Tier ${G.ITEMS[id].tier || 0} · ${have(id)} owned`), itemName(id, 'b'), statsLine(G.ITEMS[id])),
+        h('button', { type: 'button', class: 'btn small primary', onclick: async () => { close(); await act('/api/equip', { item: id }, `${G.ITEMS[id].name} fitted.`); } }, 'Fit')),
+      gearCompare(id))))
+      : h('div', { class: 'empty' }, `No spare ${slot.name.toLowerCase()} gear. Craft it, trade for it, or win it from raids.`);
+    const overlay = h('div', { class: 'modal picker-modal', onclick: e => { if (e.target === overlay) close(); } },
+      h('div', { class: 'modal-card picker-card', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${slot.name} gear` },
+        h('div', { class: 'modal-head' }, h('h2', {}, `${slot.name} gear`), h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Close', onclick: close }, ui('close', 'sm'))),
+        fitted && G.ITEMS[fitted] ? h('div', { class: 'picker-now' }, h('small', {}, 'Fitted now'), itemIco(fitted, 'sm'), itemName(fitted, 'b')) : null,
+        list));
+    document.body.append(overlay);
+    document.addEventListener('keydown', onKey);
   }
 
   // ---------- Inventory ----------
@@ -1100,7 +1176,13 @@
             if (!ofType.length) return null;
             return h('div', { class: 'inv-group' },
               invFilter === 'all' ? h('h3', { class: 'inv-head' }, INV_GROUP[type], h('small', {}, String(ofType.length))) : null,
-              h('div', { class: 'tiles' }, ofType.map(invTile)));
+              // Gear gets a row per slot.
+              type === 'gear'
+                ? G.SLOTS.filter(sl => ofType.some(id => G.ITEMS[id].slot === sl.id)).map(sl => {
+                  const inSlot = ofType.filter(id => G.ITEMS[id].slot === sl.id);
+                  return h('div', { class: 'inv-sub' }, h('h4', { class: 'inv-subhead' }, sl.name, h('small', {}, String(inSlot.length))), h('div', { class: 'tiles' }, inSlot.map(invTile)));
+                })
+                : h('div', { class: 'tiles' }, ofType.map(invTile)));
           }))
           : h('div', { class: 'empty' }, 'Nothing here yet. Start with a gathering skill: Mining, Hunting, Foraging or Herbalism.'),
         itemDetail(invSelected)),

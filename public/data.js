@@ -807,6 +807,13 @@
       'A “Loot this session” row adds up everything you’ve won since you started raiding.',
       'The raid log keeps going across fights and only clears when you stop raiding or start a different raid.',
       'While a party raid is running, the party controls sit in the fight header instead of a separate box.',
+      'Equipment: click a fitted slot to see the gear you could fit there, each compared with what you’re wearing. The old “Gear in storage” list is gone.',
+      'New gear hover cards: a type pill, one stat per line, set bonuses showing how many pieces you have (3/5), and where the item comes from.',
+      'Crafted gear and materials take their tier’s colour, so tiers are easy to tell apart. Leg armour now shows trousers instead of boots or robes.',
+      'Your mech shows more of its gear: higher tiers add crests, horns, spikes, emblems and knee guards, raid gear has gold trim, vestments a sash, and gloves and boots differ by armour type.',
+      'Item shine is constant and gentler.',
+      'Inventory splits gear into a row per slot.',
+      'Ability cards no longer squash their text next to a requirement.',
     ] },
     { v: '0.10', date: '2026-09-29', notes: [
       'A bar at the bottom of the screen shows what you’re doing, with its progress, how many are left, your queue and a Stop button.',
