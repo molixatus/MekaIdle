@@ -1620,3 +1620,12 @@ body.dock-open.on-raids .page-head { display: none; }
 /* Grouped damage numbers pop when another hit joins them. */
 .float b.bump { display: inline-block; animation: float-bump .25s ease-out; }
 @keyframes float-bump { 40% { transform: scale(1.3); } }
+/* Pilot mechs fill the height of their card. */
+.unit.pilot, body.dock-open .unit.pilot { grid-template-columns: 96px minmax(0, 1fr); align-items: center; }
+.unit.pilot .unit-art, body.dock-open .unit.pilot .unit-art { width: 96px; height: 132px; }
+.unit.pilot .unit-art .mech-sprite, body.dock-open .unit.pilot .unit-art .mech-sprite { height: 130px; }
+@media (max-width: 600px) {
+  .unit.pilot, body.dock-open .unit.pilot { grid-template-columns: 72px minmax(0, 1fr); }
+  .unit.pilot .unit-art, body.dock-open .unit.pilot .unit-art { width: 72px; height: 100px; }
+  .unit.pilot .unit-art .mech-sprite, body.dock-open .unit.pilot .unit-art .mech-sprite { height: 98px; }
+}
