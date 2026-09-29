@@ -1323,3 +1323,10 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 .diff-bar .chip { color: color-mix(in srgb, var(--chip) 80%, #fff); border-color: color-mix(in srgb, var(--chip) 40%, transparent); background: color-mix(in srgb, var(--chip) 6%, transparent); }
 .diff-bar .chip:hover { background: color-mix(in srgb, var(--chip) 14%, transparent); }
 .diff-bar .chip[aria-pressed="true"] { color: #0d1016; background: var(--chip); border-color: var(--chip); box-shadow: 0 0 12px color-mix(in srgb, var(--chip) 35%, transparent); }
+
+/* Inventory gold: icon, then the label above the amount (like the Equipment page boxes). */
+.gold-box { grid-template-columns: auto auto; align-items: center; gap: 0 12px; padding: 10px 18px 10px 12px; }
+.gold-box > div { display: grid; gap: 2px; }
+.gold-box .ico { width: 40px; height: 40px; }
+.gold-box small { line-height: 1; }
+.gold-box b { font: 700 24px/1.1 var(--display); color: var(--gold); font-variant-numeric: tabular-nums; }
