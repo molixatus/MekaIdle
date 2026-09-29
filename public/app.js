@@ -162,7 +162,11 @@
     const saved = store('mekaidle-open-' + key);
     const open = saved == null ? openByDefault : saved === '1';
     const det = h('details', { class: 'fold', open: open || null }, h('summary', {}, h('span', { class: 'fold-title' }, title), note ? h('span', { class: 'fold-note' }, note) : null), body);
-    det.addEventListener('toggle', () => store('mekaidle-open-' + key, det.open ? '1' : '0'));
+    det.addEventListener('toggle', () => {
+      store('mekaidle-open-' + key, det.open ? '1' : '0');
+      // Animate only when the player opens it, not when the page is rebuilt with it open.
+      if (det.open) { det.classList.add('opening'); setTimeout(() => det.classList.remove('opening'), 300); }
+    });
     return det;
   }
 
@@ -664,7 +668,7 @@
         return h('div', { class: 'queue-row' }, action ? itemIco(action.item, 'sm') : '', h('span', { class: 'grow' }, action ? action.name : e.id), h('small', {}, `\u00d7${num(e.count)}`),
           h('button', { type: 'button', class: 'icon-btn tiny', 'aria-label': `Remove ${action ? action.name : ''} from the queue`, onclick: () => act('/api/queue', { queue: q.filter((_, k) => k !== i) }) }, ui('close', 'sm')));
       }) : h('p', { class: 'muted small' }, 'Nothing queued. Use Queue on any skill card to line up to five actions.'));
-    const qBtn = h('button', { type: 'button', class: `btn small${queueOpen ? ' on' : ''}`, 'aria-expanded': String(queueOpen), onclick: () => { queueOpen = !queueOpen; renderActionBar(); } },
+    const qBtn = h('button', { type: 'button', class: `btn small${queueOpen ? ' on' : ''}`, 'aria-expanded': String(queueOpen), onclick: () => { queueOpen = !queueOpen; renderActionBar(); if (queueOpen) { const pnl = document.querySelector('.ab-queue'); if (pnl) pnl.classList.add('opening'); } } },
       'Queue', q.length ? h('span', { class: 'chip-count' }, String(q.length)) : '');
     const stop = a ? h('button', { type: 'button', class: 'btn small danger', onclick: () => (a.type === 'party' ? act('/api/party/leave', {}) : act('/api/action/stop', {})) }, a.type === 'party' ? 'Leave' : 'Stop') : '';
     bar.replaceChildren(panel, ...parts, qBtn, stop);
@@ -736,6 +740,8 @@
     pageRefresh = pageTick = pageCleanup = null;
     const [kind, arg] = page.split(':');
     const el = PAGES[kind](arg);
+    // A refresh during the entrance would replay the fade-in and blink; end the entrance instead.
+    if (!enterNext) { clearTimeout(renderPage.enterTimer); $('page').classList.remove('page-enter'); }
     if (el) $('page').replaceChildren(...[].concat(el).filter(Boolean));
     if (enterNext) {
       enterNext = false;
