@@ -418,8 +418,8 @@
   };
   const DIFFICULTIES = [
     { id: 'normal', name: 'Normal', hp: 1, dmg: 1, xp: 1, drop: 1, mats: 1, colour: '#5fd068' },
-    { id: 'heroic', name: 'Heroic', hp: 1.8, dmg: 1.45, xp: 1.8, drop: 2.2, mats: 1.6, colour: '#4f8ff0' },
-    { id: 'mythic', name: 'Mythic', hp: 3, dmg: 2.1, xp: 3, drop: 4, mats: 2.5, colour: '#ff9a3c' },
+    { id: 'heroic', name: 'Heroic', hp: 1.3, dmg: 1.2, xp: 1.4, drop: 1.6, mats: 1.3, colour: '#4f8ff0' },
+    { id: 'mythic', name: 'Mythic', hp: 1.65, dmg: 1.4, xp: 1.9, drop: 2.3, mats: 1.7, colour: '#ff9a3c' },
   ];
   const DIFF_BY_ID = Object.fromEntries(DIFFICULTIES.map(d => [d.id, d]));
   // bossKillS / trashKillS: seconds a reference pilot (matching crafted gear) needs to kill a boss or
@@ -429,7 +429,7 @@
   // Raid strength through a region, relative to the region's reference pilot: start + rise * (k/24)^shape.
   // region: extra strength per region (up to the 6th), since gear percentages (block, crit) grow with tier.
   // first: the first region is gentler while pilots learn the game.
-  const RAID_CURVE = { start: 0.8, rise: 0.55, shape: 1, finale: 1.05, region: 0.035, first: 0.88 };
+  const RAID_CURVE = { start: 0.75, rise: 0.82, shape: 1.3, finale: 1.0, region: 0.035, first: 0.95 };
   // No size limit. Enemy HP grows with every pilot; enemy damage grows gently up to 4 pilots, then
   // by each extra pilot's share, so a big party isn't safer per pilot than a party of four.
   const PARTY = { max: Infinity, hpPerExtra: 0.75, dmgPerExtra: 0.22, dmgPerExtraBig: 0.42, extraFoesMax: 6 };
@@ -666,7 +666,7 @@
       cls, role: cls, skill, subclass: sub && sub.cls === cls ? sub.id : null,
     };
   }
-  const power = s => Math.round(s.atk * 2 * (1 + (s.crit || 0)) + s.def * 1.5 + s.hp / 5 + ((s.mres || 0) + (s.eres || 0)) / 2);
+  const power = s => Math.round(Math.sqrt(Math.max(1, s.atk * (1 + (s.crit || 0) * 0.75) * (1 + (s.haste || 0))) * s.hp * (100 + (s.def || 0)) / 100) / 4);
 
   // A full set of a tier's crafted gear for a class, used to set raid difficulty and in tests.
   const CLASS_KIT = { melee: ['sword', 'shield', 'plate'], ranged: ['shortbow', 'quiver', 'leather'], magic: ['wand', 'orb', 'cloth'], healer: ['tome', 'relic', 'vestment'] };
@@ -738,14 +738,14 @@
       const cons = pick(CONSUMABLES.filter(c => c.tier <= t.n));
       const slot = () => pick(['head', 'body', 'legs']);
       const setDrops = finale
-        ? CLASS_IDS.map(cls => ({ item: `set${t.n}_${cls}_${slot()}`, qty: [1, 1], p: 0.035, rare: true }))
-        : [CLASS_IDS[k % 4], CLASS_IDS[(k + 2) % 4]].map(cls => ({ item: `set${t.n}_${cls}_${slot()}`, qty: [1, 1], p: 0.02, rare: true }));
+        ? CLASS_IDS.map(cls => ({ item: `set${t.n}_${cls}_${slot()}`, qty: [1, 1], p: 0.15, rare: true }))
+        : [CLASS_IDS[k % 4], CLASS_IDS[(k + 2) % 4]].map(cls => ({ item: `set${t.n}_${cls}_${slot()}`, qty: [1, 1], p: 0.1, rare: true }));
       const uniqueDrops = finale
-        ? [CLASS_IDS[Math.floor(rand() * 4)]].concat(CLASS_IDS[Math.floor(rand() * 4)]).filter((c, i, a) => a.indexOf(c) === i).map(cls => ({ item: `u${t.n}_${cls}`, qty: [1, 1], p: 0.02, rare: true }))
-        : [{ item: `u${t.n}_${CLASS_IDS[(k + 1) % 4]}`, qty: [1, 1], p: 0.008, rare: true }];
+        ? [CLASS_IDS[Math.floor(rand() * 4)]].concat(CLASS_IDS[Math.floor(rand() * 4)]).filter((c, i, a) => a.indexOf(c) === i).map(cls => ({ item: `u${t.n}_${cls}`, qty: [1, 1], p: 0.08, rare: true }))
+        : [{ item: `u${t.n}_${CLASS_IDS[(k + 1) % 4]}`, qty: [1, 1], p: 0.05, rare: true }];
       const trinketDrops = finale
-        ? [{ item: `trinket_${t.n}`, qty: [1, 1], p: 0.02, rare: true }, { item: `charm_${t.n}`, qty: [1, 1], p: 0.02, rare: true }]
-        : [{ item: k % 2 ? `trinket_${t.n}` : `charm_${t.n}`, qty: [1, 1], p: 0.007, rare: true }];
+        ? [{ item: `trinket_${t.n}`, qty: [1, 1], p: 0.08, rare: true }, { item: `charm_${t.n}`, qty: [1, 1], p: 0.08, rare: true }]
+        : [{ item: k % 2 ? `trinket_${t.n}` : `charm_${t.n}`, qty: [1, 1], p: 0.05, rare: true }];
       RAIDS.push({
         id: `r${g + 1}`, n: g + 1, region: ri, tier: t.n, k,
         name: finale ? reg.finale : `${adj} ${pick0[2].toLowerCase()}`, sprite, spriteHue,
@@ -755,7 +755,10 @@
         trash: { pool: reg.trash, maxWaves: 1 + Math.floor(k / 6), hp: Math.round(refDps * FIGHT.trashKillS * f), dps: Math.round(dpsFor('physical') * 0.6 * 10) / 10,
           def: Math.round(def * 0.7), mres: Math.round(mres * 0.7), eres: Math.round(eres * 0.7) },
         moves: { basic: finale ? 'Crushing blow' : 'Strike' },
-        recommended: Math.round(power(ref) * f),
+        // Power needed per difficulty: the rating grows slower than fight difficulty (abilities,
+        // subclass and set bonuses aren't in it), so the curve is compressed.
+        recommended: Math.round(power(ref) * Math.pow(f, 0.6)),
+        recommendedBy: Object.fromEntries(DIFFICULTIES.map(d => [d.id, Math.round(power(ref) * Math.pow(f * Math.sqrt(d.hp * d.dmg), 0.6))])),
         xp: Math.round(COMBAT_XP[ri] * (0.85 + 0.3 * k / 24) * (finale ? 1.5 : 1)),
         drops: [
           { item: `mat_${t.n}`, qty: [1, 2 + Math.floor(k / 12)] },
@@ -769,19 +772,36 @@
     }
   });
   const RAID_BY_ID = Object.fromEntries(RAIDS.map(r => [r.id, r]));
-  // A region's finale needs next-tier gear fitted: a weapon and at least 3 armour pieces of that
-  // tier or higher (tier 10 for the last region).
-  const FINALE_ARMOUR = 3;
-  function finaleGear(equipment, raid) {
+  // Gear checks through a region, so progress alternates between crafting and raid gear:
+  // raids 1-8 need nothing extra; raids 9-16 need 2 pieces of this region's raid gear (or better)
+  // fitted; raids 17-24 need a next-tier weapon; the finale a next-tier weapon and 3 next-tier
+  // armour pieces (tier 10 in the last region).
+  const FINALE_ARMOUR = 3, RAID_GEAR_NEED = 2;
+  const GEAR_STAGE = k => (k >= 24 ? 'finale' : k >= 16 ? 'next' : k >= 8 ? 'raid' : null);
+  function gearCheck(equipment, raid) {
     const need = Math.min(10, raid.tier + 1);
-    if (!raid.finale) return { ok: true, need };
+    const stage = GEAR_STAGE(raid.k);
+    const items = Object.values(equipment || {}).map(id => ITEMS[id]).filter(Boolean);
     const tierOf = slot => { const it = ITEMS[equipment && equipment[slot]]; return it ? it.tier || 0 : 0; };
+    const raidPieces = items.filter(it => it.rare && (it.tier || 0) >= raid.tier).length;
     const weapon = tierOf('weapon') >= need;
     const armour = ARMOUR_SLOTS.filter(s => tierOf(s) >= need).length;
-    return { ok: weapon && armour >= FINALE_ARMOUR, need, weapon, armour };
+    if (stage === 'raid') return { ok: raidPieces >= RAID_GEAR_NEED, stage, raidPieces, short: `Needs ${RAID_GEAR_NEED} raid gear`,
+      text: `Fit at least ${RAID_GEAR_NEED} pieces of raid gear from ${REGIONS[raid.region].name} or later (set pieces, raid weapons or trinkets). You have ${raidPieces}.` };
+    if (stage === 'next') return { ok: weapon, stage, need, short: `Needs T${need} weapon`, text: `Fit a tier ${need} (or better) weapon, crafted with this region’s raid material.` };
+    if (stage === 'finale') return { ok: weapon && armour >= FINALE_ARMOUR, stage, need, weapon, armour, short: `Needs T${need} gear`,
+      text: `Fit a tier ${need} weapon and at least ${FINALE_ARMOUR} tier ${need} armour pieces. You have ${weapon ? 'the weapon' : 'no such weapon'} and ${armour} armour piece${armour === 1 ? '' : 's'}.` };
+    return { ok: true, stage };
   }
+  const finaleGear = gearCheck;
 
   const PATCH_NOTES = [
+    { v: '0.11', date: '2026-09-29', notes: [
+      'Harder progression: each boss is now beaten on Normal, Heroic and Mythic before the next one opens. Raids you had already opened stay open.',
+      'Heroic and Mythic are smaller steps up, and raid gear drops far more often (set pieces 10–15%, raid weapons and trinkets 5–8%).',
+      'Gear checks through every region: raids 9–16 need 2 pieces of raid gear fitted, raids 17–24 a next-tier weapon, and the finale next-tier weapon and armour. Progress alternates between crafting and farming raid gear.',
+      'Power is now a combat rating (damage × toughness), and recommended power is shown per difficulty, so Mythic no longer looks out of reach when it isn’t.',
+    ] },
     { v: '0.10', date: '2026-09-29', notes: [
       'A bar at the bottom of the screen shows what you’re doing, with its progress, how many are left, your queue and a Stop button.',
       'Crafted items appear the moment the bar fills, instead of a few seconds later.',
@@ -844,7 +864,7 @@
     MAX_LEVEL, OFFLINE_CAP, TIERS, TIER_BY_ID, CLASSES, ROLES, CLASS_OF_SKILL, UNARMED_COLOUR, SKILLS, SKILL_BY_ID, COMBAT_SKILLS, STATS, describe,
     WEAPON_KINDS, WEAPON_BY_ID, OFFHAND_KINDS, OFFHAND_BY_ID, SLOTS, ARMOUR_SLOTS, ARMOUR_TYPES, CONSUMABLES, CONSUMABLE_BY_ID,
     ABILITIES, ABILITY_BY_ID, ABILITY_SLOTS, SUBCLASSES, SUBCLASS_BY_ID, REGIONS, SET_BY_ID, TRASH_ROLES, FOE_ROLE, MECHANICS, RAID_CURVE, FOES, FOE_DAMAGE, PASSIVES, DIFFICULTIES, DIFF_BY_ID, FIGHT, PARTY,
-    ITEMS, ACTIONS, ACTION_BY_ID, RAIDS, RAID_BY_ID, finaleGear, FINALE_ARMOUR, PATCH_NOTES, CLASS_KIT,
+    ITEMS, ACTIONS, ACTION_BY_ID, RAIDS, RAID_BY_ID, finaleGear, gearCheck, FINALE_ARMOUR, RAID_GEAR_NEED, PATCH_NOTES, CLASS_KIT,
     xpForLevel, levelFromXp, skillMult, mechStats, power, combatLevel, kit, rng,
     PARTY_MAX: PARTY.max, partyDmg, POTIONS_PER_RAID: 3, GUILD_COST: 0, QUEUE_MAX: 5,
   };

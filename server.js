@@ -503,13 +503,13 @@ route('GET', '/api/raid/current', async ctx => {
 const diffOf = v => (G.DIFF_BY_ID[str(v)] ? str(v) : 'normal');
 function requireUnlocked(state, raid, diff) {
   if (!game.raidUnlocked(state, raid.id, diff)) {
-    bad(diff === 'normal' ? `Clear ${G.RAIDS[raid.n - 2].name} first.` : `Clear ${raid.name} on ${diff === 'heroic' ? 'Normal' : 'Heroic'} first.`);
+    bad(diff === 'normal' ? `Clear ${G.RAIDS[raid.n - 2].name} on Mythic first.` : `Clear ${raid.name} on ${diff === 'heroic' ? 'Normal' : 'Heroic'} first.`);
   }
   requireFinaleGear(state, raid);
 }
 function requireFinaleGear(state, raid, who) {
-  const g = G.finaleGear(state.equipment, raid);
-  if (!g.ok) bad(`${who ? `${who} needs` : 'You need'} tier ${g.need} gear fitted for ${raid.name}: a tier ${g.need} weapon and at least ${G.FINALE_ARMOUR} tier ${g.need} armour pieces.`);
+  const g = G.gearCheck(state.equipment, raid);
+  if (!g.ok) bad(`${who ? `${who}: ` : ''}${raid.name} needs better gear. ${g.text}`);
 }
 
 route('POST', '/api/raid/start', ctx => {

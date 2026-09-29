@@ -1248,7 +1248,7 @@
   const VIS_LABEL = { private: 'Closed (solo)', friends: 'Friends and guild', public: 'Everyone' };
   const clearsOf = id => (me.state.clears || {})[id] || 0;
   function raidOpen(r, diff) {
-    if (diff === 'normal') return r.n === 1 || clearsOf(`r${r.n - 1}`) >= 1;
+    if (diff === 'normal') return r.n <= (me.state.reached || 1) || clearsOf(`r${r.n - 1}`) >= 3;
     return clearsOf(r.id) >= (diff === 'heroic' ? 1 : 2);
   }
   const diffScale = d => Math.sqrt(G.DIFF_BY_ID[d].hp * G.DIFF_BY_ID[d].dmg);
@@ -1311,7 +1311,7 @@
     const d = G.DIFF_BY_ID[diff];
     const open = raidOpen(r, diff);
     const here = ctx.current && ctx.current.raid === r.id && ctx.current.diff === diff;
-    const rec = Math.round(r.recommended * diffScale(diff));
+    const rec = r.recommendedBy ? r.recommendedBy[diff] : Math.round(r.recommended * diffScale(diff));
     const ratio = ctx.power / rec;
     const pClass = ratio >= 1 ? 'ok' : ratio >= 0.8 ? 'warn' : 'bad';
     const pips = h('span', { class: 'clears', title: 'Cleared on Normal, Heroic, Mythic' }, G.DIFFICULTIES.map((x, i) => {
@@ -1320,10 +1320,10 @@
       return s;
     }));
     let buttons;
-    const gear = G.finaleGear(me.state.equipment, r);
-    if (!open) buttons = h('span', { class: 'lock-note' }, ui('lock', 'sm'), diff === 'normal' ? `Clear #${r.n - 1}` : `Clear on ${diff === 'heroic' ? 'Normal' : 'Heroic'}`);
-    else if (!gear.ok) buttons = tip(h('span', { class: 'lock-note gear-lock' }, ui('lock', 'sm'), `Needs T${gear.need} gear`),
-      () => [h('b', {}, 'Finale gear check'), h('p', { class: 'tip-desc' }, `Fit a tier ${gear.need} weapon and at least ${G.FINALE_ARMOUR} tier ${gear.need} armour pieces. You have ${gear.weapon ? 'the weapon' : 'no such weapon'} and ${gear.armour} armour piece${gear.armour === 1 ? '' : 's'}.`)]);
+    const gear = G.gearCheck(me.state.equipment, r);
+    if (!open) buttons = h('span', { class: 'lock-note' }, ui('lock', 'sm'), diff === 'normal' ? `Clear #${r.n - 1} on Mythic` : `Clear on ${diff === 'heroic' ? 'Normal' : 'Heroic'}`);
+    else if (!gear.ok) buttons = tip(h('span', { class: 'lock-note gear-lock' }, ui('lock', 'sm'), gear.short),
+      () => [h('b', {}, 'Gear check'), h('p', { class: 'tip-desc' }, gear.text)]);
     else if (here) buttons = h('button', { type: 'button', class: 'btn small danger', onclick: ctx.stop }, 'Stop');
     else {
       buttons = [h('button', { type: 'button', class: 'btn small primary', onclick: () => ctx.start(r, diff) }, 'Fight'),
@@ -1385,7 +1385,7 @@
         const unlocked = raidOpen(raids[0], 'normal');
         const cleared = raids.filter(r => clearsOf(r.id) >= 1).length;
         const head = h('div', { class: 'region-head' }, h('span', { class: 'region-title' }, bossIcon(raids[24]), reg.name),
-          h('small', {}, unlocked ? `Tier ${ri + 1} \u00b7 ${cleared}/25 cleared` : `Locked \u00b7 beat ${G.REGIONS[ri - 1].finale} (#${ri * 25}) to open`));
+          h('small', {}, unlocked ? `Tier ${ri + 1} \u00b7 ${cleared}/25 cleared` : `Locked \u00b7 beat ${G.REGIONS[ri - 1].finale} (#${ri * 25}) on Mythic to open`));
         head.style.setProperty('--tier', G.TIERS[ri].colour);
         list.push(head);
         const shown = raids.filter(r => !(hideCleared && clearsOf(r.id) >= diffRank) && !(hideLooted && looted(r)));
