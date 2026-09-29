@@ -682,6 +682,9 @@
     if (!me) return;
     const act0 = me.state.activity;
     const activeSkill = !act0 ? null : act0.type ? G.CLASSES[myClass()].skill : (G.ACTION_BY_ID[act0.id] || {}).skill;
+    // A skill trained alongside a raid animates too.
+    const sideSkill = me.state.side ? (G.ACTION_BY_ID[me.state.side.id] || {}).skill : null;
+    const training = sk => sk === activeSkill || sk === sideSkill;
     Object.values(navRefs).forEach(({ btn, right, spin, item, fill }) => {
       btn.toggleAttribute('aria-current', false);
       if (item.id === page) btn.setAttribute('aria-current', 'page');
@@ -691,8 +694,8 @@
         right.textContent = String(x.level).padStart(2, '0');
         fill.style.width = x.pct + '%';
         btn.title = x.max ? `${item.name}: ${num(x.xp)} XP (max level)` : `${item.name}: ${num(x.xp)} XP, ${num(x.toGo)} to level ${x.level + 1}`;
-        spin.hidden = item.skill !== activeSkill;
-        btn.classList.toggle('training', item.skill === activeSkill);
+        spin.hidden = !training(item.skill);
+        btn.classList.toggle('training', training(item.skill));
       } else if (item.alert) {
         const n = me.alerts[item.alert];
         right.className = n ? 'badge' : 'lvl';
