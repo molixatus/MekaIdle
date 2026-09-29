@@ -792,6 +792,7 @@
       'Raid page: bigger rows with large boss portraits, loot split into materials and equipment, coloured difficulty buttons, filters to hide cleared or fully looted bosses, open parties only when there are some, and the raid log only during a raid.',
       'Fixed pages flashing every few seconds.',
       'Fixed the sidebar queue running off the edge with long item names.',
+      'Fixed the sidebar progress bar jumping back and forth during raids.',
     ] },
     { v: '0.9', date: '2026-09-29', notes: [
       'New monster art: every raid has its own boss, and enemies are drawn from a new sprite sheet.',

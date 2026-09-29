@@ -1350,3 +1350,7 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 .queue-head, .queue-row { min-width: 0; }
 .queue-row .grow { white-space: nowrap; }
 .queue-row small, .queue-row .icon-btn { flex: none; }
+
+/* The sidebar activity bar follows the clock every frame: no slide-in, and red while raiding. */
+.now-card .bar > span { transition: none; }
+.now-card .bar.red > span { background-color: var(--red); }
