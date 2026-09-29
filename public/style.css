@@ -1635,3 +1635,7 @@ body.dock-open.on-raids .page-head { display: none; }
 .ab-side .ab-bar { width: 90px; }
 /* The sidebar's current-activity card duplicates the bottom bar, so it's hidden. */
 .now-card { display: none !important; }
+/* Notifications sit above the bottom bar (and above the raid dock when it's open). */
+.toasts { bottom: 78px; }
+body.dock-closed .toasts { bottom: calc(var(--ab-h, 60px) + 50px); }
+body.dock-open .toasts { bottom: calc(var(--ab-h, 60px) + min(340px, 42vh) + 50px); }
