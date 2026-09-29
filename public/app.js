@@ -1892,15 +1892,17 @@
       const manaBar = o.enemy ? null : h('div', { class: 'manabar', title: 'Mana' }, manaFill);
       const castFill = h('span'), castText = h('b');
       const castBar = h('div', { class: 'castbar idle' }, castFill, castText);
-      const statuses = h('div', { class: 'statuses' });
+      const statusPos = h('div', { class: 'status-pos' }), statusNeg = h('div', { class: 'status-neg' });
+      const statuses = h('div', { class: 'statuses' }, statusPos, statusNeg);
       const el = h('div', { class: `unit${o.enemy ? ' enemy' : ' pilot'}${o.boss ? ' boss' : ''}` }, artBox,
         h('div', { class: 'unit-info' },
+          statuses,
           h('div', { class: 'unit-name' }, o.cls ? classIco(o.cls) : null, h('span', { class: 'unit-label' }, o.name), o.sub || null, o.kick || null),
-          hpBar, manaBar, castBar, statuses, o.kit || null),
+          hpBar, manaBar, castBar, o.kit || null),
         floats);
       if (o.tipFn) tip(artBox, o.tipFn);
       if (o.colour) el.style.setProperty('--series', o.colour);
-      const u = { ...o, el, artBox, actEl, fxEl, floats, hpFill, hpTrail, hpShield, hpText, hpBar, manaFill, castFill, castText, castBar, statuses, hp: o.max, barrier: 0, cast: null, down: false, buffs: {}, mana: o.maxMana };
+      const u = { ...o, el, artBox, actEl, fxEl, floats, hpFill, hpTrail, hpShield, hpText, hpBar, manaFill, castFill, castText, castBar, statuses, statusPos, statusNeg, hp: o.max, barrier: 0, cast: null, down: false, buffs: {}, mana: o.maxMana };
       drawHp(u);
       drawMana(u);
       return u;
@@ -2128,10 +2130,33 @@
       return foes[e.tg] ? [' on ', foeName(e.tg)] : '';
     };
     // ----- Applying events -----
+    const MECH_ICON = { cleave: 'ab_rend', smash: 'skull', poison: 'ab_poison_arrow', drain: 'ab_mana_shield', mend: 'sk_healing', summon: 'flag', shield: 'ab_shield_wall', enrage: 'power' };
+    // A boss used a mechanic: pop its icon, and for repeating ones count down to the next use
+    // (every Nth attack, so roughly N attack intervals).
+    function mechUsed(u, name, at) {
+      const m = u && u.mechByName && u.mechByName[name];
+      const ref = m && u.abRefs[m];
+      if (!ref) return;
+      const every = G.MECHANICS[m].every;
+      u.cds[m] = every ? { from: at, until: at + every * (u.castMs + 300) } : { from: at, until: at + 1 };
+      if (!quiet && !reduced) { ref.el.classList.remove('cd-fire', 'cd-ready'); void ref.el.offsetWidth; ref.el.classList.add('cd-fire'); }
+    }
     function foeUnit(x) {
-      const sub = x.boss ? (x.mechs && x.mechs.length ? mechChips(x.mechs) : null)
-        : x.role && x.role !== 'grunt' ? h('small', { class: `unit-sub role-${x.role}` }, G.TRASH_ROLES[x.role].name) : null;
-      const u = makeUnit({ name: x.name, enemy: true, boss: x.boss, max: x.max, tipFn: () => foeTip(x), art: foeArt(x.sprite ? { sprite: x.sprite, hue: x.spriteHue } : x.foe, x.boss, '', x.boss ? 48 : 32), sub });
+      const sub = !x.boss && x.role && x.role !== 'grunt' ? h('small', { class: `unit-sub role-${x.role}` }, G.TRASH_ROLES[x.role].name) : null;
+      // A boss's mechanics show like pilot abilities: an icon each, with a pop and a countdown after use.
+      const abRefs = {}, mechByName = {};
+      const mechs = (x.mechs || []).filter(m => G.MECHANICS[m]).map(m => {
+        const M = G.MECHANICS[m];
+        mechByName[M.name] = m;
+        if (m === 'enrage') mechByName.Enraged = m;
+        const time = h('small', { class: 'cd-time', 'aria-hidden': 'true' });
+        const el = h('span', { class: 'kit-ab foe-ab' }, gi(MECH_ICON[m] || 'power', '#ff9a8a', 'sm'), h('span', { class: 'cd-sweep' }), time);
+        abRefs[m] = { el, time, shown: '' };
+        return tip(el, () => [h('b', {}, M.name), h('p', { class: 'tip-desc' }, M.desc)]);
+      });
+      const kit = mechs.length ? h('div', { class: 'unit-kit' }, h('div', { class: 'kit-gear' }), h('div', { class: 'kit-right' }, mechs)) : null;
+      const u = makeUnit({ name: x.name, enemy: true, boss: x.boss, max: x.max, tipFn: () => foeTip(x), art: foeArt(x.sprite ? { sprite: x.sprite, hue: x.spriteHue } : x.foe, x.boss, '', x.boss ? 48 : 32), sub,
+        kit, abRefs, cds: {}, mechByName, castMs: x.cast || 2000 });
       foes[x.id] = u;
       return u;
     }
@@ -2154,15 +2179,17 @@
         if (e.m != null && u.maxMana) { u.mana = e.m; drawMana(u); }
         if (typeof e.a === 'number' && ABILITY_NAMES.has(e.n)) startCooldown(u, ABILITY_ID[e.n], e.t);
         if (typeof e.a === 'number' && ABILITY_NAMES.has(e.n)) addLog(at, 'abilities', [who(e.a), ' casts ', h('b', { class: 'log-ab' }, e.n), castTarget(e)], 'ability', gi('ab_' + ABILITY_ID[e.n], '#ffc98a', 'sm'));
-        else if (e.k === 'danger') addLog(at, 'abilities', [foeName(e.a), ` begins ${e.n}!`], 'danger');
+        else if (e.k === 'danger') { mechUsed(u, e.n, e.t); addLog(at, 'abilities', [foeName(e.a), ` begins ${e.n}!`], 'danger'); }
       } else if (e.e === 'hit') hit(e);
       else if (e.e === 'spawn') {
+        mechUsed(foes[e.a], e.n, e.t);
         foeBox.append(...e.foes.map(foeUnit).map(u => u.el));
         addLog(at, 'abilities', [foeName(e.a), ` uses ${e.n}: ${e.foes.map(x => x.name).join(', ')} join the fight!`], 'danger');
       } else if (e.e === 'mana') {
         const u = party[e.tg];
         if (u && u.maxMana) { u.mana = e.m; drawMana(u); flash(u, 'mana'); }
       } else if (e.e === 'buff') {
+        if (e.danger) mechUsed(foes[e.tg], e.n, e.t);
         if (e.danger) addLog(at, 'abilities', [foeName(e.tg), e.n === 'Frenzy' ? ' goes into a frenzy!' : e.n === 'Enraged' ? ' is enraged!' : ` uses ${e.n}!`], 'danger');
         const targets = e.tg === 'all' ? party.filter(u => !u.down) : [unitOf(e.tg)].filter(Boolean);
         targets.forEach(u => {
@@ -2261,6 +2288,11 @@
       drawHp(target);
     }
 
+    // An icon for a buff or debuff: the ability's own icon, else one for its damage type.
+    const TYPE_ICON = { Bleed: 'ab_rend', Burn: 'ab_fireball', Prismatic: 'ab_fireball', Fire: 'ab_fireball', Poison: 'ab_poison_arrow',
+      Frost: 'ab_frost_nova', Shadow: 'sub_shadowmender', Heal: 'sk_healing' };
+    const statusIcon = (n, b) => (ABILITY_ID[n] ? 'ab_' + ABILITY_ID[n] : b.cls === 'taunt' ? 'sub_guardian' : TYPE_ICON[b.ty] || (/shield/i.test(n) ? 'ab_mana_shield' : 'power'));
+    const clockNow = () => (cur ? now() - cur.start : 0);
     function drawStatuses(clock) {
       const tank = party.find(u => !u.down && cur.fight.fighters[u.i].subclass === 'guardian');
       Object.values(foes).forEach(u => {
@@ -2268,19 +2300,36 @@
         else delete u.buffs.Taunted;
       });
       [...party, ...Object.values(foes)].forEach(u => {
+        // Icon badges kept per effect (so they don't flicker), with the time left underneath.
         const live = Object.entries(u.buffs).filter(([, b]) => b.until > clock);
-        const chip = ([n, b]) => {
+        u.statusEls = u.statusEls || new Map();
+        const keep = new Set();
+        const badge = ([n, b]) => {
+          keep.add(n);
+          let s = u.statusEls.get(n);
+          if (!s) {
+            const time = h('small', {});
+            const el = tip(h('span', { class: `sbadge ${b.neg ? 'neg' : 'pos'}${b.ty ? ` ty-${b.ty.toLowerCase()}` : ''}${b.cls === 'taunt' ? ' ty-taunt' : ''}` },
+              gi(statusIcon(n, b), null, 'sm'), time), () => {
+              const left = b.until - clockNow();
+              return [h('b', {}, b.label || n), h('small', { class: 'muted' }, `${b.neg ? 'Debuff' : 'Buff'}${Number.isFinite(left) && b.until - b.from < 600000 ? ` · ${Math.max(0, left / 1000).toFixed(1)}s left` : ''}`)];
+            });
+            s = { el, time };
+            u.statusEls.set(n, s);
+          }
           const left = b.until - clock;
           // Fight-long effects (frenzy, enrage) show no timer.
           const timed = Number.isFinite(left) && b.from != null && b.until - b.from < 600000;
-          const el = h('span', { class: `status ${b.cls}${b.ty ? ` ty-${b.ty.toLowerCase()}` : ''}` }, b.label || n,
-            timed ? h('small', {}, `${Math.ceil(left / 1000)}s`) : null);
-          if (timed) el.style.setProperty('--left', String(Math.max(0, Math.min(1, left / (b.until - b.from)))));
-          return el;
+          const txt = timed ? (left >= 10000 ? `${Math.ceil(left / 1000)}s` : `${(left / 1000).toFixed(1)}s`) : '';
+          if (s.time.textContent !== txt) s.time.textContent = txt;
+          s.el.style.setProperty('--left', timed ? String(Math.max(0, Math.min(1, left / (b.until - b.from)))) : '1');
+          return s.el;
         };
-        const pos = live.filter(([, b]) => !b.neg).map(chip), neg = live.filter(([, b]) => b.neg).map(chip);
+        const pos = live.filter(([, b]) => !b.neg).map(badge), neg = live.filter(([, b]) => b.neg).map(badge);
+        [...u.statusEls.keys()].forEach(n => { if (!keep.has(n)) u.statusEls.delete(n); });
         if (u.down && u.respawnAt && !u.enemy) pos.unshift(h('span', { class: 'status down' }, `Respawn in ${Math.max(0, Math.ceil((u.respawnAt - clock) / 1000))}s`));
-        u.statuses.replaceChildren(h('div', { class: 'status-pos' }, pos), h('div', { class: 'status-neg' }, neg));
+        u.statusPos.replaceChildren(...pos);
+        u.statusNeg.replaceChildren(...neg);
       });
     }
 
@@ -2429,7 +2478,7 @@
     }
     // Greys out abilities on cooldown with a clock sweep and the time left; a flash when ready again.
     function drawCooldowns(clock) {
-      party.forEach(u => Object.entries(u.abRefs || {}).forEach(([id, ref]) => {
+      [...party, ...Object.values(foes)].forEach(u => Object.entries(u.abRefs || {}).forEach(([id, ref]) => {
         const c = u.cds[id];
         const left = c ? c.until - clock : 0;
         const on = left > 0;

@@ -1595,3 +1595,20 @@ body.dock-open .unit.enemy.boss .foe-sprite { width: 92px; height: 92px; }
 body.dock-open .side { padding: 10px 12px; gap: 8px; }
 body.dock-open .foe-list { gap: 8px; }
 body.dock-open.on-raids .page-head { display: none; }
+
+/* Buff and debuff badges above each unit's name: buffs left, debuffs right, time left underneath. */
+.unit-info > .statuses { min-height: 34px; align-items: flex-end; }
+.sbadge { position: relative; display: inline-grid; justify-items: center; gap: 1px; color: #9cc4ff; animation: sbadge-in .25s ease-out; cursor: help; }
+.sbadge .ico { width: 22px; height: 22px; padding: 2px; box-sizing: border-box; border-radius: 5px; background: #0d1016; border: 1px solid currentColor;
+  box-shadow: inset 0 calc(-22px * (1 - var(--left, 1))) 0 rgba(0, 0, 0, .55); }
+.sbadge small { font-size: 9.5px; font-weight: 700; line-height: 1; color: #c3c9d4; font-variant-numeric: tabular-nums; min-height: 9px; }
+.sbadge.pos.ty-heal { color: #6ff0a8; }
+.sbadge.neg { color: #ffb070; }
+.sbadge.neg.ty-poison { color: #d59bff; }
+.sbadge.neg.ty-bleed { color: #ff8a8a; }
+.sbadge.neg.ty-shadow { color: #b9a4ff; }
+.sbadge.neg.ty-frost { color: #9fe4ff; }
+.sbadge.ty-taunt { color: #ff8f7a; }
+@keyframes sbadge-in { from { transform: scale(.6); opacity: 0; } }
+/* Boss mechanics use the ability icon styles, with a red frame. */
+.kit-ab.foe-ab { border-color: rgba(239, 90, 69, .5); }

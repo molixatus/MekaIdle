@@ -799,6 +799,8 @@
 
   const PATCH_NOTES = [
     { v: '0.11', date: '2026-09-29', notes: [
+      'Buffs and debuffs now show as icons above each unit’s name (buffs left, debuffs right) with the time left underneath and details on hover.',
+      'Boss mechanics show as icons like your abilities: they pop when used, then count down to the next use.',
       'The damage meter, graph and raid log now share one panel pinned to the bottom of the raid screen (meter and graph on the left, log on the right). It opens upwards, remembers whether it’s open, and no longer makes the page jump when enemies are summoned. Units are more compact while it’s open.',
       'Skill XP bars are animated: they grow with each gain and glow, flash gold on a level-up, shimmer, and show the XP your current action is working towards as a striped segment.',
       'Damage meter and graph update much faster and look better: numbers count up smoothly, pilots slide up and down as their rank changes (gold, silver and bronze badges), bars glow in class colours, and the graph draws smooth filled curves with a pulsing marker at the live end.',
