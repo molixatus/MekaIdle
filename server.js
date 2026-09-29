@@ -360,12 +360,20 @@ route('POST', '/api/action/start', ctx => withPlayer(ctx.me, async (s, p) => {
   game.startAction(s, str(ctx.body.id), ctx.body.count);
 }));
 route('POST', '/api/queue', ctx => withPlayer(ctx.me, s => game.setQueue(s, ctx.body.queue)));
-route('POST', '/api/abilities', ctx => withPlayer(ctx.me, s => game.setAbilities(s, ctx.body.cls, str(ctx.body.generic) || null)));
-route('POST', '/api/subclass', ctx => withPlayer(ctx.me, s => game.setSubclass(s, str(ctx.body.cls), str(ctx.body.sub), str(ctx.body.second))));
+// Loadout changes (gear, abilities, subclass, supplies) take effect in a running raid straight away:
+// the current fight starts over with the new loadout.
+async function refight(p) {
+  const a = p.state.activity;
+  if (a && a.type === 'raid') { Object.assign(a, { start: Date.now(), fight: null }); game.advanceRaid(a, [p], Date.now(), null); }
+  else if (a && a.type === 'party') { const party = await partyOf(p.id); if (party && party.session) await restartParty(party); }
+}
+const withLoadout = (ctx, fn) => withPlayer(ctx.me, async (s, p) => { fn(s); await refight(p); });
+route('POST', '/api/abilities', ctx => withLoadout(ctx, s => game.setAbilities(s, ctx.body.cls, str(ctx.body.generic) || null)));
+route('POST', '/api/subclass', ctx => withLoadout(ctx, s => game.setSubclass(s, str(ctx.body.cls), str(ctx.body.sub), str(ctx.body.second))));
 route('POST', '/api/action/stop', ctx => withPlayer(ctx.me, async (s, p) => { await leaveRaid(p); game.stopAction(s); }));
-route('POST', '/api/equip', ctx => withPlayer(ctx.me, s => game.equip(s, str(ctx.body.item))));
-route('POST', '/api/unequip', ctx => withPlayer(ctx.me, s => game.unequip(s, str(ctx.body.slot))));
-route('POST', '/api/supplies', ctx => withPlayer(ctx.me, s => game.setSupply(s, str(ctx.body.item), ctx.body.on === true)));
+route('POST', '/api/equip', ctx => withLoadout(ctx, s => game.equip(s, str(ctx.body.item))));
+route('POST', '/api/unequip', ctx => withLoadout(ctx, s => game.unequip(s, str(ctx.body.slot))));
+route('POST', '/api/supplies', ctx => withLoadout(ctx, s => game.setSupply(s, str(ctx.body.item), ctx.body.on === true)));
 
 // ---------- Raids and parties ----------
 // A solo raid lives in the player's activity. A party raid lives on the party row (its

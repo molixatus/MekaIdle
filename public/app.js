@@ -1411,7 +1411,7 @@
 
     function drawParty() {
       const p = data.party;
-      if (!p) partyBox.replaceChildren();
+      if (!p || p.running) partyBox.replaceChildren();
       else {
         const raid = G.RAID_BY_ID[p.raid];
         const leader = p.leader === me.player.id;
@@ -1478,6 +1478,7 @@
       return stopRaid();
     };
     battle.onChange = () => load();
+    battle.onLeave = n => partyAct('/api/party/leave', {}, n > 1 ? 'You left the party. The next pilot now leads it.' : 'Party disbanded.');
 
     pageRefresh = load;
     pageTick = () => battle.sync();
@@ -1511,17 +1512,71 @@
   };
   const clockOf = ms => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
+  // The raid log belongs to a raid session, not to the panel: it survives page rebuilds and new
+  // fights, and is cleared only when the session ends or a different one starts.
+  const BLOG = { key: null, items: [], counts: { all: 0, abilities: 0, kills: 0, loot: 0 }, lastLootAt: null, list: null, fight: null, upTo: 0 };
+  function resetLog(key) {
+    BLOG.key = key;
+    BLOG.items.length = 0;
+    Object.keys(BLOG.counts).forEach(k => { BLOG.counts[k] = 0; });
+    BLOG.fight = null;
+    BLOG.upTo = 0;
+    if (BLOG.list) BLOG.list.replaceChildren();
+  }
+  // Short stat lines for hover cards ("1,234 damage/s").
+  // Totals keep percentages as fractions (0.05 = 5%).
+  const FRACTION_STATS = new Set(['crit', 'critDmg', 'heal', 'haste', 'pen', 'block', 'double', 'bleed', 'burn', 'poison', 'fire', 'frost', 'shock', 'lifesteal', 'enemyDmg']);
+  const statText = (k, v) => G.STATS[k].fmt(FRACTION_STATS.has(k) ? Math.round(v * 1000) / 10 : Math.round(v * 10) / 10).replace(/^\+/, '');
+  function pilotTip(p) {
+    const st = p.stats || {};
+    const sub = p.subclass && G.SUBCLASS_BY_ID[p.subclass];
+    return [
+      h('div', { class: 'tip-head' }, classIco(p.cls, 'md'), h('div', {}, h('b', {}, p.name),
+        h('small', {}, `${G.CLASSES[p.cls].name}${sub ? ` · ${sub.name}` : ''}${p.multi ? ` + ${G.CLASSES[p.multi].name}` : ''} · power ${num(G.power(st))}`))),
+      h('ul', { class: 'tip-stats' }, STAT_ORDER.filter(k => st[k] && G.STATS[k] && k !== 'power').map(k => h('li', { class: statClass(k) }, statText(k, st[k])))),
+    ];
+  }
+  const DTYPE_NAME = { physical: 'physical', magic: 'magic', fire: 'fire', frost: 'frost', shock: 'shock', poison: 'poison' };
+  function foeTip(x) {
+    const role = x.boss ? 'Boss' : x.role && G.TRASH_ROLES[x.role] ? G.TRASH_ROLES[x.role].name : 'Enemy';
+    return [
+      h('div', { class: 'tip-head' }, h('div', {}, h('b', {}, x.name), h('small', {}, role))),
+      h('ul', { class: 'tip-stats' },
+        h('li', { class: 'stat-hp' }, `${num(x.max)} HP`),
+        x.dps ? h('li', { class: 'stat-atk' }, `${num(x.dps)} ${DTYPE_NAME[x.dtype] || 'physical'} damage/s`) : null,
+        x.cast ? h('li', { class: 'stat-muted' }, `Attacks every ${secs(x.cast)}`) : null,
+        x.def != null ? h('li', { class: 'stat-def' }, `${num(x.def)} armour`) : null,
+        x.mres != null ? h('li', { class: 'stat-def' }, `${num(x.mres)} magic resist`) : null,
+        x.eres != null ? h('li', { class: 'stat-def' }, `${num(x.eres)} elemental resist`) : null),
+      x.mechs && x.mechs.length ? h('div', { class: 'tip-desc' }, mechChips(x.mechs)) : null,
+    ];
+  }
+  // Under a pilot's bars: fitted gear (left), abilities and subclass (right), each with a hover card.
+  function pilotKit(p) {
+    const gear = G.SLOTS.map(sl => p.gear && p.gear[sl.id]).filter(id => id && G.ITEMS[id])
+      .map(id => tip(h('span', { class: 'kit-item' }, itemIco(id, 'sm')), () => itemTip(id)));
+    const abs = (p.abilities || []).map(id => G.ABILITY_BY_ID[id]).filter(Boolean).map(ab =>
+      tip(h('span', { class: 'kit-ab' }, gi('ab_' + ab.id, ab.cls === 'generic' ? '#c3c9d4' : G.CLASSES[ab.cls].colour, 'sm')),
+        () => [h('b', {}, ab.name), h('p', { class: 'tip-desc' }, ab.desc),
+          h('small', { class: 'muted' }, `${ab.cd ? `${ab.cd}s cooldown` : 'Once per fight'}${ab.mana ? ` · ${ab.mana} mana` : ''}`)]));
+    const sub = p.subclass && G.SUBCLASS_BY_ID[p.subclass];
+    const subEl = sub ? tip(h('span', { class: 'kit-sub' }, gi('sub_' + sub.id, G.CLASSES[p.cls].colour, 'sm')),
+      () => [h('b', {}, sub.name), p.multi ? h('small', { class: 'muted' }, ` · also ${G.CLASSES[p.multi].name}`) : null, h('p', { class: 'tip-desc' }, sub.desc)]) : null;
+    return h('div', { class: 'unit-kit' }, h('div', { class: 'kit-gear' }, gear), h('div', { class: 'kit-right' }, abs, subEl));
+  }
+
   function createBattle() {
     const root = h('section', { class: 'battle', 'aria-label': 'Current raid fight' });
     const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const self = { el: root, sync, destroy, onStop: null, onChange: null };
+    const self = { el: root, sync, destroy, onStop: null, onChange: null, onLeave: null };
     let cur = null, raf = 0, fetching = false, idx = 0, quiet = false, asked = false;
     let party = [], foes = {}, foeBox, waveEl, clockEl, statusEl, meterList, meterRows = [], graphBox, graphSvg, graphAxisY, graphAxisX, graphCursor, graphTip;
     let stats = [], buckets = {}, lastMeter = 0, lastSec = -1, graphData = null;
     const expanded = new Set();
-    const logItems = [];
-    let lastLootAt = null;
-    const logList = h('ol', { class: 'log-list', 'aria-live': 'off' });
+    const logItems = BLOG.items;
+    if (!BLOG.list) BLOG.list = h('ol', { class: 'log-list', 'aria-live': 'off' });
+    const logList = BLOG.list;
+    let logMuted = false, muteBelow = 0, sessionLootEl = null;
 
     function destroy() { cancelAnimationFrame(raf); }
 
@@ -1537,9 +1592,10 @@
     const LOG_ICON = { wave: ['flag', '#f2c14e'], fight: ['nav_raids', '#f2c14e'], kill: ['sk_melee', '#c3c9d4'], death: ['skull', '#ff7a6b'],
       respawn: ['sk_healing', '#4ee08f'], win: ['crown', '#3ddc84'], danger: ['power', '#ff9a8a'], summary: ['nav_fights', '#9cc4ff'], crit: ['power', '#ffd24a'] };
     const ABILITY_ID = Object.fromEntries(G.ABILITIES.map(a => [a.name, a.id]));
-    const logCounts = { all: 0, abilities: 0, kills: 0, loot: 0 };
+    const logCounts = BLOG.counts;
     const tabRefs = {};
     function addLog(at, kind, parts, cls, icon) {
+      if (logMuted) return;
       const inFight = cur && at >= cur.start && at <= cur.start + cur.fight.ms + 60000;
       const ic = icon || (LOG_ICON[cls] ? gi(LOG_ICON[cls][0], LOG_ICON[cls][1], 'sm') : null);
       const li = h('li', { class: `log-${cls || kind}` }, h('time', { title: clockOf(at) }, inFight ? fmtClock(at - cur.start) : clockOf(at).slice(0, 5)), h('span', { class: 'log-ico' }, ic), h('span', { class: 'log-text' }, parts));
@@ -1585,24 +1641,22 @@
     function checkLoot() {
       const e = me && me.state.raidLog && me.state.raidLog[0];
       if (!e) return;
-      if (lastLootAt === null) { lastLootAt = e.at; return; }
-      if (e.at <= lastLootAt) return;
-      me.state.raidLog.filter(x => x.at > lastLootAt).reverse().forEach(x => {
+      if (BLOG.lastLootAt === null) { BLOG.lastLootAt = e.at; return; }
+      if (e.at <= BLOG.lastLootAt) return;
+      me.state.raidLog.filter(x => x.at > BLOG.lastLootAt).reverse().forEach(x => {
         const raid = G.RAID_BY_ID[x.raid];
         const loot = Object.entries(x.loot || {}).filter(([id]) => G.ITEMS[id]);
         addLog(x.at, 'loot', [h('b', { class: x.win ? 'ok' : 'bad' }, x.win ? 'Loot' : 'No loot'), ` from ${raid ? raid.name : 'a raid'}: ${xpText(x.xp)}`,
           loot.length ? ' · ' : '', loot.map(([id, n]) => h('span', { class: `log-loot${G.ITEMS[id].rare ? ' rare-loot' : ''}` }, itemIco(id, 'sm'), `${num(n)} `, itemName(id)))], 'loot');
       });
-      lastLootAt = e.at;
+      BLOG.lastLootAt = e.at;
     }
 
     function idle() {
       cancelAnimationFrame(raf);
       cur = null;
       // No fight: nothing to show. The log belongs to a raid, so leaving clears it.
-      logItems.length = 0;
-      logList.replaceChildren();
-      Object.keys(logCounts).forEach(k => { logCounts[k] = 0; });
+      resetLog(null);
       root.replaceChildren();
       root.hidden = true;
     }
@@ -1610,9 +1664,14 @@
     async function sync(force) {
       const a = me && me.state.activity;
       // Loot only goes in the log while you're raiding; outside a raid just note what's been seen.
-      if (a && a.type) checkLoot();
-      else if (me && me.state.raidLog && me.state.raidLog[0]) lastLootAt = me.state.raidLog[0].at;
-      if (!a || !a.type) { if (cur || !root.firstChild) idle(); return; }
+      if (a && a.type) {
+        const key = `${a.type}:${a.party || ''}:${a.raid}:${a.diff}:${a.began || ''}`;
+        if (BLOG.key !== key) resetLog(key);
+        checkLoot();
+        drawSessionLoot();
+      }
+      else if (me && me.state.raidLog && me.state.raidLog[0]) BLOG.lastLootAt = me.state.raidLog[0].at;
+      if (!a || !a.type) { if (cur || !root.firstChild || BLOG.key) idle(); return; }
       if (!force && cur && cur.n === a.n && cur.start === a.start) return;
       if (fetching) return;
       fetching = true;
@@ -1641,8 +1700,9 @@
       const el = h('div', { class: `unit${o.enemy ? ' enemy' : ' pilot'}${o.boss ? ' boss' : ''}` }, artBox,
         h('div', { class: 'unit-info' },
           h('div', { class: 'unit-name' }, o.cls ? classIco(o.cls) : null, h('span', { class: 'unit-label' }, o.name), o.sub || null, o.kick || null),
-          hpBar, manaBar, castBar, statuses),
+          hpBar, manaBar, castBar, statuses, o.kit || null),
         floats);
+      if (o.tipFn) tip(artBox, o.tipFn);
       if (o.colour) el.style.setProperty('--series', o.colour);
       const u = { ...o, el, artBox, actEl, fxEl, floats, hpFill, hpTrail, hpShield, hpText, hpBar, manaFill, castFill, castText, castBar, statuses, hp: o.max, barrier: 0, cast: null, down: false, buffs: {}, mana: o.maxMana };
       drawHp(u);
@@ -1697,6 +1757,29 @@
     }
 
     // ----- Loading a fight -----
+    function step() {
+      const i = idx++;
+      logMuted = i < muteBelow;
+      apply(cur.fight.events[i]);
+      logMuted = false;
+      if (BLOG.fight === cur.start && i >= BLOG.upTo) BLOG.upTo = i + 1;
+    }
+    // Everything this session has dropped for you so far.
+    function drawSessionLoot() {
+      if (!sessionLootEl || !cur) return;
+      const sl = me.state.sessionLoot;
+      const mine = sl && sl.began === cur.began ? sl : null;
+      const items = mine ? Object.entries(mine.items).filter(([id, n]) => G.ITEMS[id] && n > 0)
+        .sort((a, b) => (G.ITEMS[b[0]].rare ? 1 : 0) - (G.ITEMS[a[0]].rare ? 1 : 0)) : [];
+      const sig = JSON.stringify([items, mine && mine.fights]);
+      if (sessionLootEl.dataset.sig === sig) return;
+      sessionLootEl.dataset.sig = sig;
+      sessionLootEl.replaceChildren(h('small', {}, 'Loot this session'),
+        items.length ? h('div', { class: 'loot-icons' }, items.map(([id, n]) => tip(h('span', { class: `loot-ico${G.ITEMS[id].rare ? ' rare-loot' : ''}` }, itemIco(id, 'sm'), h('b', {}, num(n))), () => itemTip(id))))
+          : h('span', { class: 'muted small' }, 'Nothing yet'),
+        mine ? h('span', { class: 'muted small session-count' }, `${mine.wins}/${mine.fights} fights won`) : null);
+    }
+
     function load(c) {
       cancelAnimationFrame(raf);
       root.hidden = false;
@@ -1708,12 +1791,15 @@
       const raid = G.RAID_BY_ID[f.raid];
       const info = c.partyInfo;
       const leader = !c.party || c.leader === me.player.id;
+      muteBelow = BLOG.fight === c.start ? BLOG.upTo : 0;
+      const newFight = BLOG.fight !== c.start;
+      if (newFight) { BLOG.fight = c.start; BLOG.upTo = 0; }
       party = f.fighters.map((p, i) => {
         const colour = G.CLASSES[p.cls].colour;
         const kick = c.party && leader && p.id !== me.player.id
           ? h('button', { type: 'button', class: 'icon-btn tiny kick', title: 'Remove from party', 'aria-label': `Remove ${p.name} from the party`, onclick: () => kick_(p) }, ui('close', 'sm')) : null;
         return makeUnit({ i, id: p.id, name: p.name, cls: p.cls, colour, max: p.max, maxMana: p.mana, art: mechArt(p.gear || {}, `${p.name}’s mech`), kick,
-          sub: p.subclass ? h('small', { class: 'unit-sub' }, G.SUBCLASS_BY_ID[p.subclass].name) : null });
+          sub: p.subclass ? h('small', { class: 'unit-sub' }, G.SUBCLASS_BY_ID[p.subclass].name) : null, kit: pilotKit(p), tipFn: () => pilotTip(p) });
       });
       stats = f.fighters.map(() => ({ dps: 0, hps: 0, taken: 0, mit: 0, src: { dps: {}, hps: {}, taken: {}, mit: {} } }));
       buckets = Object.fromEntries(METER_MODES.map(([m]) => [m, f.fighters.map(() => [])]));
@@ -1780,9 +1866,12 @@
             h('small', {}, `#${raid.n} · ${raid.regionName} · ${c.party ? `Party of ${f.fighters.length}` : 'Solo'} · Fight ${c.n}`),
             h('h2', {}, raid.name, ' ', diffTag(c.diff))),
           h('div', { class: 'battle-meta' }, statusEl, clockEl),
-          h('div', { class: 'battle-actions' }, vis, h('button', { type: 'button', class: 'btn small danger', onclick: () => self.onStop && self.onStop() }, stopLabel))),
+          h('div', { class: 'battle-actions' }, vis,
+            c.party && leader ? h('button', { type: 'button', class: 'btn small', onclick: () => self.onLeave && self.onLeave(f.fighters.length) }, f.fighters.length > 1 ? 'Leave party' : 'Disband') : null,
+            h('button', { type: 'button', class: 'btn small danger', onclick: () => self.onStop && self.onStop() }, stopLabel))),
         waveEl,
         h('div', { class: 'battle-loot' }, h('small', {}, 'Drops on a win'), lootIcons(raid, c.diff)),
+        sessionLootEl = h('div', { class: 'battle-loot session-loot' }),
         h('div', { class: 'battle-stage' },
           h('div', { class: 'side pilots' }, party.map(u => u.el)),
           h('div', { class: 'side foes' }, foeBox)),
@@ -1792,11 +1881,12 @@
         logPanel());
 
       downs = 0;
-      addLog(c.start, 'kills', [h('b', {}, `Fight ${c.n}`), ' \u00b7 ', h('b', {}, raid.name), ` \u00b7 ${G.DIFF_BY_ID[c.diff || 'normal'].name}${c.party ? ` \u00b7 party of ${f.fighters.length}` : ''}`], 'fight');
+      drawSessionLoot();
+      if (newFight) addLog(c.start, 'kills', [h('b', {}, `Fight ${c.n}`), ' \u00b7 ', h('b', {}, raid.name), ` \u00b7 ${G.DIFF_BY_ID[c.diff || 'normal'].name}${c.party ? ` \u00b7 party of ${f.fighters.length}` : ''}`], 'fight');
       // Joining mid-fight: catch up to the current moment without animations.
       const clock = now() - c.start;
       quiet = true;
-      while (idx < f.events.length && f.events[idx].t <= clock) apply(f.events[idx++]);
+      while (idx < f.events.length && f.events[idx].t <= clock) step();
       quiet = false;
       drawMeter(clock);
       drawGraph(clock);
@@ -1822,7 +1912,7 @@
     function foeUnit(x) {
       const sub = x.boss ? (x.mechs && x.mechs.length ? mechChips(x.mechs) : null)
         : x.role && x.role !== 'grunt' ? h('small', { class: `unit-sub role-${x.role}` }, G.TRASH_ROLES[x.role].name) : null;
-      const u = makeUnit({ name: x.name, enemy: true, boss: x.boss, max: x.max, art: foeArt(x.sprite ? { sprite: x.sprite, hue: x.spriteHue } : x.foe, x.boss, '', x.boss ? 48 : 32), sub });
+      const u = makeUnit({ name: x.name, enemy: true, boss: x.boss, max: x.max, tipFn: () => foeTip(x), art: foeArt(x.sprite ? { sprite: x.sprite, hue: x.spriteHue } : x.foe, x.boss, '', x.boss ? 48 : 32), sub });
       foes[x.id] = u;
       return u;
     }
@@ -2042,7 +2132,7 @@
       if (!cur) return;
       const f = cur.fight;
       const clock = Math.min(now() - cur.start, f.ms);
-      while (idx < f.events.length && f.events[idx].t <= clock) apply(f.events[idx++]);
+      while (idx < f.events.length && f.events[idx].t <= clock) step();
       [...party, ...Object.values(foes)].forEach(u => {
         if (u.cast && !u.down) u.castFill.style.width = `${Math.min(1, (clock - u.cast.start) / u.cast.d) * 100}%`;
         else if (!u.cast) u.castFill.style.width = '0';

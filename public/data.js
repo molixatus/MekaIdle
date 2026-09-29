@@ -801,6 +801,12 @@
       'Heroic and Mythic are smaller steps up, and raid gear drops far more often (set pieces 10–15%, raid weapons and trinkets 5–8%).',
       'Gear checks through every region: raids 9–16 need 2 pieces of raid gear fitted, raids 17–24 a next-tier weapon, and the finale next-tier weapon and armour. Progress alternates between crafting and farming raid gear.',
       'Power is now a combat rating (damage × toughness), and recommended power is shown per difficulty, so Mythic no longer looks out of reach when it isn’t.',
+      'Raid screen: pilots and enemies sit in two-column grids, and health and cast bars are taller and easier to read.',
+      'Under each pilot’s bars: their fitted gear, abilities and subclass, each with details on hover. Hover a mech or an enemy to see its stats.',
+      'Changing gear, abilities, subclass or supplies mid-raid takes effect straight away: the current fight starts over with your new loadout.',
+      'A “Loot this session” row adds up everything you’ve won since you started raiding.',
+      'The raid log keeps going across fights and only clears when you stop raiding or start a different raid.',
+      'While a party raid is running, the party controls sit in the fight header instead of a separate box.',
     ] },
     { v: '0.10', date: '2026-09-29', notes: [
       'A bar at the bottom of the screen shows what you’re doing, with its progress, how many are left, your queue and a Stop button.',

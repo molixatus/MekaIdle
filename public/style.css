@@ -1357,3 +1357,36 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 /* HP trail: shorter, and gone instantly when a unit is down or dead. */
 .hp-trail { transition: width .3s ease-in .12s; }
 .unit.down .hp-trail, .unit.down .hp-fill { transition: none; width: 0 !important; }
+
+/* Raid screen: two-column grids per side, taller bars, and each pilot's kit under the bars. */
+.side.pilots, .foe-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.side.foes { display: block; }
+.unit { grid-template-columns: 76px minmax(0, 1fr); gap: 10px; padding: 10px; align-items: start; }
+.unit-art { width: 76px; height: 76px; }
+.unit-art .mech-sprite { height: 76px; }
+.unit.enemy { grid-template-columns: 76px minmax(0, 1fr); }
+.unit.enemy .unit-art { width: 76px; height: 76px; }
+.unit.enemy .foe-sprite { width: 72px; height: 72px; }
+.unit.enemy.boss { grid-column: 1 / -1; grid-template-columns: 140px minmax(0, 1fr); }
+.unit.enemy.boss .unit-art { width: 140px; height: 140px; }
+.unit.enemy.boss .foe-sprite { width: 136px; height: 136px; }
+.hpbar { height: 21px; }
+.hpbar b { line-height: 19px; font-size: 12px; }
+.castbar { height: 19px; }
+.castbar b { line-height: 19px; font-size: 12px; }
+.manabar { height: 6px; }
+.unit-art.has-tip { cursor: help; }
+.unit-kit { display: flex; align-items: center; gap: 6px; margin-top: 2px; min-width: 0; }
+.kit-gear, .kit-right { display: flex; flex-wrap: wrap; gap: 3px; }
+.kit-right { margin-left: auto; justify-content: flex-end; }
+.unit-kit .item-ico, .unit-kit .ico { width: 22px; height: 22px; }
+.kit-item, .kit-ab, .kit-sub { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 5px; background: #0d1016; border: 1px solid #262c38; cursor: help; }
+.kit-sub { border-color: var(--gold, #f2c14e); }
+.tip-stats { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 2px; font-size: 13px; }
+.session-loot { border-top: 1px dashed #262c38; }
+.session-loot .loot-ico { position: relative; display: inline-flex; align-items: center; gap: 3px; }
+.session-loot .loot-ico b { font-size: 12px; }
+.session-count { margin-left: auto; }
+@media (max-width: 900px) {
+  .side.pilots, .foe-list { grid-template-columns: 1fr; }
+}
