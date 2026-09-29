@@ -1370,6 +1370,50 @@
     pageHead('patch', 'skill-scribing', 'Patch notes', 'What changed in each update.'),
     ...G.PATCH_NOTES.map(p => h('section', { class: 'panel patch' }, h('h2', {}, `Version ${p.v}`, h('small', { class: 'muted' }, ` · ${p.date}`)), h('ul', {}, p.notes.map(n => h('li', {}, n))))),
   ];
+  // Rename the pilot (login name, needs the password) and/or the mech, checked as you type with the
+  // same rules the server uses.
+  function renameForm() {
+    const NAME_OK = /^[A-Za-z0-9_]{3,16}$/, MECH_OK = /^[A-Za-z0-9 .'-]{1,24}$/;
+    const name = h('input', { type: 'text', value: me.player.name, maxlength: '16', autocomplete: 'off', 'aria-label': 'Pilot name' });
+    const mech = h('input', { type: 'text', value: me.player.mech, maxlength: '24', autocomplete: 'off', 'aria-label': 'Mech name' });
+    const pass = h('input', { type: 'password', autocomplete: 'current-password', 'aria-label': 'Password' });
+    const passRow = h('label', { class: 'inline-field', hidden: true }, 'Password (needed to change your pilot name)', pass);
+    const msg = h('p', { class: 'small rename-msg' });
+    const save = h('button', { type: 'button', class: 'btn primary', disabled: true }, 'Save names');
+    const check = () => {
+      const n = name.value.trim(), m = mech.value.trim().replace(/\s+/g, ' ');
+      const nameChanged = n !== me.player.name;
+      passRow.hidden = !nameChanged;
+      let err = '';
+      if (!NAME_OK.test(n)) err = 'Pilot names are 3 to 16 letters, numbers or underscores.';
+      else if (!MECH_OK.test(m)) err = 'Mech names are up to 24 letters, numbers, spaces or . ’ -';
+      else if (nameChanged && !pass.value) err = 'Enter your password to change your pilot name.';
+      msg.textContent = err;
+      msg.className = `small rename-msg${err ? ' bad' : ''}`;
+      save.disabled = !!err || (!nameChanged && m === me.player.mech);
+      return { n, m, nameChanged };
+    };
+    [name, mech, pass].forEach(el => el.addEventListener('input', check));
+    save.addEventListener('click', async () => {
+      const { n, m } = check();
+      if (save.disabled) return;
+      const r = await act('/api/rename', { name: n, mech: m, password: pass.value }, 'Names saved.');
+      if (!r) return;
+      // The browser's backup follows the pilot to the new name.
+      if (r.oldName && r.oldName.toLowerCase() !== r.name.toLowerCase()) { try { localStorage.removeItem(backupKey(r.oldName)); } catch (e) { /* ignore */ } }
+      me.player.name = r.name;
+      me.player.mech = r.mech;
+      await poll();
+      await saveBackup();
+      renderChrome();
+      renderPage();
+    });
+    return h('div', { class: 'rename stack' },
+      h('label', { class: 'inline-field' }, 'Pilot name', name),
+      h('label', { class: 'inline-field' }, 'Mech name', mech),
+      passRow, msg, h('div', { class: 'actions' }, save));
+  }
+
   function settingsPage() {
     const toggle = (key, label, desc) => h('label', { class: 'setting' },
       h('input', { type: 'checkbox', checked: SETTINGS[key], onchange: e => {
@@ -1406,6 +1450,7 @@
       h('section', { class: 'panel stack settings' },
         h('h2', {}, 'Account'),
         h('p', {}, 'Pilot ', h('b', {}, me.player.name), ' · mech ', h('b', {}, me.player.mech), me.guild ? [' · guild ', h('b', {}, `[${me.guild.tag}] ${me.guild.name}`)] : ''),
+        renameForm(),
         h('p', { class: 'muted' }, 'Your save is backed up in this browser automatically. You can also download a copy to keep.'),
         h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn', onclick: download }, 'Download save backup'))),
       h('section', { class: 'panel stack settings danger-zone' },

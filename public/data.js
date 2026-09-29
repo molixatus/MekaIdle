@@ -808,6 +808,7 @@
 
   const PATCH_NOTES = [
     { v: '0.11', date: '2026-09-29', notes: [
+      'Change your pilot or mech name in Settings. Names are checked as you type; a new pilot name (your login name) needs your password.',
       'Fixed Multiclass: a borrowed subclass now actually applies (its bonuses, and Shadowmender’s shadow attacks on any class) and shows in the raid screen.',
       'Party raids survive updates: when pilots come back after an update, the party re-forms with its leader, members and who-can-join setting.',
       'Pilot mechs in the raid screen are bigger, filling the height of their card.',

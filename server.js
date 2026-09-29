@@ -342,6 +342,26 @@ route('POST', '/api/restore', async ctx => {
   return { ok: true, restored };
 }, false);
 
+// Renames the pilot and/or their mech, with the same rules as registering. A new pilot name is
+// also the login name, so it needs the password; the session moves to the new name.
+route('POST', '/api/rename', async ctx => {
+  limit('rename:' + ctx.me, 10, 10 * 60e3);
+  const row = await db.get('SELECT id, name, name_key, pass, mech FROM players WHERE id = ?', ctx.me);
+  const name = str(ctx.body.name).trim() || row.name;
+  const mech = str(ctx.body.mech).trim().replace(/\s+/g, ' ') || row.mech;
+  if (!/^[A-Za-z0-9_]{3,16}$/.test(name)) bad('Pilot names are 3 to 16 letters, numbers or underscores.');
+  if (!/^[A-Za-z0-9 .'-]{1,24}$/.test(mech)) bad('Mech names are up to 24 letters, numbers, spaces or . \' -');
+  if (name === row.name && mech === row.mech) bad('Nothing to change.');
+  const key = name.toLowerCase();
+  if (name !== row.name) {
+    if (!checkPassword(str(ctx.body.password).slice(0, 200), row.pass)) bad('Enter your password to change your pilot name.');
+    if (key !== row.name_key && await findByName(name)) bad('That pilot name is already taken.');
+  }
+  await db.run('UPDATE players SET name = ?, name_key = ?, mech = ? WHERE id = ?', name, key, mech, row.id);
+  if (key !== row.name_key) await startSession(ctx, key);
+  return { ok: true, name, mech, oldName: row.name };
+});
+
 // Starts a pilot over from scratch (skills, items, gear, raid clears). The pilot's name, mech,
 // guild and friends stay. The old save is kept in save_backups first, and their open trade
 // offers are withdrawn (the escrowed items went with the old save).
