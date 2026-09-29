@@ -1243,6 +1243,8 @@
   // ---------- Raids ----------
   const DIFF_KEY = 'mekaidle-diff';
   const STYLE_NAME = { melee: 'Melee', ranged: 'Ranged', magic: 'Magic' };
+  // Who can join your raids: remembered in this browser and applied to every raid you start.
+  const VIS_KEY = 'mekaidle-visibility';
   const VIS_LABEL = { private: 'Closed (solo)', friends: 'Friends and guild', public: 'Everyone' };
   const clearsOf = id => (me.state.clears || {})[id] || 0;
   function raidOpen(r, diff) {
@@ -1345,7 +1347,7 @@
     let diff = G.DIFF_BY_ID[store(DIFF_KEY)] ? store(DIFF_KEY) : 'normal';
     const ctx = {
       start: startSolo, stop: stopRaid,
-      form: (r, d) => partyAct('/api/party/create', { raid: r.id, diff: d }, 'Party formed. Friends and guildmates can join.'),
+      form: (r, d) => { const vis = store(VIS_KEY) && store(VIS_KEY) !== 'private' ? store(VIS_KEY) : 'friends'; return partyAct('/api/party/create', { raid: r.id, diff: d, visibility: vis }, vis === 'public' ? 'Party formed. Anyone can join.' : 'Party formed. Friends and guildmates can join.'); },
     };
 
     function drawBosses() {
@@ -1401,6 +1403,7 @@
     function visibilityPicker(current, disabled) {
       const sel = h('select', { 'aria-label': 'Who can join', disabled }, Object.entries(VIS_LABEL).map(([v, label]) => h('option', { value: v, selected: v === current || null }, label)));
       sel.addEventListener('change', async () => {
+        store(VIS_KEY, sel.value);
         if (await act('/api/raid/open', { visibility: sel.value }, `Party is now open to: ${VIS_LABEL[sel.value].toLowerCase()}.`)) { await poll(); load(); battle.sync(true); }
       });
       return sel;
@@ -1457,6 +1460,8 @@
     }
     async function startSolo(r, d) {
       if (await act('/api/raid/start', { raid: r.id, diff: d }, `Fighting ${r.name}. Fights repeat until you stop.`)) {
+        const vis = store(VIS_KEY);
+        if (vis && vis !== 'private') await act('/api/raid/open', { visibility: vis });
         load(); battle.sync(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
@@ -1723,6 +1728,7 @@
         ? (() => {
           const sel = h('select', { 'aria-label': 'Who can join this raid' }, Object.entries(VIS_LABEL).map(([v, label]) => h('option', { value: v, selected: v === (c.party && info ? info.visibility : 'private') || null }, label)));
           sel.addEventListener('change', async () => {
+            store(VIS_KEY, sel.value);
             if (!c.party && sel.value === 'private') return;
             if (await act('/api/raid/open', { visibility: sel.value }, sel.value === 'private' ? 'Party closed to new pilots.' : `Raid open to ${VIS_LABEL[sel.value].toLowerCase()}.`)) {
               await poll();
