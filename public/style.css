@@ -1532,3 +1532,24 @@ body.no-motion *, body.no-motion *::before, body.no-motion *::after { animation-
 @keyframes g-pulse { from { transform: scale(.5); opacity: .9; } to { transform: scale(1.8); opacity: 0; } }
 .graph-y span, .graph-x span { transition: color .2s; }
 @media (prefers-reduced-motion: reduce) { .meter-bar > span::after, .g-head::after { animation: none; } }
+
+/* Skill XP bar: grows from where it was, glows on each gain, sweeps on level-up, and previews the
+   running action's XP as a faint segment ahead of the fill. */
+.xp-bar { position: relative; overflow: hidden; }
+.level-wide .xp-bar { height: 10px; border-radius: 5px; }
+.xp-bar .xp-fill { position: relative; z-index: 1; display: block; height: 100%; border-radius: inherit; overflow: hidden;
+  background: linear-gradient(90deg, #22a35f, #3ddc84 70%, #7dffb7); box-shadow: 0 0 10px rgba(61, 220, 132, .45);
+  transition: width .9s cubic-bezier(.2, .8, .2, 1); }
+.xp-bar .xp-fill::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .35) 50%, transparent 70%);
+  transform: translateX(-100%); animation: xp-sheen 3s ease-in-out infinite; }
+.xp-bar .xp-fill::before { content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 6px; background: rgba(255, 255, 255, .7); filter: blur(3px); animation: xp-edge 1.6s ease-in-out infinite; }
+.xp-bar .xp-ghost { position: absolute; top: 0; bottom: 0; left: 0; width: 0; border-radius: 0 5px 5px 0;
+  background: repeating-linear-gradient(45deg, rgba(61, 220, 132, .35) 0 6px, rgba(61, 220, 132, .18) 6px 12px); background-size: 17px 17px; animation: xp-stripes .8s linear infinite; }
+.xp-bar.xp-gain .xp-fill { animation: xp-gain .9s ease-out; }
+.xp-bar.xp-level .xp-fill { animation: xp-level 1.2s ease-out; }
+@keyframes xp-sheen { 55%, 100% { transform: translateX(100%); } }
+@keyframes xp-edge { 50% { opacity: .35; } }
+@keyframes xp-stripes { to { background-position: 17px 0; } }
+@keyframes xp-gain { 0% { filter: brightness(1.8); box-shadow: 0 0 18px rgba(125, 255, 183, .9); } 100% { filter: none; } }
+@keyframes xp-level { 0% { filter: brightness(2) hue-rotate(-60deg); box-shadow: 0 0 22px rgba(242, 193, 78, .95); } 100% { filter: none; } }
+@media (prefers-reduced-motion: reduce) { .xp-bar .xp-fill::after, .xp-bar .xp-fill::before, .xp-bar .xp-ghost { animation: none; } }

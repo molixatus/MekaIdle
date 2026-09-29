@@ -801,6 +801,14 @@
       if (done > 0 && key !== doneKey) { doneKey = key; setTimeout(poll, 150); }
     }
     document.querySelectorAll('.card.active .card-fill').forEach(el => { el.style.width = w; });
+    const ghost = document.querySelector('.xp-ghost');
+    if (ghost) {
+      const x = xpInfo(ghost.dataset.skill);
+      const a = p && p.action && p.action.skill === ghost.dataset.skill ? p.action : null;
+      const gain = a && !x.max ? Math.min(100 - x.pct, (a.xp / (x.to - x.from)) * 100) : 0;
+      ghost.style.left = `${x.pct}%`;
+      ghost.style.width = `${gain * p.frac}%`;
+    }
     requestAnimationFrame(frame);
   }
 
@@ -920,13 +928,27 @@
     tailoring: 'Cloth armour', runecrafting: 'Runes and sigils', scribing: 'Holy books, lanterns and relics', weaving: 'Vestments', alchemy: 'Potions and tonics',
   };
 
+  // The page is rebuilt when XP changes, so the bar remembers where it was and animates from there:
+  // it grows with each gain (with a glow), sweeps round to a new level, and a faint segment ahead
+  // of it fills with the current action's progress towards the XP it will give.
+  const lastLevelBar = {};
   function levelBox(id) {
     const x = xpInfo(id);
-    const fill = h('span');
-    fill.style.width = x.pct + '%';
+    const prev = lastLevelBar[id];
+    lastLevelBar[id] = { level: x.level, pct: x.pct };
+    const fill = h('span', { class: 'xp-fill' });
+    const ghost = h('span', { class: 'xp-ghost', 'data-skill': id });
+    const bar = h('div', { class: 'bar xp-bar' }, ghost, fill);
+    const levelled = prev && x.level > prev.level;
+    const gained = prev && !levelled && x.pct > prev.pct + 0.01;
+    fill.style.width = `${prev && !levelled ? prev.pct : 0}%`;
+    setTimeout(() => {
+      fill.style.width = x.pct + '%';
+      if (gained || levelled) { bar.classList.remove('xp-gain'); void bar.offsetWidth; bar.classList.add(levelled ? 'xp-level' : 'xp-gain'); }
+    }, 30);
     return h('div', { class: 'level-box' },
       h('div', { class: 'level-row' }, h('span', {}, `Level ${x.level}`), h('span', {}, `${Math.floor(x.pct)}%`)),
-      h('div', { class: 'bar' }, fill),
+      bar,
       h('div', { class: 'xp-row' }, h('span', {}, h('b', {}, num(x.xp)), ' XP'),
         x.max ? h('span', {}, 'Maximum level') : h('span', {}, h('b', {}, num(x.toGo)), ` to level ${x.level + 1}`)));
   }
