@@ -1633,3 +1633,5 @@ body.dock-open.on-raids .page-head { display: none; }
 .ab-side { display: flex; align-items: center; gap: 8px; padding-left: 12px; border-left: 1px solid #262c38; min-width: 0; }
 .ab-side .ab-info small { color: #ffb070; }
 .ab-side .ab-bar { width: 90px; }
+/* The sidebar's current-activity card duplicates the bottom bar, so it's hidden. */
+.now-card { display: none !important; }

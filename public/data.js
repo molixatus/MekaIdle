@@ -873,6 +873,7 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'The sidebar no longer repeats what you’re doing (the bottom bar shows it), and a skill trained alongside a raid now animates in the sidebar too.',
       'Skill and raid at the same time: start a skill while raiding (or a raid while skilling) and both keep going, each at 60% of its usual XP. Stop either one and the other goes back to full XP. The bottom bar shows the skill next to the raid.',
       '80 gear tiers instead of 10: every region’s material now comes in 8 grades (Copper, Fine copper, Sturdy copper … Perfect copper), one for every 3 bosses, each with its own gathering, weapons, armour, raid sets, raid weapons, trinkets and sigils.',
       'Much harder progression: each group of 3 bosses is balanced against its own tier’s gear. Gear a tier behind loses on Normal, so every 3 bosses you craft the next tier or farm the last tier’s raid gear. Heroic takes a little more, and Mythic needs this tier’s raid gear (which then carries you into the next tier).',
