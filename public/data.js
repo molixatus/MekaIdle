@@ -366,6 +366,45 @@
     enrage: { name: 'Enrage', cost: 0.08, desc: 'Below 30% HP it hits 40% harder and faster.' },
   };
   const MECH_POOL = Object.keys(MECHANICS);
+  // Raid bosses, one per monster on the monster sheet: [row, col, name, damage type]. Every raid gets
+  // its own; when there are more raids than monsters, repeats come in a later region, recoloured.
+  const P = 'physical', Mg = 'magic', Fi = 'fire', Fr = 'frost', Sh = 'shock', Po = 'poison';
+  const BOSS_ROSTER = [
+    [0, 0, 'Skeleton warrior', P], [0, 1, 'Bone knight', P], [0, 2, 'Skeleton brute', P], [0, 3, 'Hooded executioner', P], [0, 4, 'Grey wolf', P],
+    [0, 5, 'Swamp ogre', P], [0, 6, 'Dwarf flailer', P], [0, 8, 'Frost wraith', Fr], [0, 9, 'Bat swarm', P], [0, 10, 'Axe raider', P], [0, 11, 'Dwarf bandit', P],
+    [1, 0, 'Deep one', Mg], [1, 1, 'Crimson mage', Fi], [1, 2, 'Viper', Po], [1, 3, 'Lizard rider', P], [1, 4, 'Mad jester', Mg], [1, 5, 'Hill ogre', P],
+    [1, 6, 'Owl lord', P], [1, 7, 'Bandit swordsman', P], [1, 8, 'Goblin chief', P], [1, 9, 'Brown bear', P], [1, 10, 'Imp', Fi], [1, 11, 'Horned totem', Mg],
+    [2, 0, 'Totem idol', Mg], [2, 1, 'Viking berserker', P], [2, 2, 'Blue yeti', Fr], [2, 3, 'Snow tiger', Fr], [2, 4, 'Bone pile', P], [2, 5, 'Dead treant', Po],
+    [2, 6, 'Stone troll', P], [2, 7, 'Snapping turtle', P], [2, 8, 'Lizardman', P], [2, 9, 'Giant bat', P], [2, 10, 'Winged imp', Fi], [2, 11, 'Blood worm', P],
+    [3, 0, 'Troll', P], [3, 1, 'Shadow ape', Mg], [3, 2, 'Lurker fish', Fr], [3, 3, 'Fire salamander', Fi], [3, 4, 'Vampire', Mg], [3, 5, 'Ghoul', Po],
+    [3, 6, 'Carpet genie', Mg], [3, 7, 'Living pillar', P], [3, 8, 'Pink djinn', Mg], [3, 9, 'Violet dancer', Mg], [3, 10, 'Bat flock', P], [3, 11, 'Goblin', P],
+    [4, 0, 'Harpy queen', P], [4, 1, 'Violet serpent', Po], [4, 2, 'Moth king', Mg], [4, 3, 'Green druid', Po], [4, 4, 'Myconid', Po], [4, 5, 'Red sorcerer', Fi],
+    [4, 6, 'Priestess', Mg], [4, 7, 'Gargoyle', P], [4, 8, 'Mantis horror', P], [4, 9, 'Chimera', Fi], [4, 10, 'Sea serpent', Fr], [4, 11, 'Grey ghoul', Po],
+    [5, 0, 'Werelion', P], [5, 1, 'Fairy queen', Mg], [5, 2, 'Fire cat', Fi], [5, 3, 'Frost cat', Fr], [5, 4, 'Wild cat', P], [5, 5, 'Shadow cat', Mg],
+    [5, 6, 'Fly swarm', Po], [5, 8, 'Forest witch', Mg], [5, 9, 'Adder', Po], [5, 10, 'Dragon egg', Fi], [5, 11, 'Green dragon', Po],
+    [6, 0, 'Blonde witch', Mg], [6, 1, 'Vampire countess', Mg], [6, 2, 'Blue harpy', Fr], [6, 3, 'Skeleton lord', P], [6, 4, 'Banshee', Mg], [6, 5, 'Yeti', Fr],
+    [6, 6, 'Giant hand', Mg], [6, 7, 'Clay golem', P], [6, 8, 'Phoenix', Fi], [6, 9, 'Brawler', P], [6, 10, 'Magma beast', Fi], [6, 11, 'Scorpion', Po],
+    [7, 0, 'Vampire lord', Mg], [7, 1, 'Lamia', Mg], [7, 2, 'Blood bear', P], [7, 3, 'Axe knight', P], [7, 4, 'Spirit', Mg], [7, 5, 'Iron knight', P],
+    [7, 6, 'Dark paladin', Mg], [7, 7, 'Gentleman thief', P], [7, 8, 'Ice golem', Fr], [7, 10, 'Barbarian', P], [7, 11, 'Great eagle', P],
+    [8, 0, 'Death rider', Mg], [8, 1, 'Dwarf', P], [8, 2, 'Shieldbearer', P], [8, 3, 'Ghost tree', Mg], [8, 4, 'Piranha', P], [8, 5, 'Gnome', Mg],
+    [8, 6, 'Fire fox', Fi], [8, 7, 'Crab', P], [8, 8, 'Green phantom', Mg], [8, 9, 'Spear goblin', P], [8, 10, 'Slime', Po], [8, 11, 'Rock face', P],
+    [9, 0, 'Swamp lizard', Po], [9, 1, 'Man-eater', Po], [9, 2, 'Hunter', P], [9, 3, 'Cyclops', P], [9, 4, 'Orc soldier', P], [9, 5, 'Pit fighter', P],
+    [9, 6, 'Red warrior', P], [9, 7, 'Mimic', P], [9, 8, 'Greater mimic', P], [9, 9, 'Drakeling', Fi], [9, 10, 'Red archer', P], [9, 11, 'Violet knight', Mg],
+    [10, 0, 'Leviathan', Fr], [10, 1, 'Sea urchin', Po], [10, 2, 'Palm walker', P], [10, 3, 'Roc', P], [10, 4, 'Wyvern', P], [10, 5, 'Kraken', Fr],
+    [10, 7, 'Purple serpent', Po], [10, 8, 'Hydra', Fr], [10, 9, 'Blob beast', Po], [10, 10, 'Blue djinn', Mg],
+    [11, 0, 'Pink worm', Po], [11, 1, 'Fire djinn', Fi], [11, 2, 'Water djinn', Fr], [11, 3, 'Sand djinn', Mg], [11, 4, 'Storm djinn', Sh],
+    [11, 7, 'Glass golem', Sh], [11, 9, 'Naga', Mg], [11, 10, 'Frost harpy', Fr], [11, 11, 'Stone ape', P],
+    [12, 0, 'Grey monk', Mg], [12, 1, 'Red monk', Fi], [12, 2, 'Blood monk', Fi], [12, 3, 'Cursed sword', P], [12, 4, 'Mummy', Po], [12, 5, 'White ape', Fr],
+    [12, 6, 'Blue maw', Mg], [12, 7, 'Wasp swarm', Po], [12, 8, 'Gold golem', P], [12, 10, 'Vulture', P], [12, 11, 'Night bat', P],
+    [13, 0, 'Red duchess', Mg], [13, 1, 'Living statue', P], [13, 2, 'Black rider', P], [13, 3, 'Night stalker', Mg], [13, 4, 'Ninja', P], [13, 5, 'Soldier', P],
+    [13, 6, 'Swordmaster', P], [13, 7, 'Red mask', Fi], [13, 8, 'Blue mask', Fr], [13, 9, 'Bronze mask', P], [13, 10, 'Pink mask', Mg], [13, 11, 'Violet mask', Mg],
+    [14, 0, 'Purple idol', Mg], [14, 1, 'Ice spider', Fr], [14, 3, 'Pegasus', Sh], [14, 4, 'Triton', Fr], [14, 5, 'Amazon', P], [14, 6, 'Minotaur', P],
+    [14, 8, 'Golden warrior', P], [14, 9, 'Boulder', P], [14, 10, 'Succubus', Mg], [14, 11, 'Dancer', Mg],
+    [15, 0, 'Reaper', Mg], [15, 1, 'Skeleton archer', P], [15, 2, 'Knight', P], [15, 3, 'Barbarian king', P], [15, 4, 'Dark knight', Mg], [15, 5, 'Blue knight', P],
+    [15, 7, 'Sorcerer', Mg], [15, 9, 'Valkyrie', Sh], [15, 10, 'Water nymph', Fr], [15, 11, 'Dryad', Po],
+  ];
+  // Each region's finale has its own monster.
+  const FINALE_SPRITES = [[14, 2, Mg], [0, 7, P], [15, 8, Fr], [5, 0, P], [11, 6, Fr], [11, 5, Fi], [10, 6, Sh], [7, 9, Fr], [5, 7, Mg], [10, 11, Mg]];
   const ADJECTIVES = ['Rotting', 'Savage', 'Ancient', 'Blighted', 'Furious', 'Hollow', 'Gilded', 'Twisted', 'Scarred', 'Venomous', 'Colossal', 'Cursed', 'Frenzied', 'Iron-clad', 'Starving', 'Grim'];
   const PASSIVES = {
     thorns: v => `Thorns: reflects ${v}% of damage taken.`,
@@ -646,6 +685,14 @@
   // higher skill levels). A pilot with matching gear wins early raids comfortably and starts to
   // lose around the middle of the region.
   const RAIDS = [];
+  // The roster minus the finales' monsters, shuffled once, dealt out in order across all raids.
+  const BOSS_DECK = (() => {
+    const taken = new Set(FINALE_SPRITES.map(([r, c]) => `${r},${c}`));
+    const deck = BOSS_ROSTER.filter(([r, c]) => !taken.has(`${r},${c}`));
+    const rand = rng(424242);
+    for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+    return deck;
+  })();
   // Gear drops by difficulty: the best piece (listed first: raid weapon, then trinkets, then set
   // pieces) only drops on Mythic, the next two on Heroic or Mythic, the rest on any difficulty.
   // Mythic drops everything.
@@ -655,17 +702,20 @@
   REGIONS.forEach((reg, ri) => {
     const t = TIERS[ri];
     const ref = mechStats(kit('melee', t.n), { melee: t.level + 5 });
-    const combos = [];
-    ADJECTIVES.forEach(adj => reg.bosses.forEach(b => combos.push([adj, b])));
     const pickRand = rng(1000 + ri);
-    for (let i = combos.length - 1; i > 0; i--) { const j = Math.floor(pickRand() * (i + 1)); [combos[i], combos[j]] = [combos[j], combos[i]]; }
     for (let k = 0; k < 25; k++) {
       const g = ri * 25 + k;
       const rand = rng(7919 * (g + 1));
       const pick = list => list[Math.floor(rand() * list.length)];
       const finale = k === 24;
       const f = (RAID_CURVE.start + RAID_CURVE.rise * Math.pow(k / 24, RAID_CURVE.shape)) * (finale ? RAID_CURVE.finale : 1) * (1 + RAID_CURVE.region * Math.min(ri, 5)) * (ri === 0 ? RAID_CURVE.first : 1);
-      const [adj, bossFoe] = finale ? [null, reg.bosses[0]] : combos[k];
+      const bossFoe = reg.bosses[0];
+      // This raid's boss: the next monster from the shuffled roster (a region never repeats one).
+      const pick0 = finale ? null : BOSS_DECK[(ri * 24 + k) % BOSS_DECK.length];
+      const reuse = !finale && ri * 24 + k >= BOSS_DECK.length;
+      const adj = finale ? null : ADJECTIVES[Math.floor(pickRand() * ADJECTIVES.length)];
+      const sprite = finale ? FINALE_SPRITES[ri].slice(0, 2) : pick0.slice(0, 2);
+      const spriteHue = reuse ? 60 + 70 * (ri % 4) : 0;
       const styles = ['melee', 'ranged', 'magic'];
       const weak = styles[Math.floor(rand() * 3)];
       const resist = styles.filter(x => x !== weak)[Math.floor(rand() * 2)];
@@ -674,7 +724,7 @@
       const mres = Math.round(def * (0.5 + rand()));
       const eres = Math.round(def * (0.5 + rand()));
       const refDps = ref.atk * 100 / (100 + def);
-      const dtype = FOE_DAMAGE[bossFoe] || 'physical';
+      const dtype = finale ? FINALE_SPRITES[ri][2] : pick0[3];
       const resistOf = type => (type === 'physical' ? ref.def : type === 'magic' ? ref.mres : ref.eres);
       const dpsFor = type => Math.round(ref.hp * (100 + resistOf(type)) / 100 / FIGHT.deathS * f * 10) / 10;
       // Boss mechanics: one for the first few raids, two after, three (always including adds) for a finale.
@@ -698,7 +748,7 @@
         : [{ item: k % 2 ? `trinket_${t.n}` : `charm_${t.n}`, qty: [1, 1], p: 0.007, rare: true }];
       RAIDS.push({
         id: `r${g + 1}`, n: g + 1, region: ri, tier: t.n, k,
-        name: finale ? reg.finale : `${adj} ${FOES[bossFoe].toLowerCase()}`,
+        name: finale ? reg.finale : `${adj} ${pick0[2].toLowerCase()}`, sprite, spriteHue,
         regionName: reg.name, foe: bossFoe, finale,
         res: { [weak]: 1.15, [resist]: 0.88 }, weakElement: elements[Math.floor(rand() * 4)],
         boss: { hp: Math.round(refDps * FIGHT.bossKillS * f / cost / 10) * 10, def, mres, eres, dps: Math.round(dpsFor(dtype) / Math.sqrt(cost) * 10) / 10, dtype, mechs },

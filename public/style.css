@@ -1110,3 +1110,12 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
   .raid-row { grid-template-columns: 64px minmax(0, 1fr); }
   .raid-row .boss-ico { width: 56px; height: 56px; }
 }
+@media (max-width: 1600px) {
+  .raid-row { grid-template-columns: 40px 64px minmax(0, 1fr) 130px auto; }
+  .raid-row .loot-icons { grid-column: 3 / -1; grid-row: 2; }
+  .raid-row .clears { display: none; }
+}
+@media (max-width: 900px) {
+  .raid-row { grid-template-columns: 40px 64px minmax(0, 1fr) auto; }
+  .raid-row .raid-power { display: none; }
+}

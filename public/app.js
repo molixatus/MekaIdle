@@ -333,8 +333,10 @@
     52: [2, 8], 53: [5, 4], 54: [14, 3], 55: [2, 5], 56: [4, 4], 57: [9, 1], 58: [13, 8], 59: [13, 10], 60: [10, 8], 61: [11, 8],
     62: [6, 10], 63: [10, 0], 64: [5, 6], 65: [10, 9],
   } };
+  // `foe` is an index in G.FOES, or { sprite: [row, col], hue } for a raid boss.
   function foeArt(foe, boss, cls = '', size) {
-    const cell = MONSTERS.map[foe];
+    const cell = typeof foe === 'object' && foe.sprite ? foe.sprite : MONSTERS.map[foe];
+    const hue = typeof foe === 'object' ? foe.hue : 0;
     const box = cell && window.MONSTER_BOXES && window.MONSTER_BOXES[cell[0] * MONSTERS.cols + cell[1]];
     if (box) {
       // Scale the monster so its own outline (not its cell) fills the space: bosses 150px, enemies
@@ -348,12 +350,13 @@
       el.style.backgroundImage = `url(${MONSTERS.src})`;
       el.style.backgroundSize = `${576 * sc}px ${1152 * sc}px`;
       el.style.backgroundPosition = `${-bx * sc}px ${-by * sc}px`;
+      if (hue) el.style.filter = `hue-rotate(${hue}deg)`;
       return el;
     }
     return h('span', { class: `sprite foe-sprite${boss ? ' boss-art' : ''} ${cls}`, 'aria-hidden': 'true', html: foeSprite(foe, boss, size) });
   }
   // Raid list portraits use the plain icon in the boss's colour.
-  const bossIcon = (raid, cls = '', px) => (MONSTERS.map[raid.foe] ? foeArt(raid.foe, false, `boss-ico-mon ${cls}`, px) : gi(`foe_${raid.foe}`, hslToHex(foeColour(raid.foe, true)), `boss-ico-svg ${cls}`));
+  const bossIcon = (raid, cls = '', px) => (raid.sprite ? foeArt({ sprite: raid.sprite, hue: raid.spriteHue }, false, `boss-ico-mon ${cls}`, px) : MONSTERS.map[raid.foe] ? foeArt(raid.foe, false, `boss-ico-mon ${cls}`, px) : gi(`foe_${raid.foe}`, hslToHex(foeColour(raid.foe, true)), `boss-ico-svg ${cls}`));
 
   // ---------- Auth ----------
   function showAuth() {
@@ -1604,7 +1607,7 @@
     function foeUnit(x) {
       const sub = x.boss ? (x.mechs && x.mechs.length ? mechChips(x.mechs) : null)
         : x.role && x.role !== 'grunt' ? h('small', { class: `unit-sub role-${x.role}` }, G.TRASH_ROLES[x.role].name) : null;
-      const u = makeUnit({ name: x.name, enemy: true, boss: x.boss, max: x.max, art: foeArt(x.foe, x.boss, '', x.boss ? 48 : 32), sub });
+      const u = makeUnit({ name: x.name, enemy: true, boss: x.boss, max: x.max, art: foeArt(x.sprite ? { sprite: x.sprite, hue: x.spriteHue } : x.foe, x.boss, '', x.boss ? 48 : 32), sub });
       foes[x.id] = u;
       return u;
     }
