@@ -807,6 +807,7 @@
 
   const PATCH_NOTES = [
     { v: '0.11', date: '2026-09-29', notes: [
+      'Party raids survive updates: when pilots come back after an update, the party re-forms with its leader, members and who-can-join setting.',
       'Pilot mechs in the raid screen are bigger, filling the height of their card.',
       'New setting (on by default): group damage numbers. Quick hits of the same type from the same pilot add up into one number with a ×count, so poison and other ticks don’t pile up.',
       'Multiclass (level 10) now lets you take a subclass from another class, if you have level 5 in that class. Off-hands already give you another class’s abilities, so Multiclass no longer does, and it no longer splits XP. Pick your borrowed subclass again on the Subclasses page.',

@@ -280,8 +280,14 @@ route('GET', '/api/backup', async ctx => {
   await savePlayer(p);
   const state = { ...p.state };
   if (state.activity && state.activity.type === 'raid') state.activity = { ...state.activity, fight: null };
+  let partyInfo = null;
   if (state.activity && state.activity.type === 'party') {
-    const party = await db.get('SELECT session FROM parties WHERE id = ?', state.activity.party);
+    const party = await db.get('SELECT * FROM parties WHERE id = ?', state.activity.party);
+    if (party && party.session) {
+      const leader = await db.get('SELECT name FROM players WHERE id = ?', party.leader_id);
+      partyInfo = { leader: leader ? leader.name : p.name, raid: party.raid, diff: party.diff || 'normal', visibility: party.visibility || 'friends',
+        members: (await pubList(await memberIds(party.id))).map(m => m.name) };
+    }
     const session = party && party.session ? JSON.parse(party.session) : null;
     state.activity = session && G.RAID_BY_ID[session.raid]
       ? { type: 'raid', raid: session.raid, diff: session.diff || 'normal', start: Date.now(), began: session.began || session.start, n: session.n || 1, fight: null }
@@ -293,6 +299,7 @@ route('GET', '/api/backup', async ctx => {
       kind: 'save', name: p.name, key: p.name_key, pass: p.pass, mech: p.mech, created: p.created, at: Date.now(), state,
       guild: g ? { name: g.name, tag: g.tag, rank: g.leader_id === p.id ? 'leader' : p.guild_rank || 'member' } : null,
       friends: (await pubList(await friendIds(ctx.me))).map(f => f.name),
+      party: partyInfo,
     }),
   };
 });
@@ -329,6 +336,7 @@ route('POST', '/api/restore', async ctx => {
       await db.run(`INSERT INTO friends (a, b, status, created) VALUES (?, ?, 'accepted', ?)`, id, f.id, now);
     }
     console.log(`Restored pilot ${b.name} from a browser backup.`);
+    await rejoinParty(id, b.party);
   }
   await startSession(ctx, b.key);
   return { ok: true, restored };
@@ -349,6 +357,45 @@ route('POST', '/api/reset', async ctx => {
   await savePlayer(p);
   return { state: await clientState(p.state) };
 });
+
+// After a wipe, parties come back as pilots restore. The leader re-forms the party from their raid
+// and brings in members already back and still on that raid; members restored later rejoin it.
+async function rejoinParty(id, info) {
+  if (!info || !G.RAID_BY_ID[info.raid]) return;
+  const now = Date.now();
+  const p = await fresh(id);
+  const a = p.state.activity;
+  const onRaid = x => x && x.type === 'raid' && x.raid === info.raid && (x.diff || 'normal') === info.diff;
+  if (!onRaid(a)) return;
+  const leader = await findByName(info.leader);
+  const existing = leader ? await partyOf(leader.id) : null;
+  if (leader && leader.id !== id) {
+    if (!existing || existing.leader_id !== leader.id || !existing.session || existing.raid !== info.raid) return;
+    if ((await memberIds(existing.id)).length >= G.PARTY_MAX) return;
+    await db.run('INSERT INTO party_members (party_id, player_id, joined) VALUES (?, ?, ?)', existing.id, id, now);
+    p.state.activity = { type: 'party', party: existing.id };
+    await savePlayer(p);
+    await restartParty(existing);
+    return;
+  }
+  if (!leader || existing) return;
+  const session = { raid: a.raid, diff: a.diff || 'normal', start: a.start, began: a.began, n: a.n, fight: a.fight };
+  const pid = await db.insert('INSERT INTO parties (leader_id, raid, diff, visibility, created, session) VALUES (?, ?, ?, ?, ?, ?)',
+    id, a.raid, session.diff, VISIBILITY.includes(info.visibility) ? info.visibility : 'friends', now, JSON.stringify(session));
+  await db.run('INSERT INTO party_members (party_id, player_id, joined) VALUES (?, ?, ?)', pid, id, now);
+  p.state.activity = { type: 'party', party: pid };
+  await savePlayer(p);
+  for (const name of info.members || []) {
+    const m = await findByName(name);
+    if (!m || m.id === id || await partyOf(m.id)) continue;
+    const mp = await fresh(m.id);
+    if (!onRaid(mp.state.activity)) continue;
+    await db.run('INSERT INTO party_members (party_id, player_id, joined) VALUES (?, ?, ?)', pid, m.id, now);
+    mp.state.activity = { type: 'party', party: pid };
+    await savePlayer(mp);
+  }
+  await restartParty(await db.get('SELECT * FROM parties WHERE id = ?', pid));
+}
 
 route('POST', '/api/logout', async ctx => {
   sessionCookie(ctx, '', 0);
