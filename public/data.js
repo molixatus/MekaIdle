@@ -657,7 +657,8 @@
     const offItem = ITEMS[equipment && equipment.offhand];
     const cls = weapon ? weapon.cls : 'melee';
     const sub = o.subclass && SUBCLASS_BY_ID[o.subclass];
-    if (sub && sub.cls === cls) { add(sub.stats); bonuses.push(`${sub.name}: ${sub.desc}`); }
+    // Callers pass the subclass in effect (their own, or one borrowed through Multiclass).
+    if (sub && sub.cls) { add(sub.stats); bonuses.push(`${sub.name}: ${sub.desc}`); }
     add(o.boosts);
     const lv = k => (levels && levels[k]) || 1;
     const skill = CLASSES[cls].skill;
@@ -671,7 +672,7 @@
       fire: s.fire / 100, frost: s.frost / 100, shock: s.shock / 100, lifesteal: s.lifesteal / 100, enemyDmg: s.enemyDmg / 100,
       power: s.power, passives, bonuses,
       weapon: weapon ? weapon.id : null, offhand: offItem ? offItem.offhand : null, offCls: offItem ? offItem.cls : null,
-      cls, role: cls, skill, subclass: sub && sub.cls === cls ? sub.id : null,
+      cls, role: cls, skill, subclass: sub && sub.cls ? sub.id : null,
     };
   }
   const power = s => Math.round(Math.sqrt(Math.max(1, s.atk * (1 + (s.crit || 0) * 0.75) * (1 + (s.haste || 0))) * s.hp * (100 + (s.def || 0)) / 100) / 4);
@@ -807,6 +808,7 @@
 
   const PATCH_NOTES = [
     { v: '0.11', date: '2026-09-29', notes: [
+      'Fixed Multiclass: a borrowed subclass now actually applies (its bonuses, and Shadowmender’s shadow attacks on any class) and shows in the raid screen.',
       'Party raids survive updates: when pilots come back after an update, the party re-forms with its leader, members and who-can-join setting.',
       'Pilot mechs in the raid screen are bigger, filling the height of their card.',
       'New setting (on by default): group damage numbers. Quick hits of the same type from the same pilot add up into one number with a ×count, so poison and other ticks don’t pile up.',
