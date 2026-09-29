@@ -28,7 +28,7 @@ let db = null;
 
 // ---------- Helpers ----------
 class HttpError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
+  constructor(status, message, extra) { super(message); this.status = status; this.extra = extra; }
 }
 const bad = msg => { throw new HttpError(400, msg); };
 const str = v => (typeof v === 'string' ? v : '');
@@ -148,13 +148,13 @@ async function friendIds(me) {
 const routes = new Map();
 const route = (method, p, handler, auth = true) => routes.set(`${method} ${p}`, { handler, auth });
 
-function readBody(req) {
+function readBody(req, max = BODY_LIMIT) {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks = [];
     req.on('data', c => {
       size += c.length;
-      if (size > BODY_LIMIT) { reject(new HttpError(413, 'Request too large.')); req.destroy(); return; }
+      if (size > max) { reject(new HttpError(413, 'Request too large.')); req.destroy(); return; }
       chunks.push(c);
     });
     req.on('end', () => {
@@ -182,12 +182,42 @@ function sessionCookie(ctx, token, maxAge) {
   ctx.res.setHeader('Set-Cookie', `sid=${token}; HttpOnly; Path=/; SameSite=Strict; Max-Age=${maxAge}${secure}`);
 }
 
-async function startSession(ctx, playerId) {
-  const token = crypto.randomBytes(32).toString('hex');
-  await db.run('INSERT INTO sessions (token, player_id, expires) VALUES (?, ?, ?)', sha(token), playerId, Date.now() + SESSION_MS);
-  await db.run('UPDATE players SET last_seen = ? WHERE id = ?', Date.now(), playerId);
-  sessionCookie(ctx, token, SESSION_MS / 1000);
+// ---------- Surviving a wiped server ----------
+// Railway erases the app's disk on every deploy unless a database or volume is attached. So that
+// progress survives anyway, sessions and save backups are signed with a key that stays the same
+// across deploys, and each player's browser keeps a signed copy of their save. After a wipe the
+// same browser logs straight back in and restores the pilot (see /api/backup and /api/restore).
+// The key comes from SAVE_KEY if set, otherwise from Railway's own project and service ids, which
+// players never see; locally it's a random key kept in the data folder.
+function signingKey() {
+  if (process.env.SAVE_KEY) return process.env.SAVE_KEY;
+  const ids = ['RAILWAY_PROJECT_ID', 'RAILWAY_SERVICE_ID', 'RAILWAY_ENVIRONMENT_ID'].map(k => process.env[k] || '');
+  if (ids.every(Boolean)) return 'mekaidle:' + ids.join(':');
+  const file = path.join(DATA_DIR, 'save.key');
+  try { return fs.readFileSync(file, 'utf8'); } catch (e) { /* first run */ }
+  const key = crypto.randomBytes(32).toString('hex');
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(file, key);
+  return key;
 }
+const SECRET = crypto.createHash('sha256').update(signingKey()).digest();
+const mac = body => crypto.createHmac('sha256', SECRET).update(body).digest('base64url');
+const sign = obj => { const body = Buffer.from(JSON.stringify(obj)).toString('base64url'); return `${body}.${mac(body)}`; };
+function unsign(token) {
+  if (typeof token !== 'string') return null;
+  const i = token.lastIndexOf('.');
+  if (i < 1) return null;
+  const body = token.slice(0, i), got = Buffer.from(token.slice(i + 1)), want = Buffer.from(mac(body));
+  if (got.length !== want.length || !crypto.timingSafeEqual(got, want)) return null;
+  try { return JSON.parse(Buffer.from(body, 'base64url').toString('utf8')); } catch (e) { return null; }
+}
+
+// A session is a signed pilot name and expiry, so it stays valid even if the server is wiped.
+async function startSession(ctx, nameKey) {
+  await db.run('UPDATE players SET last_seen = ? WHERE name_key = ?', Date.now(), nameKey);
+  sessionCookie(ctx, sign({ k: nameKey, e: Date.now() + SESSION_MS }), SESSION_MS / 1000);
+}
+const sessionOf = req => { const t = unsign(cookies(req).sid); return t && t.k && t.e > Date.now() ? t : null; };
 
 function send(res, status, body, headers = {}) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
@@ -200,14 +230,17 @@ async function handleApi(req, res, url) {
   const ctx = { req, res, url, body: {}, ip: String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim() };
   if (req.method === 'POST') {
     if (!String(req.headers['content-type'] || '').startsWith('application/json')) throw new HttpError(415, 'Expected JSON.');
-    ctx.body = await readBody(req);
+    ctx.body = await readBody(req, url.pathname === '/api/restore' ? 4 * 1024 * 1024 : BODY_LIMIT);
   }
   const result = await db.tx(async () => {
     if (r.auth) {
-      const token = cookies(req).sid;
-      const s = token && await db.get('SELECT player_id, expires FROM sessions WHERE token = ?', sha(token));
-      if (!s || s.expires < Date.now()) throw new HttpError(401, 'Please log in.');
-      ctx.me = s.player_id;
+      const s = sessionOf(req);
+      if (!s) throw new HttpError(401, 'Please log in.');
+      const row = await db.get('SELECT id FROM players WHERE name_key = ?', s.k);
+      // A valid session for a pilot the server doesn't have: the server was wiped, so ask the
+      // browser for its backup.
+      if (!row) throw new HttpError(409, 'Your pilot needs restoring from this browser\u2019s backup.', { restore: true, name: s.k });
+      ctx.me = row.id;
       await db.run('UPDATE players SET last_seen = ? WHERE id = ?', Date.now(), ctx.me);
     }
     return r.handler(ctx);
@@ -228,22 +261,75 @@ route('POST', '/api/register', async ctx => {
   const now = Date.now();
   const id = await db.insert('INSERT INTO players (name, name_key, pass, mech, colour, state, created, last_seen) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     name, name.toLowerCase(), hashPassword(password), mech, G.UNARMED_COLOUR, JSON.stringify(game.newState(now)), now, now);
-  await startSession(ctx, id);
+  await startSession(ctx, name.toLowerCase());
 }, false);
 
 route('POST', '/api/login', async ctx => {
   limit('auth:' + ctx.ip, 60, 10 * 60e3);
-  const row = await db.get('SELECT id, pass FROM players WHERE name_key = ?', str(ctx.body.name).trim().toLowerCase());
+  const row = await db.get('SELECT id, name_key, pass FROM players WHERE name_key = ?', str(ctx.body.name).trim().toLowerCase());
   const password = str(ctx.body.password).slice(0, 200);
   if (!row || !checkPassword(password, row.pass)) bad('Wrong pilot name or password.');
-  await startSession(ctx, row.id);
+  await startSession(ctx, row.name_key);
+}, false);
+
+// A signed copy of the pilot's save, which the browser keeps. Raid timelines are left out (the
+// next fight is simulated again), and a party raid becomes idle, since parties aren't restored.
+route('GET', '/api/backup', async ctx => {
+  const p = await fresh(ctx.me);
+  await savePlayer(p);
+  const state = { ...p.state };
+  if (state.activity && state.activity.type === 'raid') state.activity = { ...state.activity, fight: null };
+  if (state.activity && state.activity.type === 'party') state.activity = null;
+  const g = p.guild_id ? await db.get('SELECT name, tag, leader_id FROM guilds WHERE id = ?', p.guild_id) : null;
+  return {
+    backup: sign({
+      kind: 'save', name: p.name, key: p.name_key, pass: p.pass, mech: p.mech, created: p.created, at: Date.now(), state,
+      guild: g ? { name: g.name, tag: g.tag, rank: g.leader_id === p.id ? 'leader' : p.guild_rank || 'member' } : null,
+      friends: (await pubList(await friendIds(ctx.me))).map(f => f.name),
+    }),
+  };
+});
+
+// Brings back a pilot from a browser's backup after the server lost it. Needs either a session
+// for that pilot or their password. A pilot the server still has is never overwritten.
+route('POST', '/api/restore', async ctx => {
+  limit('restore:' + ctx.ip, 30, 10 * 60e3);
+  const b = unsign(ctx.body.backup);
+  if (!b || b.kind !== 'save' || !b.key || !b.state) bad('That backup isn\u2019t valid for this server.');
+  const s = sessionOf(ctx.req);
+  if (!(s && s.k === b.key) && !checkPassword(str(ctx.body.password).slice(0, 200), b.pass)) bad('Wrong pilot name or password.');
+  let restored = false;
+  if (!(await db.get('SELECT id FROM players WHERE name_key = ?', b.key))) {
+    const now = Date.now();
+    const state = game.migrate(b.state, now);
+    const id = await db.insert('INSERT INTO players (name, name_key, pass, mech, colour, state, created, last_seen) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      b.name, b.key, b.pass, b.mech, classColour(state), JSON.stringify(state), b.created || now, now);
+    restored = true;
+    // Back into the same guild (re-founded if it's gone) and back in touch with friends who are here.
+    if (b.guild) {
+      let g = await db.get('SELECT id FROM guilds WHERE tag = ?', b.guild.tag);
+      if (!g && !(await db.get('SELECT 1 AS x FROM guilds WHERE name_key = ?', b.guild.name.toLowerCase()))) {
+        g = { id: await db.insert('INSERT INTO guilds (name, name_key, tag, leader_id, created) VALUES (?, ?, ?, ?, ?)', b.guild.name, b.guild.name.toLowerCase(), b.guild.tag, id, now) };
+      }
+      if (g && (await db.get('SELECT COUNT(*) AS n FROM players WHERE guild_id = ?', g.id)).n < GUILD_MAX) {
+        await db.run('UPDATE players SET guild_id = ?, guild_joined = ?, guild_rank = ? WHERE id = ?', g.id, now, b.guild.rank === 'officer' ? 'officer' : null, id);
+      }
+    }
+    for (const name of (b.friends || []).slice(0, FRIENDS_MAX)) {
+      const f = await findByName(name);
+      if (!f || f.id === id) continue;
+      if (await db.get('SELECT 1 AS x FROM friends WHERE (a = ? AND b = ?) OR (a = ? AND b = ?)', id, f.id, f.id, id)) continue;
+      await db.run(`INSERT INTO friends (a, b, status, created) VALUES (?, ?, 'accepted', ?)`, id, f.id, now);
+    }
+    console.log(`Restored pilot ${b.name} from a browser backup.`);
+  }
+  await startSession(ctx, b.key);
+  return { ok: true, restored };
 }, false);
 
 route('POST', '/api/logout', async ctx => {
-  const token = cookies(ctx.req).sid;
-  if (token) await db.run('DELETE FROM sessions WHERE token = ?', sha(token));
   sessionCookie(ctx, '', 0);
-});
+}, false);
 
 // ---------- Player ----------
 route('GET', '/api/me', async ctx => {
@@ -545,7 +631,7 @@ route('GET', '/api/health', async () => ({
   ok: true,
   database: db.kind,
   persistentStorage: persistent,
-  storage: persistent ? `Saves are kept between deploys (${db.kind === 'postgres' ? 'PostgreSQL' : 'SQLite'}).` : 'WARNING: no database attached. Every deploy wipes all accounts and progress. Add a PostgreSQL database and set DATABASE_URL.',
+  storage: persistent ? `Saves are kept between deploys (${db.kind === 'postgres' ? 'PostgreSQL' : 'SQLite'}).` : 'No permanent database: the server is wiped on each deploy, and pilots are restored from the backups their browsers keep.',
   pilots: (await db.get('SELECT COUNT(*) AS n FROM players')).n,
 }), false);
 
@@ -809,7 +895,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/api/')) await handleApi(req, res, url);
     else serveStatic(req, res, url.pathname);
   } catch (e) {
-    if (e instanceof HttpError) send(res, e.status, { error: e.message });
+    if (e instanceof HttpError) send(res, e.status, { error: e.message, ...e.extra });
     else if (e instanceof game.GameError) send(res, 400, { error: e.message });
     else {
       console.error(e);

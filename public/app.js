@@ -82,7 +82,27 @@
     return null;
   }
 
-  async function api(path, body) {
+  // ---------- Save backups ----------
+  // The server can be wiped by an update, so this browser keeps a signed copy of each pilot's save
+  // and hands it back when the server no longer knows the pilot.
+  const backupKey = name => 'mekaidle-save:' + String(name).toLowerCase();
+  async function saveBackup() {
+    if (!me) return;
+    try {
+      const r = await api('/api/backup');
+      if (r.backup) store(backupKey(me.player.name), r.backup);
+    } catch (e) { /* try again later */ }
+  }
+  async function restoreFromBrowser(name, password) {
+    const backup = store(backupKey(name));
+    if (!backup) return false;
+    try {
+      const res = await fetch('/api/restore', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ backup, password }) });
+      return res.ok;
+    } catch (e) { return false; }
+  }
+
+  async function api(path, body, retried) {
     const opts = body === undefined
       ? { credentials: 'same-origin' }
       : { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
@@ -90,6 +110,11 @@
     try { res = await fetch(path, opts); } catch (e) { throw new Error('Can’t reach the server. Check your connection.'); }
     let data = {};
     try { data = await res.json(); } catch (e) { /* empty body */ }
+    if (res.status === 409 && data.restore && !retried) {
+      if (await restoreFromBrowser(data.name)) return api(path, body, true);
+      showAuth();
+      throw new Error('This pilot isn\u2019t on the server any more, and this browser has no backup of it.');
+    }
     if (res.status === 401 && !path.startsWith('/api/login')) { showAuth(); throw new Error(data.error || 'Please log in.'); }
     if (!res.ok) throw new Error(data.error || 'Something went wrong.');
     return data;
@@ -326,7 +351,11 @@
       const f = forms.login;
       $('login-error').textContent = '';
       try {
-        await api('/api/login', { name: f.name.value, password: f.password.value });
+        try {
+          await api('/api/login', { name: f.name.value, password: f.password.value });
+        } catch (err) {
+          if (!(await restoreFromBrowser(f.name.value.trim(), f.password.value))) throw err;
+        }
         store('mekaidle-has-account', '1');
         f.password.value = '';
         await boot();
@@ -348,7 +377,12 @@
     if (data.away) showAway(data.away);
     clearInterval(pollTimer);
     pollTimer = setInterval(poll, POLL_MS);
+    saveBackup();
+    clearInterval(backupTimer);
+    backupTimer = setInterval(saveBackup, 30000);
   }
+  let backupTimer = null;
+  document.addEventListener('visibilitychange', () => { if (document.hidden) saveBackup(); });
 
   async function poll() {
     if (!me || document.hidden) return;
@@ -498,7 +532,7 @@
     }
     renderQueue();
 
-    $('topline').replaceChildren(me.persistent === false ? h('span', { class: 'storage-warning small' }, 'Progress is not being saved permanently on this server.') : '',
+    $('topline').replaceChildren('',
       h('span', { class: 'topline-now' }, activityText()),
       (me.state.queue || []).length ? h('span', { class: 'topline-queue' }, `Queue: ${me.state.queue.length}/${G.QUEUE_MAX}`) : '');
     const cls = myClass();

@@ -43,6 +43,8 @@ Saves are stored in PostgreSQL:
 3. Redeploy. The server creates its tables on start-up.
 4. Check `/api/health` on the live site: it should show `"database": "postgres"` and `"persistentStorage": true`.
 
+**No database? Saves still survive.** If the server's storage is wiped by a deploy (no Postgres or volume attached), each player's browser keeps a signed backup of their save and restores it automatically the next time they open the game, including their guild and friends. Log-ins are signed tokens, so they survive a wipe too.
+
 How saves survive updates:
 
 - **Schema steps.** The database layout only changes through numbered steps in `lib/db.js`, each run once and recorded in `schema_migrations`. Steps only add tables and columns; they never remove data.
