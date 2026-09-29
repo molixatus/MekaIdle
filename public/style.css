@@ -1435,8 +1435,8 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 .ability > .grow { grid-column: 2; }
 .ability > :last-child:not(.grow):not(.ico) { grid-column: 2; justify-self: start; }
 
-/* The Raids page shows the fight itself, so the top status line is hidden there (kept on phones for the menu button). */
-@media (min-width: 901px) { body.on-raids .topbar { display: none; } }
+/* The action bar at the bottom already shows what you are doing, so the top status line is hidden (kept on phones for the menu button). */
+@media (min-width: 901px) { .topbar { display: none; } }
 
 /* Buffs (left) and debuffs (right) under the bars, with time left and a draining underline. */
 .statuses { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }

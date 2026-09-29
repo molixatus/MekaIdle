@@ -810,7 +810,7 @@
       'New Settings page (above Log out): turn damage numbers, hit flashes, item shine and animations on or off, download a backup of your save, or reset your progress and start again.',
       'Damage over time (bleed, burn, poison, shadow, Rend and the like), chills and debuffs show under the target’s bars with the time left; buffs and heals over time show too. Buffs sit on the left, debuffs on the right.',
       'No more rainbow strobing in party fights: damage-over-time ticks don’t flash, and each unit flashes at most once every 0.6s.',
-      'The Raids page drops the status line at the top, so the fight sits higher on screen.',
+      'The status line at the top of every page is gone (the bar at the bottom shows the same), so pages sit higher on screen.',
       'Harder progression: each boss is now beaten on Normal, Heroic and Mythic before the next one opens. Raids you had already opened stay open.',
       'Heroic and Mythic are smaller steps up, and raid gear drops far more often (set pieces 10–15%, raid weapons and trinkets 5–8%).',
       'Gear checks through every region: raids 9–16 need 2 pieces of raid gear fitted, raids 17–24 a next-tier weapon, and the finale next-tier weapon and armour. Progress alternates between crafting and farming raid gear.',
