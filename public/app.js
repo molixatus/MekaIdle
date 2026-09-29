@@ -444,22 +444,19 @@
     if (action) {
       const art = document.querySelector('.card.action.active .card-art');
       const ids = [...Object.keys(action.outputs), ...action.chance.map(c => c.item)];
-      let k = 0;
+      // One pop-up per update, a line for each gain, so they never overlap.
+      const lines = [];
       ids.forEach(id => {
         const gain = (after.items[id] || 0) - (before.items[id] || 0);
-        if (gain <= 0) return;
-        if (art) {
-          const f = h('span', { class: 'gain-float' }, itemIco(id, 'sm'), `+${num(gain)} ${G.ITEMS[id].name}`);
-          f.style.animationDelay = `${k++ * 180}ms`;
-          art.append(f);
-          setTimeout(() => f.remove(), 2000 + k * 180);
-        }
+        if (gain > 0) lines.push(h('span', { class: 'gain-line' }, itemIco(id, 'sm'), `+${num(gain)} ${G.ITEMS[id].name}`));
       });
-      if (art && after.skills[action.skill].xp > before.skills[action.skill].xp) {
-        const x = h('span', { class: 'gain-float xp' }, `+${num(after.skills[action.skill].xp - before.skills[action.skill].xp)} XP`);
-        x.style.animationDelay = `${k * 180}ms`;
-        art.append(x);
-        setTimeout(() => x.remove(), 2400);
+      const xp = after.skills[action.skill].xp - before.skills[action.skill].xp;
+      if (xp > 0) lines.push(h('span', { class: 'gain-line xp' }, `+${num(xp)} XP`));
+      if (art && lines.length) {
+        art.querySelectorAll('.gain-float').forEach(old => old.remove());
+        const f = h('span', { class: 'gain-float' }, lines);
+        art.append(f);
+        setTimeout(() => f.remove(), 2000);
       }
     }
     G.SKILLS.forEach(sk => {

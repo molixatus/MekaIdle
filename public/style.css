@@ -1272,3 +1272,7 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 }
 @keyframes glint { 0%, 55% { background-position: 150% 0; } 100% { background-position: -100% 0; } }
 @media (prefers-reduced-motion: reduce) { .item-sprite.rare, .item-sprite.shiny::after { animation: none; } }
+.gain-float { display: grid; gap: 2px; justify-items: center; padding: 4px 9px; }
+.gain-line { display: inline-flex; align-items: center; gap: 4px; }
+.gain-line.xp { color: #9cc4ff; }
+.gain-line .ico { width: 16px; height: 16px; }
