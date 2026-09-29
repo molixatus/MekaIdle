@@ -818,7 +818,7 @@
       'Founding a guild is free.',
       'When a party leader leaves, the next pilot takes over instead of the party breaking up.',
     ] },
-    { v: '0.6', date: '2026-09-29', notes: [
+    { v: '0.6', date: '2026-09-28', notes: [
       '250 raids across 10 regions, each with trash waves before the boss, in Normal, Heroic and Mythic.',
       'Abilities: 7 per combat class and 7 generic ones. Equip 2 class abilities and 1 generic.',
       'Subclasses at level 5 (including the Shadowmender healer), or multiclass at level 10.',
