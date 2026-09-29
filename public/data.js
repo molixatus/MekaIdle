@@ -797,6 +797,8 @@
 
   const PATCH_NOTES = [
     { v: '0.11', date: '2026-09-29', notes: [
+      'Fixed damage numbers near the edge of an enemy squashing into an empty box with the number spilling out.',
+      'In parties, each pilot’s damage numbers pop up in their own spot on the enemy (a grid with a cell per pilot), so they no longer pile on top of each other.',
       'New Settings page (above Log out): turn damage numbers, hit flashes, item shine and animations on or off, download a backup of your save, or reset your progress and start again.',
       'Damage over time (bleed, burn, poison, shadow, Rend and the like), chills and debuffs show under the target’s bars with the time left; buffs and heals over time show too. Buffs sit on the left, debuffs on the right.',
       'No more rainbow strobing in party fights: damage-over-time ticks don’t flash, and each unit flashes at most once every 0.6s.',

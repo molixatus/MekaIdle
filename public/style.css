@@ -1462,3 +1462,9 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 .danger-zone .inline-field input { max-width: 240px; }
 body.no-shine .item-shine { display: none; }
 body.no-motion *, body.no-motion *::before, body.no-motion *::after { animation-duration: 0s !important; animation-iteration-count: 1 !important; transition-duration: 0s !important; }
+
+/* Damage numbers keep their own width wherever they sit (near the right edge they used to squash
+   into an empty box with the text spilling out), spread over the enemy sprite. */
+.float { width: max-content; max-width: none; }
+.unit.enemy > .floats { width: 120px; }
+.unit.enemy.boss > .floats { width: 180px; }

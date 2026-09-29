@@ -1861,12 +1861,22 @@
       if (!u.maxMana) return;
       u.manaFill.style.width = `${Math.max(0, Math.min(1, u.mana / u.maxMana)) * 100}%`;
     }
-    function float(u, value, label, colour, big, kind) {
+    // Where a number pops up. Numbers on an enemy go in a grid with one cell per pilot (so in a big
+    // party each pilot's hits land in their own spot), jittered a little inside the cell.
+    function floatSpot(slot) {
+      if (slot == null || party.length < 2) return [15 + Math.random() * 70, Math.random() * 45];
+      const n = party.length, cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols);
+      const col = slot % cols, row = Math.floor(slot / cols) % rows;
+      const cw = 80 / cols, rh = 62 / rows;
+      return [10 + (col + 0.5 + (Math.random() - 0.5) * 0.6) * cw, (row + 0.15 + Math.random() * 0.5) * rh];
+    }
+    function float(u, value, label, colour, big, kind, slot) {
       if (quiet || !SETTINGS.floats) return;
-      if (u.floats.childElementCount > 7) u.floats.firstElementChild.remove();
+      if (u.floats.childElementCount > Math.max(8, party.length * 3)) u.floats.firstElementChild.remove();
       const s = h('span', { class: `float ${kind || ''}${big ? ' big' : ''}` }, h('b', {}, value), label ? h('small', {}, label) : null);
-      s.style.left = `${10 + Math.random() * 70}%`;
-      s.style.top = `${Math.random() * 40}%`;
+      const [x, y] = floatSpot(slot);
+      s.style.left = `${x}%`;
+      s.style.top = `${y}%`;
       s.style.setProperty('--fc', colour);
       u.floats.append(s);
       setTimeout(() => s.remove(), 1400);
@@ -2172,7 +2182,7 @@
         target.hp = Math.max(0, target.hp - (e.v - (e.ab || 0)));
         bump('dps', e.a, e.sr, e.v);
         const from = party[e.a];
-        float(target, `${num(e.v)}${e.c ? '!' : ''}`, e.ty, from ? from.colour : '#fff', e.c, e.k === 'dot' ? 'dot' : 'dmg');
+        float(target, `${num(e.v)}${e.c ? '!' : ''}`, e.ty, from ? from.colour : '#fff', e.c, e.k === 'dot' ? 'dot' : 'dmg', from ? e.a : null);
         if (e.c && ABILITY_NAMES.has(e.sr) && !quiet) addLog(cur.start + e.t, 'abilities', [who(e.a), '\u2019s ', h('b', { class: 'log-ab' }, e.sr), ' crits ', foeName(e.tg), ` for ${num(e.v)}!`], 'crit');
         const fxE = e.ab && e.ab >= e.v ? 'shield' : FX_OF_TYPE[e.ty];
         if (e.k !== 'dot') { pulse(target, fxE ? 'shake-plain' : 'shake'); if (from && e.k !== 'thorns') pulse(from, 'lunge'); }
