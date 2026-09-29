@@ -1177,7 +1177,6 @@
           h('small', {}, unlocked ? `Tier ${ri + 1} \u00b7 ${cleared}/25 cleared` : `Locked \u00b7 beat ${G.REGIONS[ri - 1].finale} (#${ri * 25}) to open`));
         head.style.setProperty('--tier', G.TIERS[ri].colour);
         list.push(head);
-        if (!unlocked) break;
         const shown = raids.filter(r => !(hideCleared && clearsOf(r.id) >= diffRank) && !(hideLooted && looted(r)));
         hidden += raids.length - shown.length;
         list.push(shown.length ? h('div', { class: 'raid-list' }, shown.map(r => raidRow(r, diff, ctx))) : h('div', { class: 'empty small' }, 'Every boss here is hidden by your filters.'));
@@ -1374,6 +1373,8 @@
       const floats = h('div', { class: 'floats', 'aria-hidden': 'true' });
       const bob = h('span', { class: 'bob' }, o.art);
       bob.style.animationDelay = `-${(Math.random() * 3).toFixed(2)}s`;
+      const fxEl = h('span', { class: 'fx' }, o.art);
+      bob.replaceChildren(fxEl);
       const actEl = h('span', { class: 'act' }, bob);
       const artBox = h('div', { class: 'unit-art' }, actEl);
       const hpFill = h('span', { class: 'hp-fill' }), hpTrail = h('span', { class: 'hp-trail' }), hpShield = h('span', { class: 'hp-shield' }), hpText = h('b');
@@ -1389,7 +1390,7 @@
           hpBar, manaBar, castBar, statuses),
         floats);
       if (o.colour) el.style.setProperty('--series', o.colour);
-      const u = { ...o, el, artBox, actEl, floats, hpFill, hpTrail, hpShield, hpText, hpBar, manaFill, castFill, castText, castBar, statuses, hp: o.max, barrier: 0, cast: null, down: false, buffs: {}, mana: o.maxMana };
+      const u = { ...o, el, artBox, actEl, fxEl, floats, hpFill, hpTrail, hpShield, hpText, hpBar, manaFill, castFill, castText, castBar, statuses, hp: o.max, barrier: 0, cast: null, down: false, buffs: {}, mana: o.maxMana };
       drawHp(u);
       drawMana(u);
       return u;
@@ -1417,6 +1418,15 @@
       s.style.setProperty('--fc', colour);
       u.floats.append(s);
       setTimeout(() => s.remove(), 1400);
+    }
+    // A colour flash for what's happening: poison purple, healing green, fire orange, and so on.
+    const FX_OF_TYPE = { Poison: 'poison', Venom: 'poison', Fire: 'burn', Burn: 'burn', Prismatic: 'burn', Frost: 'frost', Shock: 'shock',
+      Bleed: 'bleed', Shadow: 'shadow', Drain: 'mana', Holy: 'holy', Magic: 'shadow' };
+    function flash(u, kind) {
+      if (quiet || reduced || !u || !u.fxEl) return;
+      u.fxEl.className = 'fx';
+      void u.fxEl.offsetWidth; // restart the animation
+      u.fxEl.className = `fx fx-${kind}`;
     }
     function pulse(u, cls) {
       if (quiet || reduced) return;
@@ -1579,13 +1589,13 @@
         addLog(at, 'abilities', [foeName(e.a), ` uses ${e.n}: ${e.foes.map(x => x.name).join(', ')} join the fight!`], 'danger');
       } else if (e.e === 'mana') {
         const u = party[e.tg];
-        if (u && u.maxMana) { u.mana = e.m; drawMana(u); }
+        if (u && u.maxMana) { u.mana = e.m; drawMana(u); flash(u, 'mana'); }
       } else if (e.e === 'buff') {
         if (e.danger) addLog(at, 'abilities', [foeName(e.tg), e.n === 'Frenzy' ? ' goes into a frenzy!' : e.n === 'Enraged' ? ' is enraged!' : ` uses ${e.n}!`], 'danger');
         const targets = e.tg === 'all' ? party.filter(u => !u.down) : [unitOf(e.tg)].filter(Boolean);
         targets.forEach(u => {
           if (e.until) u.buffs[e.n] = { until: e.until, cls: typeof e.tg === 'string' ? 'debuff' : 'buff' };
-          if (e.b != null) { u.barrier = e.b; drawHp(u); }
+          if (e.b != null) { u.barrier = e.b; drawHp(u); flash(u, 'shield'); }
         });
       } else if (e.e === 'down') {
         const u = party[e.tg];
@@ -1641,6 +1651,7 @@
         if (e.k === 'potion') addLog(cur.start + e.t, 'abilities', [who(e.tg), ` drinks a ${(e.n || e.sr).toLowerCase()}`], 'potion');
         float(target, `+${num(e.v)}${e.c ? '!' : ''}`, e.k === 'potion' ? 'Potion' : e.sr, '#4ee08f', e.c, 'heal');
         pulse(target, 'glow');
+        flash(target, 'heal');
       } else if (typeof e.tg === 'number') {
         // An enemy hitting a pilot.
         if (e.ab) target.barrier = e.b || 0;
@@ -1650,12 +1661,15 @@
         bump('mit', e.tg, src, Math.max(0, (e.raw || e.v) - e.v) + (e.ab || 0));
         float(target, `${num(e.v)}${e.c ? '!' : ''}`, e.ab ? `${e.ty} · ${num(e.ab)} absorbed` : e.ty, '#ff6b5b', e.c, 'taken');
         if (foes[e.a] && e.k !== 'dot') pulse(foes[e.a], 'lunge');
-        pulse(target, 'shake');
+        const fxP = e.ab && e.ab >= e.v ? 'shield' : FX_OF_TYPE[e.ty];
+        pulse(target, fxP ? 'shake-plain' : 'shake');
+        if (fxP) flash(target, fxP);
       } else if (e.k === 'eheal') {
         // An enemy healing itself or an ally.
         target.hp = Math.min(target.max, target.hp + e.v);
         float(target, `+${num(e.v)}`, e.sr, '#4ee08f', false, 'heal');
         pulse(target, 'glow');
+        flash(target, 'heal');
         addLog(cur.start + e.t, 'abilities', [foeName(e.a), ` ${e.a === e.tg ? 'regenerates' : `mends ${target.name}`} for ${num(e.v)}`], 'danger');
       } else {
         // A pilot hitting an enemy (an enemy shield soaks some of it).
@@ -1664,7 +1678,9 @@
         bump('dps', e.a, e.sr, e.v);
         const from = party[e.a];
         float(target, `${num(e.v)}${e.c ? '!' : ''}`, e.ty, from ? from.colour : '#fff', e.c, e.k === 'dot' ? 'dot' : 'dmg');
-        if (e.k !== 'dot') { pulse(target, 'shake'); if (from && e.k !== 'thorns') pulse(from, 'lunge'); }
+        const fxE = e.ab && e.ab >= e.v ? 'shield' : FX_OF_TYPE[e.ty];
+        if (e.k !== 'dot') { pulse(target, fxE ? 'shake-plain' : 'shake'); if (from && e.k !== 'thorns') pulse(from, 'lunge'); }
+        if (fxE) flash(target, fxE);
       }
       drawHp(target);
     }
