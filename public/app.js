@@ -1373,7 +1373,8 @@
         bossBox.replaceChildren(h('p', { class: 'muted small boss-hidden' }, 'The boss list comes back when you leave this fight.'));
         return;
       }
-      bossBox.replaceChildren(section('Bosses', hidden ? `${hidden} hidden by filters` : '250 raids in 10 regions', diffBar, filters, list));
+      if (hidden) filters.append(h('small', { class: 'muted' }, `${hidden} hidden by filters`));
+      bossBox.replaceChildren(h('div', { class: 'section boss-list' }, diffBar, filters, list));
     }
 
     function visibilityPicker(current, disabled) {
@@ -1572,14 +1573,19 @@
     function idle() {
       cancelAnimationFrame(raf);
       cur = null;
-      // No fight: nothing to show, except the log of earlier fights if there is one.
-      root.replaceChildren(logItems.length ? logPanel() : '');
-      root.hidden = !logItems.length;
+      // No fight: nothing to show. The log belongs to a raid, so leaving clears it.
+      logItems.length = 0;
+      logList.replaceChildren();
+      Object.keys(logCounts).forEach(k => { logCounts[k] = 0; });
+      root.replaceChildren();
+      root.hidden = true;
     }
 
     async function sync(force) {
-      checkLoot();
       const a = me && me.state.activity;
+      // Loot only goes in the log while you're raiding; outside a raid just note what's been seen.
+      if (a && a.type) checkLoot();
+      else if (me && me.state.raidLog && me.state.raidLog[0]) lastLootAt = me.state.raidLog[0].at;
       if (!a || !a.type) { if (cur || !root.firstChild) idle(); return; }
       if (!force && cur && cur.n === a.n && cur.start === a.start) return;
       if (fetching) return;

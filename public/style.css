@@ -1318,3 +1318,8 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 @media (prefers-reduced-motion: reduce) { .item-shine { animation: none; opacity: 0; } }
 /* Off-screen raid rows (and their animated loot) aren't rendered until scrolled to. */
 .raid-row { content-visibility: auto; contain-intrinsic-size: auto 124px; }
+
+/* Difficulty buttons in their own colours; the chosen one is filled. */
+.diff-bar .chip { color: color-mix(in srgb, var(--chip) 80%, #fff); border-color: color-mix(in srgb, var(--chip) 40%, transparent); background: color-mix(in srgb, var(--chip) 6%, transparent); }
+.diff-bar .chip:hover { background: color-mix(in srgb, var(--chip) 14%, transparent); }
+.diff-bar .chip[aria-pressed="true"] { color: #0d1016; background: var(--chip); border-color: var(--chip); box-shadow: 0 0 12px color-mix(in srgb, var(--chip) 35%, transparent); }

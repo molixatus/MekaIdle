@@ -417,7 +417,7 @@
     surge: v => `Surge: ${v}% chance for a heal to be doubled.`,
   };
   const DIFFICULTIES = [
-    { id: 'normal', name: 'Normal', hp: 1, dmg: 1, xp: 1, drop: 1, mats: 1, colour: '#a3abb5' },
+    { id: 'normal', name: 'Normal', hp: 1, dmg: 1, xp: 1, drop: 1, mats: 1, colour: '#5fd068' },
     { id: 'heroic', name: 'Heroic', hp: 1.8, dmg: 1.45, xp: 1.8, drop: 2.2, mats: 1.6, colour: '#4f8ff0' },
     { id: 'mythic', name: 'Mythic', hp: 3, dmg: 2.1, xp: 3, drop: 4, mats: 2.5, colour: '#ff9a3c' },
   ];
