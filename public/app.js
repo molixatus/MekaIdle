@@ -1755,7 +1755,25 @@
     const logList = BLOG.list;
     let logMuted = false, muteBelow = 0, sessionLootEl = null;
 
-    function destroy() { cancelAnimationFrame(raf); }
+    function destroy() { cancelAnimationFrame(raf); document.body.classList.remove('dock-open', 'dock-closed'); }
+    // Meter, graph and raid log in one panel pinned to the bottom of the screen, so nothing above
+    // it moves when enemies join a fight. It collapses to a header and remembers its state.
+    function battleDock(side, log) {
+      const setOpen = open => {
+        store('mekaidle-dock', open ? '1' : '0');
+        dock.classList.toggle('open', open);
+        document.body.classList.toggle('dock-open', open);
+        document.body.classList.toggle('dock-closed', !open);
+        toggle.setAttribute('aria-expanded', String(open));
+      };
+      const toggle = h('button', { type: 'button', class: 'dock-head', onclick: () => setOpen(!dock.classList.contains('open')) },
+        ui('menu', 'sm'), h('span', {}, 'Damage meter, graph and raid log'), h('small', { class: 'muted' }, 'click to show or hide'));
+      const dock = h('section', { class: 'battle-dock', 'aria-label': 'Fight details' }, toggle, h('div', { class: 'dock-body' }, side, log));
+      const bar = document.getElementById('action-bar');
+      document.documentElement.style.setProperty('--ab-h', `${bar && !bar.hidden ? bar.offsetHeight : 0}px`);
+      setOpen(store('mekaidle-dock') !== '0');
+      return dock;
+    }
 
     // ----- Fight log -----
     function who(i) {
@@ -1799,7 +1817,7 @@
         } }, label, tabRefs[id]);
       }));
       drawTabCounts();
-      return collapsible('battle-log-v2', 'Raid log', 'newest first', h('div', { class: 'log' }, tabs, h('div', { class: 'log-scroll' }, logList)), false);
+      return h('div', { class: 'battle-cell dock-log' }, h('div', { class: 'cell-head' }, h('h3', {}, 'Raid log'), h('small', { class: 'muted' }, 'newest first')), h('div', { class: 'log' }, tabs, h('div', { class: 'log-scroll' }, logList)));
     }
     // A closing line for each fight: result, time, damage, healing, deaths and the top pilot.
     function fightSummary(e, at) {
@@ -1836,6 +1854,7 @@
       resetLog(null);
       root.replaceChildren();
       root.hidden = true;
+      document.body.classList.remove('dock-open', 'dock-closed');
     }
 
     async function sync(force) {
@@ -2074,10 +2093,11 @@
         h('div', { class: 'battle-stage' },
           h('div', { class: 'side pilots' }, party.map(u => u.el)),
           h('div', { class: 'side foes' }, foeBox)),
-        collapsible('battle-meter-v2', 'Damage meter and graph', 'click to show or hide', h('div', { class: 'battle-stats' },
-          h('div', { class: 'battle-cell' }, h('div', { class: 'cell-head' }, h('h3', {}, 'Meter'), modeTabs), h('small', { class: 'muted' }, 'Click a pilot for a breakdown.'), meterList),
-          h('div', { class: 'battle-cell' }, h('div', { class: 'cell-head' }, h('h3', {}, 'Over time'), h('small', { class: 'muted' }, '5-second average · hover for numbers')), graphBox)), false),
-        logPanel());
+        battleDock(
+          h('div', { class: 'dock-side' },
+            h('div', { class: 'battle-cell dock-meter' }, h('div', { class: 'cell-head' }, h('h3', {}, 'Meter'), modeTabs), h('div', { class: 'dock-scroll' }, meterList)),
+            h('div', { class: 'battle-cell dock-graph' }, h('div', { class: 'cell-head' }, h('h3', {}, 'Over time'), h('small', { class: 'muted' }, '5-second average · hover for numbers')), graphBox)),
+          logPanel()));
 
       downs = 0;
       drawSessionLoot();
