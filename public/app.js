@@ -1877,7 +1877,8 @@
     function float(u, value, label, colour, big, kind, slot) {
       if (quiet || !SETTINGS.floats) return;
       if (u.floats.childElementCount > Math.max(8, party.length * 3)) u.floats.firstElementChild.remove();
-      const s = h('span', { class: `float ${kind || ''}${big ? ' big' : ''}` }, h('b', {}, value), label ? h('small', {}, label) : null);
+      // Kinds get a prefix so general classes (like .dot) can't restyle the number boxes.
+      const s = h('span', { class: `float${kind ? ` fk-${kind}` : ''}${big ? ' big' : ''}` }, h('b', {}, value), label ? h('small', {}, label) : null);
       const [x, y] = floatSpot(slot);
       s.style.left = `${x}%`;
       s.style.top = `${y}%`;

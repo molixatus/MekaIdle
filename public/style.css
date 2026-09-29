@@ -555,8 +555,8 @@ button.card:hover:not(:disabled) { background: var(--card-hover); }
 .float b { font: 800 16px/1 var(--font); font-variant-numeric: tabular-nums; text-shadow: 0 1px 0 #000; }
 .float small { font: 700 9px/1 var(--font); letter-spacing: .06em; text-transform: uppercase; color: #d9dde3; opacity: .85; }
 .float.big b { font-size: 21px; }
-.float.dot { opacity: .85; }
-.float.dot b { font-size: 13px; }
+.float.fk-dot { opacity: .85; }
+.float.fk-dot b { font-size: 13px; }
 @keyframes float-up {
   0% { opacity: 0; transform: translate(-50%, 4px); }
   12% { opacity: 1; transform: translate(-50%, 0); }

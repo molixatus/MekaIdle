@@ -801,7 +801,7 @@
     { v: '0.11', date: '2026-09-29', notes: [
       'Skill pages show your level and XP bar full width under the title instead of squeezed into the corner.',
       'An off-hand from another class now trains that class too: it takes 30% of each fight’s XP, and the rest goes to your main class (split 60/40 if you multiclass).',
-      'Fixed damage numbers near the edge of an enemy squashing into an empty box with the number spilling out.',
+      'Fixed damage-over-time numbers (bleed, burn, poison, shadow and others) squashing into a tiny box, and numbers near the edge of an enemy doing the same.',
       'In parties, each pilot’s damage numbers pop up in their own spot on the enemy (a grid with a cell per pilot), so they no longer pile on top of each other.',
       'New Settings page (above Log out): turn damage numbers, hit flashes, item shine and animations on or off, download a backup of your save, or reset your progress and start again.',
       'Damage over time (bleed, burn, poison, shadow, Rend and the like), chills and debuffs show under the target’s bars with the time left; buffs and heals over time show too. Buffs sit on the left, debuffs on the right.',
