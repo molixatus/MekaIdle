@@ -1090,8 +1090,12 @@
   }
   const TYPE_CLASS = { plate: 'melee', leather: 'ranged', cloth: 'magic', vestment: 'healer' };
   const itemClass = it => it && (it.cls || (it.set && G.SET_BY_ID[it.set] && G.SET_BY_ID[it.set].cls) || TYPE_CLASS[it.armour]) || null;
-  function lootIcons(r, diff) {
-    return h('div', { class: 'loot-icons', 'aria-label': 'Drops on a win' }, r.drops.map(x => {
+  // Drops shown as chips; `only` picks 'gear' or 'materials' (everything else), or all when unset.
+  const isGearDrop = x => G.ITEMS[x.item] && G.ITEMS[x.item].type === 'gear';
+  const lootGroup = (label, r, diff, only) => h('div', { class: 'loot-group' }, h('small', { class: 'loot-label' }, label), lootIcons(r, diff, only));
+  function lootIcons(r, diff, only) {
+    const drops = r.drops.filter(x => !only || (only === 'gear') === isGearDrop(x));
+    return h('div', { class: 'loot-icons', 'aria-label': 'Drops on a win' }, drops.map(x => {
       const text = dropText(x, diff);
       const cls = itemClass(G.ITEMS[x.item]);
       const need = x.minDiff && G.DIFF_BY_ID[x.minDiff];
@@ -1128,10 +1132,11 @@
     }
     return h('div', { class: `raid-row${here ? ' fighting' : ''}${open ? '' : ' locked'}${r.finale ? ' finale' : ''}` },
       h('span', { class: 'raid-n' }, `#${r.n}`),
-      h('span', { class: 'boss-ico' }, bossIcon(r, '', 58)),
+      h('span', { class: 'boss-ico' }, bossIcon(r, '', 88)),
       h('div', { class: 'raid-info' }, h('b', {}, r.name, r.finale ? h('span', { class: 'finale-tag' }, 'Finale') : null), h('div', { class: 'raid-chips' }, weakChips(r), mechChips(r.boss.mechs))),
       h('div', { class: 'raid-power', title: 'Your power / recommended' }, h('small', {}, 'Power'), h('b', { class: pClass }, `${fmt(ctx.power)} / ${fmt(rec)}`)),
-      lootIcons(r, diff),
+      lootGroup('Materials', r, diff, 'materials'),
+      lootGroup('Equipment', r, diff, 'gear'),
       pips,
       h('div', { class: 'raid-btns' }, buttons));
   }

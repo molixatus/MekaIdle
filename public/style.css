@@ -1119,3 +1119,28 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
   .raid-row { grid-template-columns: 40px 64px minmax(0, 1fr) auto; }
   .raid-row .raid-power { display: none; }
 }
+
+/* Raid rows v3: taller, big boss portrait, loot split into materials and equipment. */
+.raid-row {
+  grid-template-columns: 44px 104px minmax(200px, 1fr) 130px minmax(0, max-content) minmax(0, max-content) 66px 190px;
+  min-height: 120px; padding: 12px 16px;
+}
+.raid-row .boss-ico { width: 100px; height: 100px; border-radius: 12px; }
+.loot-group { display: grid; gap: 6px; justify-items: start; }
+.loot-label { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+@media (max-width: 1600px) {
+  .raid-row { grid-template-columns: 40px 104px minmax(0, 1fr) 130px auto; }
+  .raid-row .loot-group { grid-row: 2; }
+  .raid-row .loot-group:nth-of-type(1) { grid-column: 3 / 4; }
+  .raid-row .loot-group:nth-of-type(2) { grid-column: 4 / -1; }
+  .raid-row .loot-icons { grid-column: auto; grid-row: auto; }
+}
+@media (max-width: 900px) {
+  .raid-row { grid-template-columns: 40px 88px minmax(0, 1fr) auto; }
+  .raid-row .boss-ico { width: 84px; height: 84px; }
+  .raid-row .loot-group { grid-column: 2 / -1 !important; grid-row: auto; }
+}
+@media (max-width: 600px) {
+  .raid-row { grid-template-columns: 88px minmax(0, 1fr); }
+  .raid-row .loot-group { grid-column: 1 / -1 !important; }
+}
