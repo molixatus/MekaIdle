@@ -118,7 +118,7 @@
 
   // Display settings, kept in this browser.
   const SETTINGS_KEY = 'mekaidle-settings';
-  const SETTINGS = { floats: true, flashes: true, shine: true, motion: true };
+  const SETTINGS = { floats: true, groupFloats: true, flashes: true, shine: true, motion: true };
   try { Object.assign(SETTINGS, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch (e) { /* defaults */ }
   function applySettings() {
     document.body.classList.toggle('no-motion', !SETTINGS.motion);
@@ -1399,6 +1399,7 @@
       h('section', { class: 'panel stack settings' },
         h('h2', {}, 'Display'),
         toggle('floats', 'Damage and healing numbers', 'Numbers that float up from units in raids.'),
+        toggle('groupFloats', 'Group damage numbers', 'Hits of the same type from the same pilot in quick succession add up into one number (with a ×count) instead of stacking.'),
         toggle('flashes', 'Hit flashes', 'Units flash red when hit, green when healed, and so on.'),
         toggle('shine', 'Item shine', 'The light sweep across rare and high-tier items.'),
         toggle('motion', 'Animations', 'Page transitions, bobbing sprites and other movement.')),
@@ -1947,6 +1948,20 @@
     }
     function float(u, value, label, colour, big, kind, slot) {
       if (quiet || !SETTINGS.floats) return;
+      // Grouping: a hit of the same type from the same pilot shortly after joins the number already
+      // showing (summed, with a ×count) instead of stacking another box on top. Crits stay separate.
+      const key = `${slot}|${label}|${kind}`;
+      u.floatGroups = u.floatGroups || new Map();
+      const g = SETTINGS.groupFloats && !big && u.floatGroups.get(key);
+      const amount = parseFloat(String(value).replace(/[^0-9.]/g, '')) || 0;
+      if (g && g.el.isConnected && performance.now() - g.at < 600) {
+        g.total += amount;
+        g.count++;
+        g.b.textContent = `${String(value).startsWith('+') ? '+' : ''}${num(Math.round(g.total))}`;
+        if (g.small) g.small.textContent = `${label} ×${g.count}`;
+        g.b.classList.remove('bump'); void g.b.offsetWidth; g.b.classList.add('bump');
+        return;
+      }
       if (u.floats.childElementCount > Math.max(8, party.length * 3)) u.floats.firstElementChild.remove();
       // Kinds get a prefix so general classes (like .dot) can't restyle the number boxes.
       const s = h('span', { class: `float${kind ? ` fk-${kind}` : ''}${big ? ' big' : ''}` }, h('b', {}, value), label ? h('small', {}, label) : null);
@@ -1955,6 +1970,7 @@
       s.style.top = `${y}%`;
       s.style.setProperty('--fc', colour);
       u.floats.append(s);
+      if (!big) u.floatGroups.set(key, { el: s, b: s.firstChild, small: label ? s.lastChild : null, total: amount, count: 1, at: performance.now() });
       setTimeout(() => s.remove(), 1400);
     }
     // A colour flash for what's happening: poison purple, healing green, fire orange, and so on.

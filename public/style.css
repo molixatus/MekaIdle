@@ -1617,3 +1617,6 @@ body.dock-open.on-raids .page-head { display: none; }
   color: var(--role, var(--muted)); border-bottom: 1px solid color-mix(in srgb, var(--role, #262c38) 45%, transparent); }
 .picker-group:first-child { margin-top: 0; }
 .picker-group small { color: var(--faint); font-weight: 600; }
+/* Grouped damage numbers pop when another hit joins them. */
+.float b.bump { display: inline-block; animation: float-bump .25s ease-out; }
+@keyframes float-bump { 40% { transform: scale(1.3); } }
