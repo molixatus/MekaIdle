@@ -794,6 +794,7 @@
       'Fixed the sidebar queue running off the edge with long item names.',
       'Fixed the sidebar progress bar jumping back and forth during raids.',
       'Who can join your raids (closed, friends and guild, or everyone) is remembered and applied to every raid you start.',
+      'Fixed HP bars briefly showing health left after a pilot went down or an enemy died.',
     ] },
     { v: '0.9', date: '2026-09-29', notes: [
       'New monster art: every raid has its own boss, and enemies are drawn from a new sprite sheet.',

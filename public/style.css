@@ -1354,3 +1354,6 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 /* The sidebar activity bar follows the clock every frame: no slide-in, and red while raiding. */
 .now-card .bar > span { transition: none; }
 .now-card .bar.red > span { background-color: var(--red); }
+/* HP trail: shorter, and gone instantly when a unit is down or dead. */
+.hp-trail { transition: width .3s ease-in .12s; }
+.unit.down .hp-trail, .unit.down .hp-fill { transition: none; width: 0 !important; }
