@@ -505,6 +505,11 @@ function requireUnlocked(state, raid, diff) {
   if (!game.raidUnlocked(state, raid.id, diff)) {
     bad(diff === 'normal' ? `Clear ${G.RAIDS[raid.n - 2].name} first.` : `Clear ${raid.name} on ${diff === 'heroic' ? 'Normal' : 'Heroic'} first.`);
   }
+  requireFinaleGear(state, raid);
+}
+function requireFinaleGear(state, raid, who) {
+  const g = G.finaleGear(state.equipment, raid);
+  if (!g.ok) bad(`${who ? `${who} needs` : 'You need'} tier ${g.need} gear fitted for ${raid.name}: a tier ${g.need} weapon and at least ${G.FINALE_ARMOUR} tier ${g.need} armour pieces.`);
 }
 
 route('POST', '/api/raid/start', ctx => {
@@ -577,6 +582,7 @@ route('POST', '/api/party/join', async ctx => {
   if (await db.get('SELECT 1 AS x FROM party_members WHERE player_id = ?', ctx.me)) bad('Leave your current party first.');
   if ((await memberIds(party.id)).length >= G.PARTY_MAX) bad('That party is full.');
   const p = await fresh(ctx.me);
+  requireFinaleGear(p.state, G.RAID_BY_ID[party.raid]);
   if (party.session) await leaveRaid(p);
   await db.run('INSERT INTO party_members (party_id, player_id, joined) VALUES (?, ?, ?)', party.id, ctx.me, Date.now());
   if (party.session) {
@@ -605,6 +611,8 @@ route('POST', '/api/party/start', async ctx => {
   // Every member switches from whatever they were doing to the party raid.
   const players = [];
   for (const id of await memberIds(party.id)) players.push(await fresh(id));
+  const raid = G.RAID_BY_ID[party.raid];
+  players.forEach(p => requireFinaleGear(p.state, raid, p.id === ctx.me ? null : p.name));
   players.forEach(p => { p.state.activity = { type: 'party', party: party.id }; });
   const session = game.newSession(party.raid, party.diff || 'normal', now);
   game.advanceRaid(session, players, now, null);

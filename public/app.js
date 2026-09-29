@@ -316,7 +316,22 @@
     spriteCache.set(key, svg);
     return svg;
   }
-  const foeArt = (foe, boss, cls = '', size) => h('span', { class: `sprite foe-sprite ${cls}`, 'aria-hidden': 'true', html: foeSprite(foe, boss, size) });
+  // Enemies the pixel-art sheet has a creature for (index in G.FOES -> [row, col]).
+  const FOE_SHEET = {
+    4: [14, 0], 5: [14, 2], 7: [14, 3], 48: [14, 4], 25: [22, 12], 27: [23, 11], 28: [23, 0], 51: [23, 2],
+    55: [1, 15], 56: [15, 7], 57: [16, 6], 61: [10, 13],
+  };
+  function foeArt(foe, boss, cls = '', size) {
+    const cell = FOE_SHEET[foe];
+    if (cell && SHEET) {
+      const el = h('span', { class: `sprite foe-sprite sheet-foe${boss ? ' boss-art' : ''} ${cls}`, 'aria-hidden': 'true' });
+      el.style.backgroundImage = `url(${SHEET.src})`;
+      el.style.backgroundSize = `${SHEET.cols * 100}% ${SHEET.rows * 100}%`;
+      el.style.backgroundPosition = `${(cell[1] / (SHEET.cols - 1)) * 100}% ${(cell[0] / (SHEET.rows - 1)) * 100}%`;
+      return el;
+    }
+    return h('span', { class: `sprite foe-sprite${boss ? ' boss-art' : ''} ${cls}`, 'aria-hidden': 'true', html: foeSprite(foe, boss, size) });
+  }
   // Raid list portraits use the plain icon in the boss's colour.
   const bossIcon = (raid, cls = '') => gi(`foe_${raid.foe}`, hslToHex(foeColour(raid.foe, true)), `boss-ico-svg ${cls}`);
 
@@ -736,7 +751,7 @@
       ? h('div', { class: 'needs' }, inputs.map(([id, q]) => needChip(id, String(q), `/${fmt(have(id))}`, have(id) < q ? 'short' : '')))
       : h('div', { class: 'needs' }, outputs.map(([id, q]) => needChip(id, q[0] === q[1] ? `+${q[0]}` : `+${q[0]}–${q[1]}`)),
         a.chance.map(c => needChip(c.item, `${Math.round(c.p * 100)}%`))),
-    h('div', { class: 'card-foot' }, h('span', {}, `Owned: ${fmt(have(a.item))}`), active ? h('span', { class: 'ok' }, me.state.activity.left ? `${num(me.state.activity.left)} left` : 'Running') : null)),
+    h('div', { class: 'card-foot' }, h('span', {}, inputs.length ? `Owned: ${fmt(have(a.item))}` : `Owned: ${[...outputs.map(([id]) => id), ...a.chance.map(c => c.item)].map(id => `${fmt(have(id))} ${G.ITEMS[id].name.split(' ').pop().toLowerCase()}`).join(', ')}`), active ? h('span', { class: 'ok' }, me.state.activity.left ? `${num(me.state.activity.left)} left` : 'Running') : null)),
     () => itemTip(a.item, recipe));
     return h('div', { class: `card action${active ? ' active' : ''}${locked ? ' locked' : ''}` }, main,
       h('div', { class: 'card-controls' }, count,
@@ -1050,10 +1065,14 @@
     const lo = Math.round(x.qty[0] * d.mats), hi = Math.round(x.qty[1] * d.mats);
     return lo === hi ? `${lo}` : `${lo}–${hi}`;
   }
+  const TYPE_CLASS = { plate: 'melee', leather: 'ranged', cloth: 'magic', vestment: 'healer' };
+  const itemClass = it => it && (it.cls || (it.set && G.SET_BY_ID[it.set] && G.SET_BY_ID[it.set].cls) || TYPE_CLASS[it.armour]) || null;
   function lootIcons(r, diff) {
     return h('div', { class: 'loot-icons', 'aria-label': 'Drops on a win' }, r.drops.map(x => {
       const text = dropText(x, diff);
-      const chip = h('span', { class: `loot-ico${x.rare ? ' rare' : ''}` }, itemIco(x.item, 'sm'), h('small', {}, text));
+      const cls = itemClass(G.ITEMS[x.item]);
+      const chip = h('span', { class: `loot-ico${x.rare ? ' rare' : ''}${cls ? ' class-loot' : ''}` }, itemIco(x.item, 'sm'), h('small', {}, text));
+      if (cls) { chip.style.setProperty('--cls', G.CLASSES[cls].colour); chip.title = `${G.CLASSES[cls].name} gear`; }
       return tip(chip, () => itemTip(x.item, h('p', { class: x.rare ? 'rare-loot' : 'ok' }, x.p ? `${text} chance per win` : `${text} per win`)));
     }));
   }
@@ -1071,7 +1090,10 @@
       return s;
     }));
     let buttons;
+    const gear = G.finaleGear(me.state.equipment, r);
     if (!open) buttons = h('span', { class: 'lock-note' }, ui('lock', 'sm'), diff === 'normal' ? `Clear #${r.n - 1}` : `Clear on ${diff === 'heroic' ? 'Normal' : 'Heroic'}`);
+    else if (!gear.ok) buttons = tip(h('span', { class: 'lock-note gear-lock' }, ui('lock', 'sm'), `Needs T${gear.need} gear`),
+      () => [h('b', {}, 'Finale gear check'), h('p', { class: 'tip-desc' }, `Fit a tier ${gear.need} weapon and at least ${G.FINALE_ARMOUR} tier ${gear.need} armour pieces. You have ${gear.weapon ? 'the weapon' : 'no such weapon'} and ${gear.armour} armour piece${gear.armour === 1 ? '' : 's'}.`)]);
     else if (here) buttons = h('button', { type: 'button', class: 'btn small danger', onclick: ctx.stop }, 'Stop');
     else {
       buttons = [h('button', { type: 'button', class: 'btn small primary', onclick: () => ctx.start(r, diff) }, 'Fight'),

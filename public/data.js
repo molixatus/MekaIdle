@@ -711,6 +711,17 @@
     }
   });
   const RAID_BY_ID = Object.fromEntries(RAIDS.map(r => [r.id, r]));
+  // A region's finale needs next-tier gear fitted: a weapon and at least 3 armour pieces of that
+  // tier or higher (tier 10 for the last region).
+  const FINALE_ARMOUR = 3;
+  function finaleGear(equipment, raid) {
+    const need = Math.min(10, raid.tier + 1);
+    if (!raid.finale) return { ok: true, need };
+    const tierOf = slot => { const it = ITEMS[equipment && equipment[slot]]; return it ? it.tier || 0 : 0; };
+    const weapon = tierOf('weapon') >= need;
+    const armour = ARMOUR_SLOTS.filter(s => tierOf(s) >= need).length;
+    return { ok: weapon && armour >= FINALE_ARMOUR, need, weapon, armour };
+  }
 
   const PATCH_NOTES = [
     { v: '0.7', date: '2026-09-28', notes: [
@@ -744,7 +755,7 @@
     MAX_LEVEL, OFFLINE_CAP, TIERS, TIER_BY_ID, CLASSES, ROLES, CLASS_OF_SKILL, UNARMED_COLOUR, SKILLS, SKILL_BY_ID, COMBAT_SKILLS, STATS, describe,
     WEAPON_KINDS, WEAPON_BY_ID, OFFHAND_KINDS, OFFHAND_BY_ID, SLOTS, ARMOUR_SLOTS, ARMOUR_TYPES, CONSUMABLES, CONSUMABLE_BY_ID,
     ABILITIES, ABILITY_BY_ID, ABILITY_SLOTS, SUBCLASSES, SUBCLASS_BY_ID, REGIONS, SET_BY_ID, TRASH_ROLES, FOE_ROLE, MECHANICS, RAID_CURVE, FOES, FOE_DAMAGE, PASSIVES, DIFFICULTIES, DIFF_BY_ID, FIGHT, PARTY,
-    ITEMS, ACTIONS, ACTION_BY_ID, RAIDS, RAID_BY_ID, PATCH_NOTES, CLASS_KIT,
+    ITEMS, ACTIONS, ACTION_BY_ID, RAIDS, RAID_BY_ID, finaleGear, FINALE_ARMOUR, PATCH_NOTES, CLASS_KIT,
     xpForLevel, levelFromXp, skillMult, mechStats, power, combatLevel, kit, rng,
     PARTY_MAX: PARTY.max, POTIONS_PER_RAID: 3, GUILD_COST: 0, QUEUE_MAX: 5,
   };
