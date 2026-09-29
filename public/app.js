@@ -1821,6 +1821,9 @@
       Bleed: 'bleed', Shadow: 'shadow', Drain: 'mana', Holy: 'holy', Magic: 'shadow' };
     function flash(u, kind) {
       if (quiet || reduced || !u || !u.fxEl) return;
+      const t0 = performance.now();
+      if (u.lastFlash && t0 - u.lastFlash < 600) return;
+      u.lastFlash = t0;
       u.fxEl.className = 'fx';
       void u.fxEl.offsetWidth; // restart the animation
       u.fxEl.className = `fx fx-${kind}`;
@@ -2029,7 +2032,7 @@
         if (e.danger) addLog(at, 'abilities', [foeName(e.tg), e.n === 'Frenzy' ? ' goes into a frenzy!' : e.n === 'Enraged' ? ' is enraged!' : ` uses ${e.n}!`], 'danger');
         const targets = e.tg === 'all' ? party.filter(u => !u.down) : [unitOf(e.tg)].filter(Boolean);
         targets.forEach(u => {
-          if (e.until) u.buffs[e.n] = { until: e.until, cls: typeof e.tg === 'string' ? 'debuff' : 'buff' };
+          if (e.until) u.buffs[e.n] = { until: e.until, from: e.t, neg: !!e.neg, ty: e.ty, cls: e.neg ? 'debuff' : 'buff' };
           if (e.b != null) { u.barrier = e.b; drawHp(u); flash(u, 'shield'); }
         });
       } else if (e.e === 'down') {
@@ -2054,7 +2057,7 @@
       } else if (e.e === 'kill') {
         const u = foes[e.tg];
         if (u) {
-          Object.assign(u, { hp: 0, down: true, cast: null });
+          Object.assign(u, { hp: 0, down: true, cast: null, buffs: {} });
           u.el.classList.add('down');
           u.castBar.className = 'castbar idle';
           u.castText.textContent = 'Defeated';
@@ -2088,7 +2091,7 @@
         if (e.k === 'potion') { const pid = Object.keys(G.ITEMS).find(id => G.ITEMS[id].name === (e.n || e.sr)); addLog(cur.start + e.t, 'abilities', [who(e.tg), ` drinks a ${(e.n || e.sr).toLowerCase()} (+${num(e.v)} HP)`], 'potion', pid ? itemIco(pid, 'sm') : null); }
         float(target, `+${num(e.v)}${e.c ? '!' : ''}`, e.k === 'potion' ? 'Potion' : e.sr, '#4ee08f', e.c, 'heal');
         pulse(target, 'glow');
-        flash(target, 'heal');
+        if (e.k !== 'hot') flash(target, 'heal');
       } else if (typeof e.tg === 'number') {
         // An enemy hitting a pilot.
         if (e.ab) target.barrier = e.b || 0;
@@ -2100,7 +2103,7 @@
         if (foes[e.a] && e.k !== 'dot') pulse(foes[e.a], 'lunge');
         const fxP = e.ab && e.ab >= e.v ? 'shield' : FX_OF_TYPE[e.ty];
         pulse(target, fxP ? 'shake-plain' : 'shake');
-        if (fxP) flash(target, fxP);
+        if (fxP && e.k !== 'dot') flash(target, fxP);
       } else if (e.k === 'eheal') {
         // An enemy healing itself or an ally.
         target.hp = Math.min(target.max, target.hp + e.v);
@@ -2118,7 +2121,7 @@
         if (e.c && ABILITY_NAMES.has(e.sr) && !quiet) addLog(cur.start + e.t, 'abilities', [who(e.a), '\u2019s ', h('b', { class: 'log-ab' }, e.sr), ' crits ', foeName(e.tg), ` for ${num(e.v)}!`], 'crit');
         const fxE = e.ab && e.ab >= e.v ? 'shield' : FX_OF_TYPE[e.ty];
         if (e.k !== 'dot') { pulse(target, fxE ? 'shake-plain' : 'shake'); if (from && e.k !== 'thorns') pulse(from, 'lunge'); }
-        if (fxE) flash(target, fxE);
+        if (fxE && e.k !== 'dot') flash(target, fxE);
       }
       drawHp(target);
     }
@@ -2126,13 +2129,23 @@
     function drawStatuses(clock) {
       const tank = party.find(u => !u.down && cur.fight.fighters[u.i].subclass === 'guardian');
       Object.values(foes).forEach(u => {
-        if (tank && !u.down) u.buffs.Taunted = { until: Infinity, cls: 'taunt', label: `Taunted by ${tank.name}` };
+        if (tank && !u.down) u.buffs.Taunted = { until: Infinity, cls: 'taunt', neg: true, label: `Taunted by ${tank.name}` };
         else delete u.buffs.Taunted;
       });
       [...party, ...Object.values(foes)].forEach(u => {
-        const chips = Object.entries(u.buffs).filter(([, b]) => b.until > clock).map(([n, b]) => h('span', { class: `status ${b.cls}` }, b.label || n));
-        if (u.down && u.respawnAt && !u.enemy) chips.unshift(h('span', { class: 'status down' }, `Respawn in ${Math.max(0, Math.ceil((u.respawnAt - clock) / 1000))}s`));
-        u.statuses.replaceChildren(...chips);
+        const live = Object.entries(u.buffs).filter(([, b]) => b.until > clock);
+        const chip = ([n, b]) => {
+          const left = b.until - clock;
+          // Fight-long effects (frenzy, enrage) show no timer.
+          const timed = Number.isFinite(left) && b.from != null && b.until - b.from < 600000;
+          const el = h('span', { class: `status ${b.cls}${b.ty ? ` ty-${b.ty.toLowerCase()}` : ''}` }, b.label || n,
+            timed ? h('small', {}, `${Math.ceil(left / 1000)}s`) : null);
+          if (timed) el.style.setProperty('--left', String(Math.max(0, Math.min(1, left / (b.until - b.from)))));
+          return el;
+        };
+        const pos = live.filter(([, b]) => !b.neg).map(chip), neg = live.filter(([, b]) => b.neg).map(chip);
+        if (u.down && u.respawnAt && !u.enemy) pos.unshift(h('span', { class: 'status down' }, `Respawn in ${Math.max(0, Math.ceil((u.respawnAt - clock) / 1000))}s`));
+        u.statuses.replaceChildren(h('div', { class: 'status-pos' }, pos), h('div', { class: 'status-neg' }, neg));
       });
     }
 

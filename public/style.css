@@ -1437,3 +1437,17 @@ span.log-loot { display: inline-flex; align-items: center; gap: 3px; }
 
 /* The Raids page shows the fight itself, so the top status line is hidden there (kept on phones for the menu button). */
 @media (min-width: 901px) { body.on-raids .topbar { display: none; } }
+
+/* Buffs (left) and debuffs (right) under the bars, with time left and a draining underline. */
+.statuses { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }
+.status-pos, .status-neg { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.status-neg { justify-content: flex-end; margin-left: auto; }
+.status { position: relative; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; }
+.status small { font-size: 9.5px; opacity: .8; font-variant-numeric: tabular-nums; }
+.status::after { content: ''; position: absolute; left: 0; bottom: 0; height: 2px; width: calc(var(--left, 1) * 100%); background: currentColor; opacity: .7; }
+.status.buff.ty-heal { color: #6ff0a8; background: rgba(61, 220, 132, .14); }
+.status.debuff.ty-poison { color: #d59bff; background: rgba(170, 90, 255, .16); }
+.status.debuff.ty-burn, .status.debuff.ty-prismatic { color: #ffb070; background: rgba(255, 140, 60, .16); }
+.status.debuff.ty-bleed { color: #ff8a8a; background: rgba(230, 60, 60, .16); }
+.status.debuff.ty-shadow { color: #b9a4ff; background: rgba(120, 90, 230, .18); }
+.status.debuff.ty-frost { color: #9fe4ff; background: rgba(80, 190, 255, .16); }
