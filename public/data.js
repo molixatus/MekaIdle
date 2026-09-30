@@ -16,7 +16,7 @@
   // Each level of a combat skill adds 1% to its damage or healing.
   const skillMult = level => 1 + (level - 1) / 100;
   // Levels above your weapon's tier level + this margin add no damage.
-  const LEVEL_CAP_MARGIN = 5;
+  const LEVEL_CAP_MARGIN = 2;
 
   // Deterministic random numbers, so generated raids are the same on server and client.
   function rng(seed) {
@@ -890,7 +890,7 @@
     { v: '0.12', date: '2026-09-29', notes: [
       'Difficulty now climbs in one even ladder: boss 1 Normal, then Heroic, then Mythic, then boss 2 Normal, and so on, each a small step harder than the last, so a boss’s Mythic is never harder than the next boss’s Normal.',
       'Fixed kills not counting if you stopped or left a raid in the few seconds between fights: a fight that has ended always pays out its clear, loot and XP.',
-      'Your level bonus to damage now only counts up to your weapon’s tier level + 5, so levels gained while idling don’t make you much stronger until your gear catches up. Equipment shows your level bonus and its cap.',
+      'Your level bonus to damage now only counts up to your weapon’s tier level + 2, so levels gained while idling don’t make you much stronger until your gear catches up. Equipment shows your level bonus and its cap.',
       'Each boss row has Normal, Heroic and Mythic buttons: fight or switch straight to any unlocked difficulty. The next one to clear is highlighted and the one you’re on becomes Stop. The chips at the top now just pick which loot and power to show.',
       'Switch bosses mid-raid: the boss list stays visible while you fight, and a party leader picking a new boss takes the whole party along.',
       'Fixed the boss list jumping back up while scrolling far down.',
