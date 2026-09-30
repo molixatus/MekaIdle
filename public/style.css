@@ -1730,3 +1730,7 @@ body.on-raids .battle:not([hidden]) > .battle-stage { flex: 1; }
 .mech-sprite .mech-glint { mix-blend-mode: screen; opacity: .4; }
 body.no-shine .mech-sprite .mech-glint { display: none; }
 @media (prefers-reduced-motion: reduce) { .mech-sprite .mech-glint { opacity: .25; } }
+/* Skill pages: one grid per tier; tiers not built yet keep their space. */
+.tier-list .tier-divider { margin: 18px 0 10px; }
+.tier-list .tier-divider:first-child { margin-top: 0; }
+.tier-list .tier-grid { margin-bottom: 4px; }

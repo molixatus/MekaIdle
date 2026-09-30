@@ -1021,20 +1021,52 @@
     // Every tier on one screen, lowest level first, with a divider where each tier starts.
     const tierOf = a => a.tier || (G.ITEMS[a.item] || {}).tier || 1;
     const all = G.ACTIONS.filter(a => a.skill === id).sort((x, y) => tierOf(x) - tierOf(y) || x.level - y.level);
-    const cards = [];
-    let lastTier = 0;
+    const groups = [];
     all.forEach(a => {
       const tn = tierOf(a);
-      if (new Set(all.map(tierOf)).size > 1 && tn !== lastTier) {
-        const t = G.TIERS[tn - 1];
-        const div = h('div', { class: 'tier-divider' }, h('span', {}, `Tier ${tn} · ${t.metal}`), h('small', {}, `from level ${a.level}`));
-        div.style.setProperty('--tier', t.colour);
-        cards.push(div);
-      }
-      lastTier = tn;
-      cards.push(actionCard(a));
+      if (!groups.length || groups[groups.length - 1].tn !== tn) groups.push({ tn, acts: [] });
+      groups[groups.length - 1].acts.push(a);
     });
-    return [...head, chainBar(id), section(SKILL_SECTION[id] || 'Actions', 'Hover a card for details. Click it to start, or set a count and start or queue it.', h('div', { class: 'grid' }, cards))];
+    // Only the first tiers are built straight away; each other tier is built when it comes within a
+    // couple of screens of view, holding its space until then (measured from the first tier) so the
+    // page never jumps. Opening a skill page stays quick with 80 tiers.
+    const build = g => {
+      if (g.built) return;
+      g.built = true;
+      g.grid.classList.remove('tier-pending');
+      g.grid.style.minHeight = '';
+      g.grid.replaceChildren(...g.acts.map(actionCard));
+    };
+    const blocks = groups.map((g, i) => {
+      const t = G.TIERS[g.tn - 1];
+      const div = groups.length > 1 ? h('div', { class: 'tier-divider' }, h('span', {}, `Tier ${g.tn} · ${t.metal}`), h('small', {}, `from level ${g.acts[0].level}`)) : null;
+      if (div) div.style.setProperty('--tier', t.colour);
+      g.grid = h('div', { class: 'grid tier-grid' });
+      if (i < 2) build(g);
+      else { g.grid.classList.add('tier-pending'); g.grid.style.minHeight = `${Math.ceil(g.acts.length / 4) * 250}px`; }
+      return [div, g.grid];
+    });
+    const pending = groups.filter(g => !g.built);
+    if (pending.length && 'IntersectionObserver' in window) {
+      const byEl = new Map(pending.map(g => [g.grid, g]));
+      const io = new IntersectionObserver(entries => entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        build(byEl.get(e.target));
+        io.unobserve(e.target);
+      }), { rootMargin: '2000px 0px' });
+      pending.forEach(g => io.observe(g.grid));
+      pageCleanup = () => io.disconnect();
+      // Size the waiting tiers like the first one, per row of cards.
+      setTimeout(() => {
+        const cards = [...groups[0].grid.children];
+        if (!cards.length || !groups[0].grid.offsetHeight) return;
+        const cols = Math.max(1, cards.filter(c => c.offsetTop === cards[0].offsetTop).length);
+        const gap = parseFloat(getComputedStyle(groups[0].grid).rowGap) || 0;
+        const rowH = (groups[0].grid.offsetHeight + gap) / Math.ceil(cards.length / cols);
+        pending.forEach(g => { if (!g.built) g.grid.style.minHeight = `${Math.round(Math.ceil(g.acts.length / cols) * rowH - gap)}px`; });
+      }, 0);
+    } else pending.forEach(build);
+    return [...head, chainBar(id), section(SKILL_SECTION[id] || 'Actions', 'Hover a card for details. Click it to start, or set a count and start or queue it.', h('div', { class: 'tier-list' }, blocks))];
   }
 
   // A small item badge (icon and a number) with the item's details on hover.
