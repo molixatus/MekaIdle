@@ -925,6 +925,7 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'The Inventory and Social tabs are gone. Your gold now shows on the Equipment page.',
       'Skill pages open much faster: tiers are built as they come near the screen instead of all 80 at once.',
       'Glinting gear shows its glint on your mech too, only on that piece (weapon, off-hand, helmet, body, legs, gloves or boots) and in its colour. The Item shine setting turns it off.',
       'New item glint, like an enchanted item: soft diagonal stripes drift constantly across rare gear, raid materials and high-tier gear (tier 25+), in each item’s own colour. It’s subtler than before.',

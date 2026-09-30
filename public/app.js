@@ -313,6 +313,7 @@
   let me = null;      // latest /api/me payload
   let offset = 0;     // server clock minus local clock
   let page = store(PAGE_KEY) || 'skill:mining';
+  if (/^(inventory|social)/.test(page)) page = 'equipment';
   let pollTimer = null;
   let polls = 0;
   let pageRefresh = null; // refresh hook for pages that load their own data
@@ -628,7 +629,6 @@
       { id: 'raids', name: 'Raids', icon: 'raids' },
       { id: 'fights', name: 'Recent fights', icon: 'fights' },
       { id: 'equipment', name: 'Equipment', icon: 'equipment' },
-      { id: 'inventory', name: 'Inventory', icon: 'inventory' },
       { id: 'abilities', name: 'Abilities', icon: 'abilities' },
       { id: 'subclass', name: 'Subclasses', icon: 'subclass' },
     ] },
@@ -638,7 +638,6 @@
     { title: 'Pilot', items: [
       { id: 'trade', name: 'Trade', icon: 'trade', alert: 'trades' },
       { id: 'guild', name: 'Guild', icon: 'guild' },
-      { id: 'social', name: 'Social', icon: 'social', alert: 'friends' },
       { id: 'patch', name: 'Patch notes', icon: 'patch' },
     ] },
   ];
@@ -854,7 +853,7 @@
   const itemsSig = (st, keep) => Object.entries(st.items).filter(([id]) => !keep || (G.ITEMS[id] && keep(G.ITEMS[id]))).sort().join(';');
   const PAGE_SIG = {
     skill: st => JSON.stringify([levelsSig(st), st.activity && [st.activity.id, st.activity.type], st.side && st.side.id]),
-    equipment: st => JSON.stringify([st.equipment, st.supplies, st.subclasses, levelsSig(st), itemsSig(st, it => it.type === 'gear' || it.supply)]),
+    equipment: st => JSON.stringify([st.equipment, st.supplies, st.subclasses, levelsSig(st), itemsSig(st, it => it.type === 'gear' || it.supply), st.items.gold]),
     inventory: st => JSON.stringify([itemsSig(st), st.equipment]),
     abilities: st => JSON.stringify([st.abilities, st.subclasses, st.multi, st.equipment, levelsSig(st)]),
     subclass: st => JSON.stringify([st.subclasses, st.multi, st.equipment, levelsSig(st)]),
@@ -874,6 +873,8 @@
   function go(id) {
     const kind = id.split(':')[0];
     if (kind === 'hangar') id = 'equipment';
+    // The Inventory and Social tabs are gone; old links land on Equipment.
+    if (kind === 'inventory' || kind === 'social') id = 'equipment';
     if (!PAGES[id.split(':')[0]] || (id.startsWith('skill:') && !G.SKILL_BY_ID[id.slice(6)])) id = 'skill:mining';
     if (pageCleanup) pageCleanup();
     page = id;
@@ -1214,7 +1215,8 @@
       pageHead('equipment', 'skill-melee', me.player.mech, `Piloted by ${me.player.name}. Your main-hand weapon sets your class and your mech’s colour.`,
         h('div', { class: 'head-stats' },
           h('div', {}, h('small', {}, 'Combat level'), h('b', {}, num(myCombat()))),
-          h('div', {}, h('small', {}, 'Power'), h('b', {}, num(G.power(s)))))),
+          h('div', {}, h('small', {}, 'Power'), h('b', {}, num(G.power(s)))),
+          h('div', { class: 'gold-box' }, itemIco('gold', 'md'), h('div', {}, h('small', {}, 'Gold'), h('b', {}, num(have('gold'))))))),
       h('div', { class: 'hangar' },
         h('div', { class: 'panel hangar-mech' },
           h('div', { class: 'hangar-stage' }, mechArt(eq, `${me.player.mech}, your mech`)),
