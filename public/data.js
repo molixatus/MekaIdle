@@ -526,6 +526,8 @@
     const [name, icon, desc] = MAT_INFO[k](t);
     item(matId(k, t), { name, type: 'resource', icon, colour: t.colour, tier: t.n, desc: `Tier ${t.n}. ${desc}` });
   }));
+  TIERS.forEach(t => item(`${t.id}_geode`, { name: `${t.metal} geode`, type: 'resource', icon: 'ore', colour: t.colour, tier: t.n,
+    desc: `Tier ${t.n}. Mined from ${t.metal.toLowerCase()} geode seams at Mining ${t.level + 2}. For Honing’s whetstone charms.` }));
   TIERS.forEach(t => {
     const reg = REGIONS[t.region];
     item(`mat_${t.n}`, { name: t.grade ? `${GRADES[t.grade]} ${reg.mat.toLowerCase()}` : reg.mat, type: 'material', icon: `mat_${t.region}`, colour: t.colour, tier: t.n,
@@ -602,7 +604,7 @@
     // A crafted trinket for each chain's consumable skill, about as strong as the sigil, leaning
     // towards its class.
     item(`whetcharm_${n}`, { name: `${t.metal} whetstone charm`, type: 'gear', slot: 'trinket', icon: iconFor('trinket', t.region + 1), colour: t.colour, tier: n,
-      stats: { power: round1(3 + 1.5 * t.p), pen: round1(4 + 2 * t.p), hpPct: round1(2 + t.p) }, desc: 'A trinket honed from ore and raid material with Honing. Suits melee pilots.' });
+      stats: { power: round1(3 + 1.5 * t.p), pen: round1(4 + 2 * t.p), hpPct: round1(2 + t.p) }, desc: 'A trinket honed from ore, geodes and raid material with Honing. Suits melee pilots.' });
     item(`fang_${n}`, { name: `${t.bone} talisman`, type: 'gear', slot: 'trinket', icon: iconFor('trinket', t.region + 1), colour: t.colour, tier: n,
       stats: { crit: round1(2 + t.p), haste: round1(3 + 1.5 * t.p), hpPct: round1(2 + t.p) }, desc: 'A trinket steeped in venom and raid material with Poisoncraft. Suits ranged pilots.' });
     item(`locket_${n}`, { name: `${t.herb} locket`, type: 'gear', slot: 'trinket', icon: iconFor('trinket', t.region + 1), colour: t.colour, tier: n,
@@ -653,7 +655,7 @@
     // Mining: ore, a rich vein (more ore, sometimes gold) and a deposit (gold).
     gather(`mine_${t.id}`, 'mining', t.vein, 0, 3, matId('ore', t), [1, 1]);
     gather(`mine_rich_${t.id}`, 'mining', `Rich ${lower(t.vein)}`, 1, 5, matId('ore', t), [2, 2], [{ item: 'gold', p: 0.25, qty: 2 }]);
-    gather(`deposit_${t.id}`, 'mining', `${t.metal} deposit`, 2, 5, 'gold', [Math.max(2, Math.round(3 * t.armourMult)), Math.max(4, Math.round(6 * t.armourMult))]);
+    gather(`deposit_${t.id}`, 'mining', `${t.metal} geode seam`, 2, 5, `${t.id}_geode`, [1, 1]);
     // Hunting: hides, bones and venom from the tier's beast.
     gather(`hunt_${t.id}`, 'hunting', `${t.beast} hides`, 0, 3.5, matId('hide', t), [1, 2]);
     gather(`tusks_${t.id}`, 'hunting', `${t.bone}s`, 1, 3.5, matId('bone', t), [1, 2]);
@@ -692,7 +694,8 @@
     action({ id: `craft_${sid}`, skill: 'runecrafting', name: ITEMS[sid].name, level: t.level + 5, time: 5000, xp: craftXp(t, sInputs, 5000), item: sid, inputs: sInputs, outputs: { [sid]: [1, 1] } });
     [['whetcharm', 'honing', 'ore'], ['fang', 'poisoncraft', 'venom'], ['locket', 'alchemy', 'herb']].forEach(([base, skill, mat]) => {
       const id = `${base}_${t.n}`;
-      const inputs = { [`mat_${t.n}`]: 4, [matId(mat, t)]: 3 };
+      // Whetstone charms also need the tier's geodes.
+      const inputs = { [`mat_${t.n}`]: 4, [matId(mat, t)]: 3, ...(base === 'whetcharm' ? { [`${t.id}_geode`]: 2 } : {}) };
       action({ id: `craft_${id}`, skill, name: ITEMS[id].name, tier: t.n, level: t.level + 5, time: 5000, xp: craftXp(t, inputs, 5000), item: id, inputs, outputs: { [id]: [1, 1] } });
     });
   });
@@ -921,6 +924,7 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'Mining’s third node at each tier is now a geode seam instead of a gold deposit. Its geodes (e.g. Copper geode) are needed, with ore and the tier’s raid material, to hone whetstone charms.',
       'Crafted trinkets for every chain, not just Runecrafting: Honing makes whetstone charms (power and armour pierce, for melee), Poisoncraft makes talismans (crit and attack speed, for ranged) and Alchemy makes lockets (healing and mana regen, for healers), one per tier, from the tier’s raid material.',
       'The beginner ease-in now only covers the first 3 bosses. From boss 4 on, every boss is fully tuned to its tier, so tier 1 gear (even with a few raid pieces and a high level) no longer carries you through tiers 2 and 3. Your mech’s base damage and HP now grow with your weapon’s tier, so every tier of gear is a full step stronger.',
       'Every gathering skill has 3 things to gather at each tier, each giving its own material: Mining has veins, rich veins and deposits (gold); Hunting has hides, tusks and venom; Foraging has branches, fibre and essence; Herbalism has herbs, reeds and wild herbs.',

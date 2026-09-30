@@ -65,6 +65,7 @@
   };
   const M = {
     ore: [[12, 0], [13, 0], [12, 1], [13, 1], [12, 3], [13, 3], [12, 5], [13, 5], [10, 7], [10, 5]],
+    geode: [[12, 2], [13, 2], [12, 4], [13, 4], [12, 6], [13, 6], [10, 0], [10, 1], [10, 2], [13, 7]],
     hide: withHue([[12, 11], [13, 11], [14, 12], [14, 13], [14, 14], [14, 15]], [90, 180, 270, 320]),
     bone: [[14, 6], [14, 7], [14, 5], [12, 13], [13, 13], [14, 8], [14, 9], [14, 10], [14, 11], [14, 1]],
     venom: [[3, 12], [3, 13], [3, 14], [7, 8], [3, 8], [3, 9], [3, 10], [16, 8], [16, 11], [16, 13]],
@@ -97,7 +98,7 @@
     if (CONSUMABLE[it.id]) return CONSUMABLE[it.id];
     let m = /^mat_(\d+)$/.exec(it.id);
     if (m) return RAID_MATS[step(m[1])];
-    m = /^[a-z]+\d*_(ore|hide|bone|venom|branch|fibre|essence|herb)$/.exec(it.id);
+    m = /^[a-z]+\d*_(ore|geode|hide|bone|venom|branch|fibre|essence|herb)$/.exec(it.id);
     if (m) return pick(M[m[1]]);
     if ((m = /^sigil_(\d+)$/.exec(it.id))) return [132, (Number(m[1]) - 1) % 16];
     // Crafted trinkets from Honing, Poisoncraft and Alchemy: their own cells and tints.
