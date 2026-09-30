@@ -925,6 +925,7 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'Boss names are no longer hidden behind big boss sprites in the raid screen.',
       'Trading moved to the Guild page: press Trade on a guildmate to open a trade window with your items as icons (filter by type or name), pick amounts, and search for anything to ask for. Offers to you show on the Guild page (“… sent you a trade offer”) with a button to open them, and the Guild tab shows a badge. The Trade tab is gone.',
       'Friends are gone: guilds replace them. Parties open to “Guildmates” can be joined by your guild.',
       'The Inventory and Social tabs are gone. Your gold now shows on the Equipment page.',
