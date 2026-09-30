@@ -2105,9 +2105,9 @@
     }
     // Where a number pops up. Numbers on an enemy go in a grid with one cell per pilot (so in a big
     // party each pilot's hits land in their own spot), jittered a little inside the cell.
-    function floatSpot(slot) {
-      if (slot == null || party.length < 2) return [15 + Math.random() * 70, Math.random() * 45];
-      const n = party.length, cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols);
+    function floatSpot(slot, cells = party.length) {
+      if (slot == null || cells < 2) return [15 + Math.random() * 70, Math.random() * 45];
+      const n = cells, cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols);
       const col = slot % cols, row = Math.floor(slot / cols) % rows;
       const cw = 80 / cols, rh = 62 / rows;
       return [10 + (col + 0.5 + (Math.random() - 0.5) * 0.6) * cw, (row + 0.15 + Math.random() * 0.5) * rh];
@@ -2131,7 +2131,8 @@
       if (u.floats.childElementCount > Math.max(8, party.length * 3)) u.floats.firstElementChild.remove();
       // Kinds get a prefix so general classes (like .dot) can't restyle the number boxes.
       const s = h('span', { class: `float${kind ? ` fk-${kind}` : ''}${big ? ' big' : ''}` }, h('b', {}, value), label ? h('small', {}, label) : null);
-      const [x, y] = floatSpot(slot);
+      // On pilots, numbers go in a 2x2 grid by kind (hits taken, damage over time, heals, other) so they don't pile up.
+      const [x, y] = u.enemy ? floatSpot(slot) : floatSpot(kind === 'taken' ? 0 : kind === 'dot' ? 1 : kind === 'heal' ? 2 : 3, 4);
       s.style.left = `${x}%`;
       s.style.top = `${y}%`;
       s.style.setProperty('--fc', colour);
