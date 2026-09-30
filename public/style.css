@@ -1761,3 +1761,6 @@ body.no-shine .mech-sprite .mech-glint { display: none; }
 /* Boss: name and bars start clear of the sprite, which spills past its box. */
 .unit.enemy.boss .unit-info { margin-left: 70px; }
 @media (max-width: 900px) { .unit.enemy.boss .unit-info { margin-left: 30px; } }
+/* Other enemies: a little room between the sprite and the name and bars too. */
+.unit.enemy:not(.boss) .unit-info { margin-left: 22px; }
+@media (max-width: 900px) { .unit.enemy:not(.boss) .unit-info { margin-left: 10px; } }
