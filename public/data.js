@@ -925,6 +925,8 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'New item glint, like an enchanted item: soft diagonal stripes drift constantly across rare gear, raid materials and high-tier gear (tier 25+), in each item’s own colour. It’s subtler than before.',
+      'Boss rows line up again: locked bosses no longer sit further right than unlocked ones.',
       'In the boss list, raid gear you already have is dimmed with a tick, like the cleared difficulties.',
       'On the Raids page the fight fills the screen above the bottom panel, and the boss list starts below it (scroll down to see it). Fixed a stray “null” in the Loot this session row.',
       'Fixed skill pages jumping while you scroll: counts and XP now update in place instead of the whole page being rebuilt after every action.',

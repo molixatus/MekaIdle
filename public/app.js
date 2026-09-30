@@ -54,7 +54,7 @@
     // Rare gear and tier 7+ gear shine: a light sweep drawn only on the item's own pixels (masked by
     // the same sheet cell), gold for rare gear, tinted with the tier colour otherwise.
     // Raid materials shine too, in their tier colour.
-    const shiny = (it.type === 'gear' && (it.rare || (it.tier || 0) >= 7)) || it.type === 'material';
+    const shiny = (it.type === 'gear' && (it.rare || (it.tier || 0) >= 25)) || it.type === 'material';
     const box = h('span', { class: `ico item-sprite ${cls}${it.rare ? ' rare' : ''}${shiny ? ' shiny' : ''}`, 'aria-hidden': 'true' }, inner);
     // A layer drawn only on the item's own pixels (masked by the same sheet cell).
     const layer = klass => {
@@ -75,7 +75,8 @@
     }
     if (shiny) {
       const shineEl = layer('item-shine');
-      shineEl.style.setProperty('--shine', it.rare ? '#ffd86b' : it.colour);
+      // The glint takes the item's own colour.
+      shineEl.style.setProperty('--shine', it.colour);
       box.append(shineEl);
     }
     return box;
