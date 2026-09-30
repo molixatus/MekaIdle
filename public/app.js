@@ -400,7 +400,7 @@
   function mechArt(equipment = {}, label = 'Mech') {
     const piece = slot => {
       const it = G.ITEMS[equipment[slot]];
-      return it && it.armour ? { type: it.armour, colour: it.colour, tier: it.tier, rare: !!it.rare } : null;
+      return it && it.armour ? { type: it.armour, colour: (it.rare && spriteColour(it.id)) || it.colour, tier: it.tier, rare: !!it.rare } : null;
     };
     const weapon = G.ITEMS[equipment.weapon];
     const off = G.ITEMS[equipment.offhand];
