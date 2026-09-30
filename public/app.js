@@ -1591,7 +1591,9 @@
       const nextDiff = G.DIFFICULTIES[Math.min(cleared, G.DIFFICULTIES.length - 1)].id;
       const diffBtn = (x, i) => {
         if (ctx.current && ctx.current.raid === r.id && ctx.current.diff === x.id) {
-          const stop = h('button', { type: 'button', class: 'btn small danger diff-btn', title: `Stop fighting on ${x.name}`, onclick: ctx.stop }, ui('close', 'sm'), x.name);
+          // The one you're fighting: a tick if it's cleared (a cross otherwise), turning into a cross on hover to stop.
+          const stop = h('button', { type: 'button', class: `btn small danger diff-btn fighting-btn${cleared > i ? ' was-done' : ''}`, title: `Fighting on ${x.name}${cleared > i ? ' (cleared)' : ''}. Click to stop.`, onclick: ctx.stop },
+            h('span', { class: 'fb-idle' }, cleared > i ? '✓' : ui('close', 'sm')), h('span', { class: 'fb-hover' }, ui('close', 'sm')), x.name);
           stop.style.setProperty('--diff', x.colour);
           return stop;
         }

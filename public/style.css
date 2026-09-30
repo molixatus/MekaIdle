@@ -1685,3 +1685,9 @@ body.dock-open.on-raids .page-head { display: none; }
 @keyframes part-drift { 0% { opacity: 0; transform: translate(0, -10px); } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(8px, 40px) rotate(90deg); } }
 body.no-auras .auras { display: none; }
 @media (prefers-reduced-motion: reduce) { .aura-parts i { animation: none !important; } }
+/* The difficulty you're fighting: a tick if cleared, a cross on hover (click to stop). */
+.fighting-btn .fb-hover { display: none; }
+.fighting-btn:hover .fb-hover { display: inline-flex; }
+.fighting-btn:hover .fb-idle { display: none; }
+.fighting-btn.was-done .fb-idle { color: #6ff0a8; font-weight: 800; }
+.fighting-btn.was-done:not(:hover) { background: color-mix(in srgb, var(--diff) 30%, #1a1f29); }
