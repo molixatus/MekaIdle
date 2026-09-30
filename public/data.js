@@ -808,9 +808,9 @@
       const nb = t.grade === 7 ? 4 : 3;
       const j = k - 3 * t.grade;
       const diffStep = Math.pow(TIER_STEP, 1 / (3 * nb));
-      // The first 12 bosses ease new pilots in (no potions or abilities yet).
-      const introIdx = (t.n - 1) * 3 + j;
-      const intro = introIdx < 12 ? 0.65 + 0.35 * introIdx / 12 : 1;
+      // The first 3 bosses (tier 1) ease new pilots in (no potions or abilities yet); from boss 4 on,
+      // every boss is fully tuned to its tier's gear.
+      const intro = t.n === 1 ? 0.6 + 0.12 * j : 1;
       const f = RAID_CURVE.base * intro * Math.pow(diffStep, 3 * j);
       const bossFoe = reg.bosses[0];
       // This raid's boss: the next monster from the shuffled roster (a region never repeats one).
@@ -906,6 +906,7 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'The beginner ease-in now only covers the first 3 bosses. From boss 4 on, every boss is fully tuned to its tier, so tier 1 gear (even with a few raid pieces and a high level) no longer carries you through tiers 2 and 3.',
       'Every gathering skill has 3 things to gather at each tier: rich veins and deposits (with gold) for Mining; traps and skinning for Hunting; thickets and essence blooms for Foraging; wild herbs and reed beds for Herbalism.',
       'Much more variety in item sprites: each tier uses a different sprite from the one before, and a sprite only comes back after several tiers, instead of the same shape recoloured for a whole region.',
       'Effect animations in raids: shielded units get a shimmering bubble, and units that are bleeding, poisoned, burning, chilled, shadowed or healing over time show drops, bubbles, embers, frost, wisps or sparkles. Turn them off in Settings.',
