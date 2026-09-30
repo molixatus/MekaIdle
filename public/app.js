@@ -2417,7 +2417,9 @@
         if (e.danger) addLog(at, 'abilities', [foeName(e.tg), e.n === 'Frenzy' ? ' goes into a frenzy!' : e.n === 'Enraged' ? ' is enraged!' : ` uses ${e.n}!`], 'danger');
         const targets = e.tg === 'all' ? party.filter(u => !u.down) : [unitOf(e.tg)].filter(Boolean);
         targets.forEach(u => {
-          if (e.until) u.buffs[e.n] = { until: e.until, from: e.t, neg: !!e.neg, ty: e.ty, cls: e.neg ? 'debuff' : 'buff' };
+          // Each application runs on its own (damage over time stacks); the badge counts them.
+          if (e.until) { const prev = u.buffs[e.n]; const stacks = (prev && prev.stacks ? prev.stacks.filter(x => x > e.t) : []).concat(e.until);
+            u.buffs[e.n] = { until: Math.max(e.until, prev && prev.until > e.t ? prev.until : 0), from: e.t, neg: !!e.neg, ty: e.ty, cls: e.neg ? 'debuff' : 'buff', stacks }; }
           if (e.b != null) { u.barrier = e.b; drawHp(u); flash(u, 'shield'); }
         });
       } else if (e.e === 'down') {
@@ -2544,7 +2546,8 @@
           const left = b.until - clock;
           // Fight-long effects (frenzy, enrage) show no timer.
           const timed = Number.isFinite(left) && b.from != null && b.until - b.from < 600000;
-          const txt = timed ? (left >= 10000 ? `${Math.ceil(left / 1000)}s` : `${(left / 1000).toFixed(1)}s`) : '';
+          const stackN = b.stacks ? b.stacks.filter(x => x > clock).length : 1;
+          const txt = (timed ? (left >= 10000 ? `${Math.ceil(left / 1000)}s` : `${(left / 1000).toFixed(1)}s`) : '') + (stackN > 1 ? ` ×${stackN}` : '');
           if (s.time.textContent !== txt) s.time.textContent = txt;
           s.el.style.setProperty('--left', timed ? String(Math.max(0, Math.min(1, left / (b.until - b.from)))) : '1');
           return s.el;
