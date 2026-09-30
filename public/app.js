@@ -685,7 +685,10 @@
     const activeSkill = !act0 ? null : act0.type ? G.CLASSES[myClass()].skill : (G.ACTION_BY_ID[act0.id] || {}).skill;
     // A skill trained alongside a raid animates too.
     const sideSkill = me.state.side ? (G.ACTION_BY_ID[me.state.side.id] || {}).skill : null;
-    const training = sk => sk === activeSkill || sk === sideSkill;
+    // Raiding with an off-hand from another class trains that class too (its share of the XP).
+    const offItem = act0 && act0.type ? G.ITEMS[me.state.equipment.offhand] : null;
+    const offSkill = offItem && offItem.cls && offItem.cls !== myClass() ? G.CLASSES[offItem.cls].skill : null;
+    const training = sk => sk === activeSkill || sk === sideSkill || sk === offSkill;
     Object.values(navRefs).forEach(({ btn, right, spin, item, fill }) => {
       btn.toggleAttribute('aria-current', false);
       if (item.id === page) btn.setAttribute('aria-current', 'page');
