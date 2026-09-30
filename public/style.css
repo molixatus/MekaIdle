@@ -1693,3 +1693,6 @@ body.no-auras .auras { display: none; }
 body.on-raids .battle:not([hidden]) { display: flex; flex-direction: column; min-height: calc(100vh - var(--ab-h, 60px) - 44px - 16px); }
 body.on-raids.dock-open .battle:not([hidden]) { min-height: calc(100vh - var(--ab-h, 60px) - min(340px, 42vh) - 44px - 16px); }
 body.on-raids .battle:not([hidden]) > .battle-stage { flex: 1; }
+@media (max-width: 900px) {
+  body.on-raids.dock-open .battle:not([hidden]) { min-height: calc(100vh - var(--ab-h, 60px) - min(420px, 55vh) - 44px - 16px); }
+}
