@@ -925,6 +925,8 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'Trading moved to the Guild page: press Trade on a guildmate to open a trade window with your items as icons (filter by type or name), pick amounts, and search for anything to ask for. Offers to you show on the Guild page (“… sent you a trade offer”) with a button to open them, and the Guild tab shows a badge. The Trade tab is gone.',
+      'Friends are gone: guilds replace them. Parties open to “Guildmates” can be joined by your guild.',
       'The Inventory and Social tabs are gone. Your gold now shows on the Equipment page.',
       'Skill pages open much faster: tiers are built as they come near the screen instead of all 80 at once.',
       'Glinting gear shows its glint on your mech too, only on that piece (weapon, off-hand, helmet, body, legs, gloves or boots) and in its colour. The Item shine setting turns it off.',

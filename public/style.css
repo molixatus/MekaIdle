@@ -1734,3 +1734,24 @@ body.no-shine .mech-sprite .mech-glint { display: none; }
 .tier-list .tier-divider { margin: 18px 0 10px; }
 .tier-list .tier-divider:first-child { margin-top: 0; }
 .tier-list .tier-grid { margin-bottom: 4px; }
+
+/* Trade pop-up: item tiles you can see at a glance. */
+.trade-dialog { width: min(880px, 100%); display: grid; gap: 14px; }
+.trade-cols, .trade-browse { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.trade-col { display: grid; gap: 8px; align-content: start; min-width: 0; padding: 12px; background: var(--card); border-radius: 10px; }
+.trade-col h3 { margin: 0; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.trade-grid, .trade-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.trade-pick { max-height: 240px; overflow-y: auto; padding-right: 4px; }
+.trade-tile { display: grid; justify-items: center; gap: 2px; padding: 8px 6px; background: #12151c; border: 1px solid #262c38; border-radius: 8px; text-align: center; min-width: 0; }
+.trade-tile b { font-size: 14px; font-variant-numeric: tabular-nums; }
+.trade-tile small { font-size: 11px; color: var(--muted); line-height: 1.2; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.trade-tile.pick { cursor: pointer; transition: border-color .15s, transform .15s; }
+.trade-tile.pick:hover { border-color: var(--accent, #6cb4ff); transform: translateY(-2px); }
+.trade-tile.chosen { border-color: color-mix(in srgb, #3ddc84 50%, #262c38); }
+.trade-tile.short { border-color: rgba(239, 90, 69, .6); }
+.trade-tile.rare-tile { background: linear-gradient(#1c1a12, #12151c); }
+.trade-qty { display: flex; gap: 4px; align-items: center; margin-top: 4px; }
+.trade-qty input { width: 58px; padding: 2px 4px; }
+.trade-col input[type="search"] { width: 100%; }
+.trade-note .trade-preview { display: flex; gap: 2px; }
+@media (max-width: 700px) { .trade-cols, .trade-browse { grid-template-columns: 1fr; } }

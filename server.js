@@ -572,13 +572,13 @@ async function partyView(party) {
   };
 }
 
-// visibility: private (nobody else), friends (friends and guildmates) or public (anyone).
+// visibility: private (nobody else), friends (guildmates; the stored name is from when friends
+// existed) or public (anyone).
 const VISIBILITY = ['private', 'friends', 'public'];
 async function canJoin(me, party) {
   if (party.leader_id === me) return true;
   if (party.visibility === 'private') return false;
   if (party.visibility === 'public') return true;
-  if ((await friendIds(me)).includes(party.leader_id)) return true;
   const mine = (await db.get('SELECT guild_id FROM players WHERE id = ?', me)).guild_id;
   const theirs = await db.get('SELECT guild_id FROM players WHERE id = ?', party.leader_id);
   return !!mine && !!theirs && theirs.guild_id === mine;

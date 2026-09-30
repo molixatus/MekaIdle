@@ -313,7 +313,8 @@
   let me = null;      // latest /api/me payload
   let offset = 0;     // server clock minus local clock
   let page = store(PAGE_KEY) || 'skill:mining';
-  if (/^(inventory|social)/.test(page)) page = 'equipment';
+  if (/^(inventory|social)/.test(page)) page = 'equipment';
+  if (/^trade/.test(page)) page = 'guild';
   let pollTimer = null;
   let polls = 0;
   let pageRefresh = null; // refresh hook for pages that load their own data
@@ -636,8 +637,7 @@
     { title: 'Gathering', items: skillNav('gathering') },
     { title: 'Artisan', items: skillNav('artisan') },
     { title: 'Pilot', items: [
-      { id: 'trade', name: 'Trade', icon: 'trade', alert: 'trades' },
-      { id: 'guild', name: 'Guild', icon: 'guild' },
+      { id: 'guild', name: 'Guild', icon: 'guild', alert: 'trades' },
       { id: 'patch', name: 'Patch notes', icon: 'patch' },
     ] },
   ];
@@ -875,6 +875,7 @@
     if (kind === 'hangar') id = 'equipment';
     // The Inventory and Social tabs are gone; old links land on Equipment.
     if (kind === 'inventory' || kind === 'social') id = 'equipment';
+    if (kind === 'trade') id = 'guild';
     if (!PAGES[id.split(':')[0]] || (id.startsWith('skill:') && !G.SKILL_BY_ID[id.slice(6)])) id = 'skill:mining';
     if (pageCleanup) pageCleanup();
     page = id;
@@ -1355,7 +1356,7 @@
       source.length ? h('div', {}, h('b', {}, 'Comes from'), h('ul', {}, source.map(s => h('li', {}, s)))) : null,
       usedIn.length ? h('div', {}, h('b', {}, 'Used in'), h('ul', {}, usedIn.slice(0, 8).map(a => h('li', {}, `${a.name} (${a.inputs[id]})`)), usedIn.length > 8 ? h('li', {}, `and ${usedIn.length - 8} more`) : null)) : null,
       it.type === 'gear' ? h('button', { type: 'button', class: 'btn primary', onclick: () => act('/api/equip', { item: id }, `${it.name} fitted.`) }, 'Fit to mech') : null,
-      h('button', { type: 'button', class: 'btn', onclick: () => { tradePrefill = { give: id }; go('trade'); } }, 'Offer in a trade'));
+      null);
   }
 
   // ---------- Abilities ----------
@@ -1548,7 +1549,7 @@
         h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn', onclick: download }, 'Download save backup'))),
       h('section', { class: 'panel stack settings danger-zone' },
         h('h2', {}, 'Reset progress'),
-        h('p', {}, 'Start again from scratch: all skills back to level 1, and your items, gear, abilities, subclasses and raid clears are cleared. Your name, mech, guild and friends stay. Open trade offers are withdrawn.'),
+        h('p', {}, 'Start again from scratch: all skills back to level 1, and your items, gear, abilities, subclasses and raid clears are cleared. Your name, mech and guild stay. Open trade offers are withdrawn.'),
         h('label', { class: 'inline-field' }, 'Type your pilot name to confirm', confirmBox),
         h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn danger', onclick: reset }, 'Reset stats'))),
     ];
@@ -1571,7 +1572,7 @@
   const STYLE_NAME = { melee: 'Melee', ranged: 'Ranged', magic: 'Magic' };
   // Who can join your raids: remembered in this browser and applied to every raid you start.
   const VIS_KEY = 'mekaidle-visibility';
-  const VIS_LABEL = { private: 'Closed (solo)', friends: 'Friends and guild', public: 'Everyone' };
+  const VIS_LABEL = { private: 'Closed (solo)', friends: 'Guildmates', public: 'Everyone' };
   const clearsOf = id => (me.state.clears || {})[id] || 0;
   function raidOpen(r, diff) {
     if (diff === 'normal') return r.n <= (me.state.reached || 1) || clearsOf(`r${r.n - 1}`) >= 3;
@@ -1694,7 +1695,7 @@
     let diff = G.DIFF_BY_ID[store(DIFF_KEY)] ? store(DIFF_KEY) : 'normal';
     const ctx = {
       start: startSolo, stop: () => (battle.onStop ? battle.onStop() : stopRaid()),
-      form: (r, d) => { const vis = store(VIS_KEY) && store(VIS_KEY) !== 'private' ? store(VIS_KEY) : 'friends'; return partyAct('/api/party/create', { raid: r.id, diff: d, visibility: vis }, vis === 'public' ? 'Party formed. Anyone can join.' : 'Party formed. Friends and guildmates can join.'); },
+      form: (r, d) => { const vis = store(VIS_KEY) && store(VIS_KEY) !== 'private' ? store(VIS_KEY) : 'friends'; return partyAct('/api/party/create', { raid: r.id, diff: d, visibility: vis }, vis === 'public' ? 'Party formed. Anyone can join.' : 'Party formed. Guildmates can join.'); },
     };
 
     function drawBosses() {
@@ -2729,101 +2730,94 @@
   }
 
   // Trade
-  let tradePrefill = null;
 
-  function tradePage() {
-    const lists = h('div');
-    let data = { incoming: [], outgoing: [], history: [] };
-
-    const giveRows = h('div', { class: 'item-rows' });
-    const wantRows = h('div', { class: 'item-rows' });
-    const itemOptions = (ids, withCount) => ids.map(id => h('option', { value: id }, withCount ? `${G.ITEMS[id].name} (${fmt(have(id))})` : G.ITEMS[id].name));
-    const myIds = () => Object.keys(me.state.items).filter(id => G.ITEMS[id]);
-    const allIds = Object.keys(G.ITEMS);
-
-    function addRow(box, mine, preset) {
-      const ids = mine ? myIds() : allIds;
-      if (!ids.length) { toast('You don’t have anything to offer yet.', 'error'); return; }
-      const sel = h('select', { 'aria-label': 'Item' }, itemOptions(ids, mine));
-      if (preset) sel.value = preset;
-      const qty = h('input', { type: 'number', min: '1', value: '1', 'aria-label': 'Amount', inputmode: 'numeric' });
-      const row = h('div', { class: 'item-row' }, sel, qty, h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Remove row', onclick: () => row.remove() }, ui('close')));
-      box.append(row);
-    }
-    const collect = box => {
-      const out = {};
-      box.querySelectorAll('.item-row').forEach(r => {
-        const id = r.querySelector('select').value;
-        const n = parseInt(r.querySelector('input').value, 10);
-        if (id && n > 0) out[id] = (out[id] || 0) + n;
+  // Trade pop-up. New offer: pick what you give from your items (an icon grid) and what you ask for
+  // (search), with amounts. An offer to or from you: see both sides and accept, decline or cancel.
+  function tradeDialog(opts) {
+    const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = e => { if (e.key === 'Escape') close(); };
+    const card = h('div', { class: 'modal-card trade-dialog', role: 'dialog', 'aria-modal': 'true' });
+    const overlay = h('div', { class: 'modal trade-modal', onclick: e => { if (e.target === overlay) close(); } }, card);
+    const closeBtn = h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Close', onclick: close }, ui('close', 'sm'));
+    const done = () => { close(); if (opts.onDone) opts.onDone(); poll(); };
+    const tile = (id, n, extra, cls = '') => tip(h('div', { class: `trade-tile${G.ITEMS[id].rare ? ' rare-tile' : ''} ${cls}` }, itemIco(id, 'md'),
+      h('b', {}, num(n)), h('small', {}, G.ITEMS[id].name), extra || null), () => itemTip(id));
+    if (opts.trade) {
+      const t = opts.trade, incoming = opts.mode === 'in';
+      const other = incoming ? t.from : t.to;
+      const side = (items, label, mine) => h('div', { class: 'trade-col' }, h('h3', {}, label),
+        Object.keys(items).length ? h('div', { class: 'trade-grid' }, Object.entries(items).map(([id, n]) =>
+          tile(id, n, mine ? h('small', { class: have(id) >= n ? 'ok' : 'bad' }, `you have ${num(have(id))}`) : null, mine && have(id) < n ? 'short' : '')))
+          : h('p', { class: 'muted' }, 'Nothing (a gift)'));
+      const canAfford = !incoming || Object.entries(t.want).every(([id, n]) => have(id) >= n);
+      const act2 = async (path, msg) => { if (await act(path, { id: t.id }, msg)) done(); };
+      card.append(
+        h('div', { class: 'modal-head' }, h('h2', {}, incoming ? `${other.name}’s trade offer` : `Your offer to ${other.name}`), closeBtn),
+        h('p', { class: 'muted' }, `Sent ${ago(t.created)}. Offered items are held until it’s settled.`),
+        h('div', { class: 'trade-cols' }, side(t.give, incoming ? 'You get' : 'They get', false), side(t.want, incoming ? 'You give' : 'You get', incoming)),
+        h('div', { class: 'actions' }, incoming
+          ? [h('button', { type: 'button', class: 'btn primary', disabled: !canAfford, onclick: () => act2('/api/trade/accept', 'Trade complete.') }, canAfford ? 'Accept' : 'You’re missing items'),
+            h('button', { type: 'button', class: 'btn danger', onclick: () => act2('/api/trade/decline', 'Offer declined.') }, 'Decline')]
+          : h('button', { type: 'button', class: 'btn danger', onclick: () => act2('/api/trade/cancel', 'Offer cancelled. Your items are back.') }, 'Cancel offer')));
+    } else {
+      const to = opts.to;
+      const give = {}, want = {};
+      const giveBox = h('div', { class: 'trade-grid' }), wantBox = h('div', { class: 'trade-grid' });
+      const chosen = (map, id, mine) => {
+        const qty = h('input', { type: 'number', min: '1', max: mine ? String(have(id)) : null, value: String(map[id]), 'aria-label': `How many ${G.ITEMS[id].name}`, inputmode: 'numeric' });
+        qty.addEventListener('input', () => { const v = parseInt(qty.value, 10); if (v > 0) map[id] = mine ? Math.min(v, have(id)) : v; });
+        return tile(id, map[id], h('div', { class: 'trade-qty' }, qty, h('button', { type: 'button', class: 'icon-btn tiny', 'aria-label': 'Remove', onclick: () => { delete map[id]; drawChosen(); } }, ui('close', 'sm'))), 'chosen');
+      };
+      const drawChosen = () => {
+        giveBox.replaceChildren(...(Object.keys(give).length ? Object.keys(give).map(id => chosen(give, id, true)) : [h('p', { class: 'muted' }, 'Click your items below to add them.')]));
+        wantBox.replaceChildren(...(Object.keys(want).length ? Object.keys(want).map(id => chosen(want, id, false)) : [h('p', { class: 'muted' }, 'Nothing: leave empty to send a gift.')]));
+      };
+      const add = (map, id, mine) => {
+        if (!map[id] && Object.keys(map).length >= 8) { toast('Up to 8 kinds of item on each side.', 'error'); return; }
+        map[id] = mine ? Math.min(have(id), (map[id] || 0) + 1) : (map[id] || 0) + 1;
+        drawChosen();
+      };
+      // Your items, grouped by type, filterable.
+      const TYPES = [['all', 'All'], ['resource', 'Resources'], ['material', 'Raid materials'], ['consumable', 'Consumables'], ['gear', 'Gear']];
+      let type = 'all';
+      const filter = h('input', { type: 'search', placeholder: 'Filter your items', 'aria-label': 'Filter your items', autocomplete: 'off' });
+      const mineGrid = h('div', { class: 'trade-pick' });
+      const drawMine = () => {
+        const q = filter.value.trim().toLowerCase();
+        const ids = Object.keys(me.state.items).filter(id => G.ITEMS[id] && have(id) > 0 && id !== 'gold' || (id === 'gold' && have('gold') > 0))
+          .filter(id => (type === 'all' || G.ITEMS[id].type === type) && (!q || G.ITEMS[id].name.toLowerCase().includes(q)))
+          .sort((a, b) => (G.ITEMS[b].tier || 0) - (G.ITEMS[a].tier || 0));
+        mineGrid.replaceChildren(...(ids.length ? ids.map(id => { const el = tile(id, have(id), null, 'pick'); el.addEventListener('click', () => add(give, id, true)); return el; })
+          : [h('p', { class: 'muted' }, 'Nothing here.')]));
+      };
+      const typeChips = h('div', { class: 'chips small' }, TYPES.map(([id, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(id === type),
+        onclick: e => { type = id; typeChips.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c === e.currentTarget))); drawMine(); } }, label)));
+      filter.addEventListener('input', drawMine);
+      // Anything to ask for: search every item by name.
+      const ask = h('input', { type: 'search', placeholder: 'Search any item to ask for', 'aria-label': 'Search items to ask for', autocomplete: 'off' });
+      const askGrid = h('div', { class: 'trade-pick' });
+      const ALL = Object.values(G.ITEMS);
+      ask.addEventListener('input', () => {
+        const q = ask.value.trim().toLowerCase();
+        const hits = q.length < 2 ? [] : ALL.filter(it => it.name.toLowerCase().includes(q)).slice(0, 30);
+        askGrid.replaceChildren(...hits.map(it => { const el = tile(it.id, have(it.id), null, 'pick'); el.addEventListener('click', () => add(want, it.id, false)); return el; }));
       });
-      return out;
-    };
-
-    const toInput = h('input', { name: 'to', required: true, spellcheck: 'false', autocomplete: 'off', list: 'friend-names' });
-    const friendList = h('datalist', { id: 'friend-names' });
-    const form = h('form', { class: 'panel', onsubmit: async e => {
-      e.preventDefault();
-      const res = await act('/api/trade/create', { to: toInput.value, give: collect(giveRows), want: collect(wantRows) }, 'Offer sent. Your items are held until it’s settled.');
-      if (res) { giveRows.replaceChildren(); wantRows.replaceChildren(); addRow(giveRows, true); load(); }
-    } },
-      h('label', { class: 'field' }, 'Trade with pilot', toInput, friendList),
-      h('div', { class: 'section-head section' }, h('h2', {}, 'You give'), h('button', { type: 'button', class: 'btn small', onclick: () => addRow(giveRows, true) }, 'Add item')),
-      giveRows,
-      h('div', { class: 'section-head section' }, h('h2', {}, 'You want'), h('button', { type: 'button', class: 'btn small', onclick: () => addRow(wantRows, false) }, 'Add item')),
-      wantRows,
-      h('p', { class: 'muted section' }, 'Leave “You want” empty to send a gift.'),
-      h('p', { class: 'actions' }, h('button', { type: 'submit', class: 'btn primary' }, 'Send offer')));
-
-    if (tradePrefill && tradePrefill.to) toInput.value = tradePrefill.to;
-    if (myIds().length) addRow(giveRows, true, tradePrefill && tradePrefill.give);
-    tradePrefill = null;
-
-    const side = (label, items) => h('div', { class: 'trade-side' }, h('small', {}, label),
-      Object.keys(items).length ? Object.entries(items).map(([id, n]) => h('span', { class: 'pill' }, itemIco(id, 'sm'), `${num(n)} × ${G.ITEMS[id].name}`)) : h('span', { class: 'muted' }, 'Nothing'));
-
-    function tradeCard(t, mode) {
-      const other = mode === 'in' ? t.from : t.to;
-      const title = mode === 'in' ? `${other.name} offers you` : mode === 'out' ? `Your offer to ${other.name}` : `${t.from.name} → ${t.to.name}`;
-      const give = side(mode === 'in' ? 'You get' : 'They get', t.give);
-      const want = side(mode === 'in' ? 'You give' : 'You get', t.want);
-      const canAfford = mode !== 'in' || Object.entries(t.want).every(([id, n]) => have(id) >= n);
-      return h('div', { class: 'trade-card' },
-        h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 'name' }, title), h('small', {}, mode === 'done' ? `${t.status} · ${ago(t.updated)}` : ago(t.created)))),
-        h('div', { class: 'trade-sides' }, give, ui('trade', 'arrow'), want),
-        mode === 'in' ? h('div', { class: 'actions' },
-          h('button', { type: 'button', class: 'btn primary', disabled: !canAfford, onclick: () => tradeAct('/api/trade/accept', t.id, 'Trade complete.') }, canAfford ? 'Accept' : 'You’re missing items'),
-          h('button', { type: 'button', class: 'btn danger', onclick: () => tradeAct('/api/trade/decline', t.id, 'Offer declined.') }, 'Decline')) : null,
-        mode === 'out' ? h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn danger', onclick: () => tradeAct('/api/trade/cancel', t.id, 'Offer cancelled. Your items are back.') }, 'Cancel offer')) : null);
+      const send = async () => {
+        if (!Object.keys(give).length) { toast('Add at least one item to give.', 'error'); return; }
+        if (await act('/api/trade/create', { to: to.name, give, want }, `Offer sent to ${to.name}. Your items are held until it’s settled.`)) done();
+      };
+      card.append(
+        h('div', { class: 'modal-head' }, h('h2', {}, `Trade with ${to.name}`), closeBtn),
+        h('div', { class: 'trade-cols' }, h('div', { class: 'trade-col' }, h('h3', {}, 'You give'), giveBox), h('div', { class: 'trade-col' }, h('h3', {}, 'You ask for'), wantBox)),
+        h('div', { class: 'trade-browse' },
+          h('div', { class: 'trade-col' }, h('h3', {}, 'Your items'), typeChips, filter, mineGrid),
+          h('div', { class: 'trade-col' }, h('h3', {}, 'Ask for'), ask, askGrid)),
+        h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn primary', onclick: send }, 'Send offer'), h('button', { type: 'button', class: 'btn', onclick: close }, 'Cancel')));
+      drawChosen();
+      drawMine();
     }
-
-    async function tradeAct(path, id, msg) {
-      if (await act(path, { id }, msg)) { load(); poll(); }
-    }
-
-    function draw() {
-      lists.replaceChildren(
-        section('Offers to you', null, data.incoming.length ? h('div', { class: 'list' }, data.incoming.map(t => tradeCard(t, 'in'))) : h('div', { class: 'empty' }, 'No offers waiting.')),
-        section('Your open offers', null, data.outgoing.length ? h('div', { class: 'list' }, data.outgoing.map(t => tradeCard(t, 'out'))) : h('div', { class: 'empty' }, 'You have no open offers.')),
-        data.history.length ? section('Recent trades', null, h('div', { class: 'list' }, data.history.map(t => tradeCard(t, 'done')))) : '');
-    }
-
-    async function load() {
-      try {
-        const [t, s] = await Promise.all([api('/api/trades'), api('/api/social')]);
-        data = t;
-        friendList.replaceChildren(...s.friends.map(f => h('option', { value: f.name })));
-        draw();
-      } catch (e) { /* shown on next action */ }
-    }
-
-    pageRefresh = load;
-    draw();
-    load();
-    return [
-      pageHead('trade', 'skill-smithing', 'Trade', 'Swap materials and parts with other pilots. Items you offer are held safely until the other pilot accepts, declines, or you cancel.'),
-      h('div', { class: 'two-col' }, h('div', {}, form), lists),
-    ];
+    document.body.append(overlay);
+    document.addEventListener('keydown', onKey);
   }
 
   // Guild
@@ -2833,7 +2827,8 @@
 
     async function load() {
       try {
-        const data = await api('/api/guild');
+        const [data, trades] = await Promise.all([api('/api/guild'), api('/api/trades')]);
+        drawTrades(trades);
         if (data.guild) drawGuild(data); else drawNoGuild(data);
       } catch (e) { /* shown on next action */ }
     }
@@ -2849,6 +2844,19 @@
         h('div', { class: 'form-row' }, h('label', { class: 'field' }, 'Guild name', name), h('label', { class: 'field' }, 'Tag (2\u20134)', tag)),
         h('p', { class: 'actions section' }, h('button', { type: 'submit', class: 'btn primary' }, 'Found guild'))));
     const guildList = h('div');
+    // Trade offers to and from you, shown above the guild.
+    const tradesBox = h('div');
+    const drawTrades = t => {
+      const row = (tr, mode) => {
+        const other = mode === 'in' ? tr.from : tr.to;
+        const preview = Object.entries(mode === 'in' ? tr.give : tr.give).slice(0, 5).map(([id]) => itemIco(id, 'sm'));
+        return h('div', { class: `row trade-note ${mode}` }, ui('trade', 'sm'),
+          h('div', { class: 'grow' }, h('div', { class: 'name' }, mode === 'in' ? `${other.name} sent you a trade offer` : `Your offer to ${other.name}`), h('small', {}, mode === 'in' ? ago(tr.created) : `Waiting · ${ago(tr.created)}`)),
+          h('span', { class: 'trade-preview' }, preview),
+          h('button', { type: 'button', class: `btn small${mode === 'in' ? ' primary' : ''}`, onclick: () => tradeDialog({ trade: tr, mode, onDone: load }) }, 'Open'));
+      };
+      tradesBox.replaceChildren(...(t.incoming.length || t.outgoing.length ? [section('Trade offers', null, h('div', { class: 'list' }, t.incoming.map(tr => row(tr, 'in')), t.outgoing.map(tr => row(tr, 'out'))))] : []));
+    };
 
     function drawNoGuild(data) {
       lastChatId = 0;
@@ -2915,6 +2923,7 @@
     function membersList(data, myRank) {
       return data.members.map(m => {
         const controls = [];
+        if (m.id !== me.player.id) controls.push(h('button', { type: 'button', class: 'btn small primary', onclick: () => tradeDialog({ to: m, onDone: load }) }, 'Trade'));
         const rankAct = (rank, label, msg) => h('button', { type: 'button', class: 'btn small', onclick: async () => {
           if (rank === 'leader' && !confirm(`Hand leadership of the guild to ${m.name}? You'll become an officer.`)) return;
           if (await act('/api/guild/rank', { id: m.id, rank }, msg)) load();
@@ -2942,61 +2951,14 @@
     load();
     return [
       pageHead('guild', 'skill-scribing', me.guild ? me.guild.name : 'Guild', 'Band together with other pilots. Guildmates can see and join each other’s raid parties.'),
+      tradesBox,
       body,
     ];
   }
 
-  // Social
-  function socialPage() {
-    const lists = h('div');
-    const nameInput = h('input', { required: true, spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Pilot name', placeholder: 'Pilot name' });
-
-    async function load() {
-      try { draw(await api('/api/social')); } catch (e) { /* shown on next action */ }
-    }
-    async function friendAct(path, body, msg) {
-      if (await act(path, body, msg)) { load(); poll(); }
-    }
-
-    function draw(data) {
-      lists.replaceChildren(
-        data.incoming.length ? section('Friend requests', null, h('div', { class: 'list' }, data.incoming.map(p => {
-          const row = memberRow(p);
-          row.append(
-            h('button', { type: 'button', class: 'btn small primary', onclick: () => friendAct('/api/friends/accept', { id: p.id }, `You and ${p.name} are now friends.`) }, 'Accept'),
-            h('button', { type: 'button', class: 'btn small danger', onclick: () => friendAct('/api/friends/remove', { id: p.id }, 'Request declined.') }, 'Decline'));
-          return row;
-        }))) : '',
-        section('Friends', `${data.friends.filter(f => f.online).length} online`, data.friends.length ? h('div', { class: 'list' }, data.friends.map(p => {
-          const row = memberRow(p, `Level ${p.level}`);
-          row.append(
-            h('button', { type: 'button', class: 'btn small', onclick: () => { tradePrefill = { to: p.name }; go('trade'); } }, 'Trade'),
-            h('button', { type: 'button', class: 'btn small danger', onclick: () => { if (confirm(`Remove ${p.name} from your friends?`)) friendAct('/api/friends/remove', { id: p.id }, `${p.name} removed.`); } }, 'Remove'));
-          return row;
-        })) : h('div', { class: 'empty' }, 'No friends yet. Add a pilot by name above.')),
-        data.outgoing.length ? section('Sent requests', null, h('div', { class: 'list' }, data.outgoing.map(p => {
-          const row = memberRow(p);
-          row.append(h('button', { type: 'button', class: 'btn small', onclick: () => friendAct('/api/friends/remove', { id: p.id }, 'Request cancelled.') }, 'Cancel'));
-          return row;
-        }))) : null);
-    }
-
-    pageRefresh = load;
-    load();
-    return [
-      pageHead('social', 'skill-mining', 'Social', 'Add friends to trade with them and join their raid parties.'),
-      h('form', { class: 'panel form-row', onsubmit: async e => {
-        e.preventDefault();
-        if (await act('/api/friends/add', { name: nameInput.value })) { nameInput.value = ''; load(); }
-      } }, h('label', { class: 'field' }, 'Add a friend', nameInput), h('button', { type: 'submit', class: 'btn primary' }, 'Send request')),
-      lists,
-    ];
-  }
-
-
   const PAGES = {
     skill: skillPage, equipment: equipmentPage, inventory: inventoryPage, abilities: abilitiesPage, subclass: subclassPage, raids: raidsPage,
-    fights: fightsPage, trade: tradePage, guild: guildPage, social: socialPage, patch: patchPage, credits: creditsPage, settings: settingsPage,
+    fights: fightsPage, guild: guildPage, patch: patchPage, credits: creditsPage, settings: settingsPage,
   };
 
   // ---------- Wiring ----------
