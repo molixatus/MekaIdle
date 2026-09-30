@@ -1705,21 +1705,23 @@ body.on-raids .battle:not([hidden]) > .battle-stage { flex: 1; }
 .item-shine, .item-sprite.rare .item-shine {
   background-color: transparent;
   background-image:
-    repeating-linear-gradient(118deg, transparent 0 32%, color-mix(in srgb, var(--shine) 75%, #fff) 45%, transparent 60% 100%),
-    repeating-linear-gradient(62deg, transparent 0 34%, color-mix(in srgb, var(--shine) 55%, #fff) 46%, transparent 58% 100%);
-  background-size: calc(var(--gl) * 1.3) calc(var(--gl) * 1.3), calc(var(--gl) * 1.8) calc(var(--gl) * 1.8);
+    repeating-linear-gradient(45deg, transparent 0 17%, color-mix(in srgb, var(--shine) 75%, #fff) 25%, transparent 33% 50%),
+    repeating-linear-gradient(135deg, transparent 0 18%, color-mix(in srgb, var(--shine) 55%, #fff) 25%, transparent 32% 50%);
+  background-size: var(--gl-a) var(--gl-a), var(--gl-b) var(--gl-b);
   background-repeat: repeat;
   mix-blend-mode: screen;
   opacity: .32;
   animation: glint 4.5s linear infinite;
 }
 .item-sprite.rare .item-shine { opacity: .45; animation-duration: 3.5s; }
-@keyframes glint { from { background-position: 0 0, 0 0; } to { background-position: calc(var(--gl) * 1.3) 0, calc(var(--gl) * -1.8) 0; } }
+/* 45-degree stripes with a period of half the tile join up across tile edges, and each loop moves
+   exactly one whole-pixel tile, so the glint never visibly restarts. */
+@keyframes glint { from { background-position: 0 0, 0 0; } to { background-position: var(--gl-a) 0, calc(var(--gl-b) * -1) 0; } }
 /* Stripe spacing follows the icon's size, so every icon shows a couple of stripes. */
-.item-sprite { --gl: 22px; }
-.item-sprite.md { --gl: 32px; }
-.item-sprite.lg { --gl: 44px; }
-.item-sprite.xl { --gl: 76px; }
+.item-sprite { --gl-a: 28px; --gl-b: 40px; }
+.item-sprite.md { --gl-a: 40px; --gl-b: 56px; }
+.item-sprite.lg { --gl-a: 56px; --gl-b: 80px; }
+.item-sprite.xl { --gl-a: 96px; --gl-b: 136px; }
 /* Boss rows: the difficulty-button column keeps its width even when a boss is locked, so rows line up. */
 @media (min-width: 901px) { .raid-row .raid-btns { min-width: 380px; } }
 @media (prefers-reduced-motion: reduce) { .item-shine { animation: none !important; } }
