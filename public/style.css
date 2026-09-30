@@ -1725,3 +1725,8 @@ body.on-raids .battle:not([hidden]) > .battle-stage { flex: 1; }
 /* Boss rows: the difficulty-button column keeps its width even when a boss is locked, so rows line up. */
 @media (min-width: 901px) { .raid-row .raid-btns { min-width: 380px; } }
 @media (prefers-reduced-motion: reduce) { .item-shine { animation: none !important; } }
+
+/* Glint on the mech's glinting pieces: faint stripes blended over the piece. */
+.mech-sprite .mech-glint { mix-blend-mode: screen; opacity: .4; }
+body.no-shine .mech-sprite .mech-glint { display: none; }
+@media (prefers-reduced-motion: reduce) { .mech-sprite .mech-glint { opacity: .25; } }

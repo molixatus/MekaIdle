@@ -55,7 +55,22 @@
         out.forEach(([x, y]) => { g[y][x] = ch; });
       },
       // Renders runs of equal pixels as rects.
-      svg(palette, label) {
+      // Runs of any of the given pixel letters, as rects with the given attributes (for overlays).
+      runs(chars, attrs) {
+        let out = '';
+        for (let y = 0; y < h; y++) {
+          let x = 0;
+          while (x < w) {
+            if (!chars.includes(g[y][x])) { x++; continue; }
+            let run = 1;
+            while (x + run < w && chars.includes(g[y][x + run])) run++;
+            out += `<rect x="${x}" y="${y}" width="${run}" height="1" ${attrs}/>`;
+            x += run;
+          }
+        }
+        return out;
+      },
+      svg(palette, label, extra = '') {
         let rects = '';
         for (let y = 0; y < h; y++) {
           let x = 0;
@@ -67,7 +82,7 @@
             x += run;
           }
         }
-        return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" role="img" aria-label="${label}">${rects}</svg>`;
+        return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" role="img" aria-label="${label}">${rects}${extra}</svg>`;
       },
     };
     return c;
@@ -300,13 +315,25 @@
     const wc = o.weaponColour || '#b4bcc6';
     const vc = o.offhandColour || '#b4bcc6';
     const hc = o.hands ? o.hands.colour : '#1b1e26', fc = o.feet ? o.feet.colour : paint;
+    // Glinting pieces (rare or high-tier gear) get the enchant-style glint over just their pixels.
+    const SLOT_PIXELS = { weapon: 'WwY', offhand: 'Vv', head: 'AaT', body: 'BbU', legs: 'CcZ', hands: 'IM', feet: 'FfN' };
+    let glint = '';
+    Object.entries(o.glint || {}).forEach(([slot, colour]) => {
+      if (!colour || !SLOT_PIXELS[slot]) return;
+      const id = `mg${++glintUid}`;
+      glint += `<defs><pattern id="${id}" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">`
+        + `<rect x="0" y="0" width="1.6" height="6" fill="${colour}"/>`
+        + `<animateTransform attributeName="patternTransform" type="translate" from="0 0" to="6 0" dur="2.6s" repeatCount="indefinite" additive="sum"/></pattern></defs>`
+        + c.runs(SLOT_PIXELS[slot], `fill="url(#${id})" class="mech-glint"`);
+    });
     return c.svg({
       K: '#07080c', P: paint, p: mix(paint, -0.32), H: mix(paint, 0.35), G: accent, E: '#ffdf4d', D: '#1b1e26',
       R: o.core || '#b3261e', A, a: mix(A, -0.32), B, b: mix(B, -0.32), C, c: mix(C, -0.32),
       W: wc, w: mix(wc, -0.35), X: GLOW[o.role] || accent, Y: '#f4efe0', V: vc, v: mix(vc, -0.35), I: hc, F: fc, f: mix(fc, -0.35),
       T: trim(o.head), U: trim(o.body), Z: trim(o.legs), M: trim(o.hands), N: trim(o.feet),
-    }, 'Mech');
+    }, 'Mech', glint);
   }
+  let glintUid = 0;
 
   root.SPRITES = { mech, mix };
 })(window);

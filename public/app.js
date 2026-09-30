@@ -35,6 +35,8 @@
   };
   // Item icons come from the pixel-art sheet (itemsheet.js); anything unmapped falls back to game-icons.
   const SHEET = window.ITEM_SHEET;
+  // Which items glint: rare gear, raid materials and high-tier gear.
+  const glints = it => (it.type === 'gear' && (it.rare || (it.tier || 0) >= 25)) || it.type === 'material';
   const itemIco = (id, cls = '') => {
     const it = G.ITEMS[id];
     if (!it) return gi('ore', '#5d6575', cls);
@@ -54,7 +56,7 @@
     // Rare gear and tier 7+ gear shine: a light sweep drawn only on the item's own pixels (masked by
     // the same sheet cell), gold for rare gear, tinted with the tier colour otherwise.
     // Raid materials shine too, in their tier colour.
-    const shiny = (it.type === 'gear' && (it.rare || (it.tier || 0) >= 25)) || it.type === 'material';
+    const shiny = glints(it);
     const box = h('span', { class: `ico item-sprite ${cls}${it.rare ? ' rare' : ''}${shiny ? ' shiny' : ''}`, 'aria-hidden': 'true' }, inner);
     // A layer drawn only on the item's own pixels (masked by the same sheet cell).
     const layer = klass => {
@@ -380,6 +382,7 @@
       paint: cls ? cls.colour : G.UNARMED_COLOUR, accent: cls ? cls.accent : '#8cff5a', head: piece('head'), body: piece('body'), legs: piece('legs'),
       hands: piece('hands'), feet: piece('feet'), weapon: weapon ? weapon.weapon : null, role: weapon ? weapon.cls : null, weaponColour: weapon ? weapon.colour : null,
       offhand: off ? off.offhand : null, offhandColour: off ? off.colour : null, core: trinket ? trinket.colour : null,
+      glint: Object.fromEntries(['weapon', 'offhand', 'head', 'body', 'legs', 'hands', 'feet'].map(sl => { const it = G.ITEMS[equipment[sl]]; return [sl, it && glints(it) ? it.colour : null]; })),
     }) });
     el.firstElementChild.removeAttribute('role');
     el.firstElementChild.setAttribute('aria-hidden', 'true');
