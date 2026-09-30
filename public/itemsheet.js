@@ -100,6 +100,10 @@
     m = /^[a-z]+\d*_(ore|hide|bone|venom|branch|fibre|essence|herb)$/.exec(it.id);
     if (m) return pick(M[m[1]]);
     if ((m = /^sigil_(\d+)$/.exec(it.id))) return [132, (Number(m[1]) - 1) % 16];
+    // Crafted trinkets from Honing, Poisoncraft and Alchemy: their own cells and tints.
+    if ((m = /^whetcharm_(\d+)$/.exec(it.id))) return [133, (Number(m[1]) + 7) % 16, 20];
+    if ((m = /^fang_(\d+)$/.exec(it.id))) return [115, 2 + ((Number(m[1]) + 4) % 10), 90];
+    if ((m = /^locket_(\d+)$/.exec(it.id))) return [132, (Number(m[1]) + 8) % 16, 150];
     if ((m = /^trinket_(\d+)$/.exec(it.id))) return [115, 2 + step(m[1]), 40 * tier.region];
     if ((m = /^charm_(\d+)$/.exec(it.id))) return [133, (Number(m[1]) - 1) % 16, 40 * tier.region];
     // Raid weapons: the sheet's unique coloured weapons, a different one for every region and class.

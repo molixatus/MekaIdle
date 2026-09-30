@@ -599,6 +599,14 @@
     const lowerFirst = x => x.charAt(0).toLowerCase() + x.slice(1);
     item(`sigil_${n}`, { name: `${pre}${t.grade ? lowerFirst(reg.mat.split(' ')[0]) : reg.mat.split(' ')[0]} sigil`, type: 'gear', slot: 'trinket', icon: iconFor('sigil', t.region + 1), colour: t.colour, tier: n,
       stats: { power: round1(4 + 2 * t.p), hpPct: round1(4 + 2 * t.p) }, desc: `A trinket carved from ${reg.mat.toLowerCase()}s with Runecrafting.` });
+    // A crafted trinket for each chain's consumable skill, about as strong as the sigil, leaning
+    // towards its class.
+    item(`whetcharm_${n}`, { name: `${t.metal} whetstone charm`, type: 'gear', slot: 'trinket', icon: iconFor('trinket', t.region + 1), colour: t.colour, tier: n,
+      stats: { power: round1(3 + 1.5 * t.p), pen: round1(4 + 2 * t.p), hpPct: round1(2 + t.p) }, desc: 'A trinket honed from ore and raid material with Honing. Suits melee pilots.' });
+    item(`fang_${n}`, { name: `${t.bone} talisman`, type: 'gear', slot: 'trinket', icon: iconFor('trinket', t.region + 1), colour: t.colour, tier: n,
+      stats: { crit: round1(2 + t.p), haste: round1(3 + 1.5 * t.p), hpPct: round1(2 + t.p) }, desc: 'A trinket steeped in venom and raid material with Poisoncraft. Suits ranged pilots.' });
+    item(`locket_${n}`, { name: `${t.herb} locket`, type: 'gear', slot: 'trinket', icon: iconFor('trinket', t.region + 1), colour: t.colour, tier: n,
+      stats: { heal: round1(4 + 2 * t.p), regen: round1(1 + 0.3 * t.p), hpPct: round1(2 + t.p) }, desc: 'A trinket brewed from herbs and raid material with Alchemy. Suits healers.' });
     const sets = Object.keys(SET_KINDS).map(cls => makeSet(t, cls));
     // Raid set pieces: one set per class, a little stronger than crafted armour of the tier.
     sets.forEach(set => {
@@ -682,6 +690,11 @@
     const sid = `sigil_${t.n}`;
     const sInputs = { [`mat_${t.n}`]: 4, [matId('essence', t)]: 3 };
     action({ id: `craft_${sid}`, skill: 'runecrafting', name: ITEMS[sid].name, level: t.level + 5, time: 5000, xp: craftXp(t, sInputs, 5000), item: sid, inputs: sInputs, outputs: { [sid]: [1, 1] } });
+    [['whetcharm', 'honing', 'ore'], ['fang', 'poisoncraft', 'venom'], ['locket', 'alchemy', 'herb']].forEach(([base, skill, mat]) => {
+      const id = `${base}_${t.n}`;
+      const inputs = { [`mat_${t.n}`]: 4, [matId(mat, t)]: 3 };
+      action({ id: `craft_${id}`, skill, name: ITEMS[id].name, tier: t.n, level: t.level + 5, time: 5000, xp: craftXp(t, inputs, 5000), item: id, inputs, outputs: { [id]: [1, 1] } });
+    });
   });
   CONSUMABLES.forEach(c => {
     const t = TIERS[c.tier - 1];
@@ -908,6 +921,7 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'Crafted trinkets for every chain, not just Runecrafting: Honing makes whetstone charms (power and armour pierce, for melee), Poisoncraft makes talismans (crit and attack speed, for ranged) and Alchemy makes lockets (healing and mana regen, for healers), one per tier, from the tier’s raid material.',
       'The beginner ease-in now only covers the first 3 bosses. From boss 4 on, every boss is fully tuned to its tier, so tier 1 gear (even with a few raid pieces and a high level) no longer carries you through tiers 2 and 3. Your mech’s base damage and HP now grow with your weapon’s tier, so every tier of gear is a full step stronger.',
       'Every gathering skill has 3 things to gather at each tier, each giving its own material: Mining has veins, rich veins and deposits (gold); Hunting has hides, tusks and venom; Foraging has branches, fibre and essence; Herbalism has herbs, reeds and wild herbs.',
       'Much more variety in item sprites: each tier uses a different sprite from the one before, and a sprite only comes back after several tiers, instead of the same shape recoloured for a whole region.',
