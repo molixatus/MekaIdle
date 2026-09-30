@@ -998,11 +998,7 @@
     if (sk.group === 'combat') return [...head, chainBar(id), ...combatSkillBody(sk)];
     // Every tier on one screen, lowest level first, with a divider where each tier starts.
     const tierOf = a => (G.ITEMS[a.item] || {}).tier || 1;
-    const every = G.ACTIONS.filter(a => a.skill === id).sort((x, y) => tierOf(x) - tierOf(y) || x.level - y.level);
-    // With 80 tiers, show the ones near your level (a few below, the next few above) unless asked for all.
-    const L = lvl(id);
-    const near = a => a.level >= L - 12 && a.level <= L + 8;
-    const all = showAllTiers ? every : every.filter(near);
+    const all = G.ACTIONS.filter(a => a.skill === id).sort((x, y) => tierOf(x) - tierOf(y) || x.level - y.level);
     const cards = [];
     let lastTier = 0;
     all.forEach(a => {
@@ -1016,12 +1012,8 @@
       lastTier = tn;
       cards.push(actionCard(a));
     });
-    const hidden = every.length - all.length;
-    const toggle = hidden || showAllTiers ? h('button', { type: 'button', class: 'btn small', onclick: () => { showAllTiers = !showAllTiers; renderPage(); } },
-      showAllTiers ? 'Show tiers near my level' : `Show all tiers (${hidden} more)`) : null;
-    return [...head, chainBar(id), section(SKILL_SECTION[id] || 'Actions', 'Hover a card for details. Click it to start, or set a count and start or queue it.', toggle, h('div', { class: 'grid' }, cards))];
+    return [...head, chainBar(id), section(SKILL_SECTION[id] || 'Actions', 'Hover a card for details. Click it to start, or set a count and start or queue it.', h('div', { class: 'grid' }, cards))];
   }
-  let showAllTiers = false;
 
   // A small item badge (icon and a number) with the item's details on hover.
   const needChip = (id, main, sub, cls = '') => tip(h('span', { class: `need ${cls}` }, itemIco(id, 'sm'), main, sub ? h('small', {}, sub) : null), () => itemTip(id));
@@ -1147,6 +1139,7 @@
     const statRows = [
       ['Damage/s', num(s.atk), 'stat-atk'], ['Armour', num(s.def), 'stat-def'], ['HP', num(s.hp), 'stat-hp'], ['Mana', `${num(s.mana)} (+${s.regen}/s)`, 'stat-mana'],
       ['Magic resist', num(s.mres), 'stat-def'], ['Elemental resist', num(s.eres), 'stat-def'], ['Crit', pct((weapon ? weapon.crit : 0.05) + s.crit), 'stat-atk'],
+      ['Level bonus', `+${s.effLevel - 1}% damage${s.level > s.levelCap ? ` (capped at level ${s.levelCap} by your weapon)` : ''}`, 'stat-atk'],
       ['Attack speed', `+${pct(s.haste)}`, 'stat-atk'], ['Armour pen', pct(s.pen), 'stat-atk'], ['Block', pct(s.block), 'stat-def'],
       s.heal ? ['Healing', `+${pct(s.heal)}`, 'stat-hp'] : null, s.double ? ['Double hit', pct(s.double), 'stat-atk'] : null,
       s.lifesteal ? ['Lifesteal', pct(s.lifesteal), 'stat-hp'] : null,
@@ -1576,8 +1569,6 @@
 
   function raidRow(r, diff, ctx) {
     const d = G.DIFF_BY_ID[diff];
-    const open = raidOpen(r, diff);
-    const here = ctx.current && ctx.current.raid === r.id && ctx.current.diff === diff;
     const rec = r.recommendedBy ? r.recommendedBy[diff] : Math.round(r.recommended * diffScale(diff));
     const ratio = ctx.power / rec;
     const pClass = ratio >= 1 ? 'ok' : ratio >= 0.8 ? 'warn' : 'bad';
@@ -1586,17 +1577,34 @@
       s.style.setProperty('--diff', x.colour);
       return s;
     }));
+    // One button per difficulty right on the row: fight (or switch to) any unlocked one directly.
+    // The next difficulty you haven't cleared is highlighted; the one you're on becomes Stop.
     let buttons;
-    const gear = G.gearCheck(me.state.equipment, r);
-    if (!open) buttons = h('span', { class: 'lock-note' }, ui('lock', 'sm'), diff === 'normal' ? `Clear #${r.n - 1} on Mythic` : `Clear on ${diff === 'heroic' ? 'Normal' : 'Heroic'}`);
-    else if (!gear.ok) buttons = tip(h('span', { class: 'lock-note gear-lock' }, ui('lock', 'sm'), gear.short),
-      () => [h('b', {}, 'Gear check'), h('p', { class: 'tip-desc' }, gear.text)]);
-    else if (here) buttons = h('button', { type: 'button', class: 'btn small danger', onclick: ctx.stop }, 'Stop');
+    const anyOpen = raidOpen(r, 'normal');
+    if (!anyOpen) buttons = h('span', { class: 'lock-note' }, ui('lock', 'sm'), `Clear #${r.n - 1} on Mythic`);
     else {
-      buttons = [h('button', { type: 'button', class: 'btn small primary', onclick: () => ctx.start(r, diff) }, 'Fight'),
-        h('button', { type: 'button', class: 'btn small', disabled: !!ctx.party, title: 'Form a party others can join', onclick: () => ctx.form(r, diff) }, 'Party')];
+      const member = ctx.party && ctx.party.leader !== me.player.id;
+      const leading = ctx.party && !member;
+      const cleared = clearsOf(r.id);
+      const nextDiff = G.DIFFICULTIES[Math.min(cleared, G.DIFFICULTIES.length - 1)].id;
+      const diffBtn = (x, i) => {
+        if (ctx.current && ctx.current.raid === r.id && ctx.current.diff === x.id) {
+          const stop = h('button', { type: 'button', class: 'btn small danger diff-btn', title: `Stop fighting on ${x.name}`, onclick: ctx.stop }, ui('close', 'sm'), x.name);
+          stop.style.setProperty('--diff', x.colour);
+          return stop;
+        }
+        const ok = raidOpen(r, x.id);
+        const title = !ok ? `Clear it on ${G.DIFFICULTIES[i - 1].name} first` : member ? 'Only the party leader can change the boss'
+          : `${leading ? 'Take your party' : ctx.current ? 'Switch' : 'Fight'} on ${x.name}${cleared > i ? ' (cleared)' : ''}`;
+        const b = h('button', { type: 'button', class: `btn small diff-btn${x.id === nextDiff && cleared < 3 ? ' next' : ''}${cleared > i ? ' done' : ''}`,
+          disabled: !ok || member || null, title, onclick: () => ctx.start(r, x.id) }, ok ? null : ui('lock', 'sm'), x.name);
+        b.style.setProperty('--diff', x.colour);
+        return b;
+      };
+      buttons = [h('div', { class: 'diff-btns', role: 'group', 'aria-label': `Fight ${r.name}` }, G.DIFFICULTIES.map(diffBtn)),
+        h('button', { type: 'button', class: 'btn small party-btn', disabled: !!ctx.party, title: `Form a party on ${G.DIFF_BY_ID[nextDiff].name} that others can join`, onclick: () => ctx.form(r, nextDiff) }, 'Party')];
     }
-    return h('div', { class: `raid-row${here ? ' fighting' : ''}${open ? '' : ' locked'}${r.finale ? ' finale' : ''}` },
+    return h('div', { class: `raid-row${ctx.current && ctx.current.raid === r.id ? ' fighting' : ''}${anyOpen ? '' : ' locked'}${r.finale ? ' finale' : ''}` },
       h('span', { class: 'raid-n' }, `#${r.n}`),
       h('span', { class: 'boss-ico' }, bossIcon(r, '', 88)),
       h('div', { class: 'raid-info' }, h('b', {}, r.name, r.finale ? h('span', { class: 'finale-tag' }, 'Finale') : null), h('div', { class: 'raid-chips' }, weakChips(r), mechChips(r.boss.mechs))),
@@ -1611,25 +1619,33 @@
     const battle = createBattle();
     const partyBox = h('div'), openBox = h('div'), bossBox = h('div');
     let data = { party: null, open: [] };
+    let lastBossSig = null;
     let diff = G.DIFF_BY_ID[store(DIFF_KEY)] ? store(DIFF_KEY) : 'normal';
     const ctx = {
-      start: startSolo, stop: stopRaid,
+      start: startSolo, stop: () => (battle.onStop ? battle.onStop() : stopRaid()),
       form: (r, d) => { const vis = store(VIS_KEY) && store(VIS_KEY) !== 'private' ? store(VIS_KEY) : 'friends'; return partyAct('/api/party/create', { raid: r.id, diff: d, visibility: vis }, vis === 'public' ? 'Party formed. Anyone can join.' : 'Party formed. Friends and guildmates can join.'); },
     };
 
     function drawBosses() {
       const a = me.state.activity;
-      ctx.current = a && a.type === 'raid' ? { raid: a.raid, diff: a.diff || 'normal' } : null;
+      ctx.current = a && a.type && a.raid ? { raid: a.raid, diff: a.diff || 'normal' } : null;
       ctx.party = data.party;
       ctx.power = G.power(myStats());
+      // Only rebuild the list when something it shows has changed: rebuilding every refresh made
+      // long lists jump while scrolling.
+      const sig = JSON.stringify([diff, me.state.clears, ctx.current, ctx.party && [ctx.party.id, ctx.party.leader], ctx.power, me.state.items, me.state.equipment,
+        store('mekaidle-hide-cleared'), store('mekaidle-hide-looted')]);
+      if (sig === lastBossSig && bossBox.firstChild) return;
+      lastBossSig = sig;
       const dd = G.DIFF_BY_ID[diff];
       const diffBar = h('div', { class: 'diff-bar' },
-        h('div', { class: 'chips', role: 'group', 'aria-label': 'Difficulty' }, G.DIFFICULTIES.map(x => {
+        h('small', { class: 'diff-bar-label' }, 'Show loot and power for'),
+        h('div', { class: 'chips', role: 'group', 'aria-label': 'Show loot and power for' }, G.DIFFICULTIES.map(x => {
           const b = h('button', { type: 'button', class: 'chip', 'aria-pressed': String(x.id === diff), onclick: () => { diff = x.id; store(DIFF_KEY, diff); drawBosses(); } }, x.name);
           b.style.setProperty('--chip', x.colour);
           return b;
         })),
-        h('span', { class: 'muted small' }, diff === 'normal' ? 'Base rewards. Clear a raid on Normal to unlock the next one and its Heroic mode.'
+        h('span', { class: 'muted small' }, diff === 'normal' ? 'Base rewards. Pick a difficulty on each boss to fight it; clear all three to open the next boss.'
           : `Enemies have ${dd.hp}× HP and hit ${dd.dmg}× harder. ${dd.xp}× XP, ${dd.mats}× materials and ${dd.drop}× rare drop chance.`));
       // One list of every open region, with a header per region. Filters hide bosses cleared on the
       // chosen difficulty, or bosses whose rare loot (set pieces, weapons, trinkets) you all own.
@@ -1658,10 +1674,6 @@
         const shown = raids.filter(r => !(hideCleared && clearsOf(r.id) >= diffRank) && !(hideLooted && looted(r)));
         hidden += raids.length - shown.length;
         list.push(shown.length ? h('div', { class: 'raid-list' }, shown.map(r => raidRow(r, diff, ctx))) : h('div', { class: 'empty small' }, 'Every boss here is hidden by your filters.'));
-      }
-      if (raiding()) {
-        bossBox.replaceChildren(h('p', { class: 'muted small boss-hidden' }, 'The boss list comes back when you leave this fight.'));
-        return;
       }
       if (hidden) filters.append(h('small', { class: 'muted' }, `${hidden} hidden by filters`));
       bossBox.replaceChildren(h('div', { class: 'section boss-list' }, diffBar, filters, list));
@@ -1726,9 +1738,10 @@
       if (await act(path, body, msg)) { await poll(); load(); battle.sync(true); }
     }
     async function startSolo(r, d) {
-      if (await act('/api/raid/start', { raid: r.id, diff: d }, `Fighting ${r.name}. Fights repeat until you stop.`)) {
+      const moving = data.party && data.party.leader === me.player.id;
+      if (await act('/api/raid/start', { raid: r.id, diff: d }, moving ? `Your party moves to ${r.name}.` : `Fighting ${r.name}. Fights repeat until you stop.`)) {
         const vis = store(VIS_KEY);
-        if (vis && vis !== 'private') await act('/api/raid/open', { visibility: vis });
+        if (!moving && vis && vis !== 'private') await act('/api/raid/open', { visibility: vis });
         load(); battle.sync(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }

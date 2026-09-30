@@ -1637,3 +1637,22 @@ body.dock-open.on-raids .page-head { display: none; }
 .now-card { display: none !important; }
 /* Notifications in the top right, clear of the bottom bar and the raid dock. */
 .toasts, body.dock-open .toasts, body.dock-closed .toasts { top: 16px; bottom: auto; align-content: start; }
+/* Skill pages list every tier: cards off screen aren't rendered until scrolled to. */
+.grid > .card.action { content-visibility: auto; contain-intrinsic-size: auto 230px; }
+/* Difficulty buttons on each boss row. */
+.raid-btns { flex-wrap: wrap; align-items: center; }
+.diff-btns { display: inline-flex; border-radius: 7px; overflow: hidden; border: 1px solid #2b3240; }
+.diff-btn { border-radius: 0; border: 0; border-right: 1px solid #2b3240; background: color-mix(in srgb, var(--diff) 10%, #1a1f29); color: color-mix(in srgb, var(--diff) 70%, #fff);
+  display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; transition: background .15s, color .15s, transform .15s; }
+.diff-btn:last-child { border-right: 0; }
+.diff-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--diff) 32%, #1a1f29); color: #fff; }
+.diff-btn.done { opacity: .75; }
+.diff-btn.done::after { content: '✓'; font-size: 10px; margin-left: 2px; }
+.diff-btn.next { background: color-mix(in srgb, var(--diff) 38%, #1a1f29); color: #fff; box-shadow: inset 0 -2px 0 var(--diff); animation: diff-next 2.4s ease-in-out infinite; }
+.diff-btn.danger { background: color-mix(in srgb, #ef5a45 30%, #1a1f29); color: #fff; box-shadow: inset 0 -2px 0 var(--diff); }
+.diff-btn:disabled { opacity: .4; cursor: not-allowed; }
+.diff-btn .ico { width: 12px; height: 12px; }
+@keyframes diff-next { 50% { background: color-mix(in srgb, var(--diff) 55%, #1a1f29); } }
+.diff-bar-label { color: var(--faint); font-weight: 700; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+@media (min-width: 1601px) { .raid-row { grid-template-columns: 44px 104px minmax(200px, 1fr) 130px minmax(0, max-content) minmax(0, max-content) 66px auto; } }
+.raid-btns { justify-content: flex-end; }

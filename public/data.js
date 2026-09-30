@@ -15,6 +15,8 @@
   }
   // Each level of a combat skill adds 1% to its damage or healing.
   const skillMult = level => 1 + (level - 1) / 100;
+  // Levels above your weapon's tier level + this margin add no damage.
+  const LEVEL_CAP_MARGIN = 5;
 
   // Deterministic random numbers, so generated raids are the same on server and client.
   function rng(seed) {
@@ -718,8 +720,13 @@
     add(o.boosts);
     const lv = k => (levels && levels[k]) || 1;
     const skill = CLASSES[cls].skill;
+    // The level bonus only counts up to a little above your weapon's tier level, so levels gained
+    // idling don't make you much stronger until your gear catches up.
+    const levelCap = (weaponItem && weaponItem.tier ? TIERS[weaponItem.tier - 1].level : 1) + LEVEL_CAP_MARGIN;
+    const effLevel = Math.min(lv(skill), levelCap);
     return {
-      atk: Math.round(s.atk * (1 + s.power / 100) * skillMult(lv(skill))),
+      atk: Math.round(s.atk * (1 + s.power / 100) * skillMult(effLevel)),
+      level: lv(skill), effLevel, levelCap,
       def: Math.round(s.def * (1 + s.defPct / 100)),
       hp: Math.round(s.hp * (1 + s.hpPct / 100)),
       mres: Math.round(s.mres), eres: Math.round(s.eres), mana: Math.round(s.mana), regen: round1(s.regen),
@@ -873,6 +880,11 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'Your level bonus to damage now only counts up to your weapon’s tier level + 5, so levels gained while idling don’t make you much stronger until your gear catches up. Equipment shows your level bonus and its cap.',
+      'Each boss row has Normal, Heroic and Mythic buttons: fight or switch straight to any unlocked difficulty. The next one to clear is highlighted and the one you’re on becomes Stop. The chips at the top now just pick which loot and power to show.',
+      'Switch bosses mid-raid: the boss list stays visible while you fight, and a party leader picking a new boss takes the whole party along.',
+      'Fixed the boss list jumping back up while scrolling far down.',
+      'Skill pages show every tier again.',
       'The sidebar no longer repeats what you’re doing (the bottom bar shows it), and a skill trained alongside a raid now animates in the sidebar too.',
       'Skill and raid at the same time: start a skill while raiding (or a raid while skilling) and both keep going, each at 60% of its usual XP. Stop either one and the other goes back to full XP. The bottom bar shows the skill next to the raid.',
       '80 gear tiers instead of 10: every region’s material now comes in 8 grades (Copper, Fine copper, Sturdy copper … Perfect copper), one for every 3 bosses, each with its own gathering, weapons, armour, raid sets, raid weapons, trinkets and sigils.',

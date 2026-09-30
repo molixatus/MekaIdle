@@ -626,8 +626,22 @@ route('POST', '/api/raid/start', ctx => {
   const diff = diffOf(ctx.body.diff);
   return withPlayer(ctx.me, async (s, p) => {
     requireUnlocked(s, raid, diff);
-    await leaveRaid(p);
     const party = await partyOf(p.id);
+    // A party leader picking another boss takes the whole party along: finished fights are paid
+    // out, then everyone starts the new raid together.
+    if (party && party.leader_id === p.id) {
+      const now = Date.now();
+      if (party.session) await advanceParty(party, now, p);
+      const players = [p];
+      for (const id of await memberIds(party.id)) if (id !== p.id) players.push(await fresh(id));
+      players.forEach(o => game.enterRaid(o.state, { type: 'party', party: party.id }));
+      const session = game.newSession(raid.id, diff, now);
+      game.advanceRaid(session, players, now, null);
+      await db.run('UPDATE parties SET raid = ?, diff = ?, session = ? WHERE id = ?', raid.id, diff, JSON.stringify(session), party.id);
+      for (const o of players) if (o !== p) await savePlayer(o);
+      return;
+    }
+    await leaveRaid(p);
     if (party) await leaveParty(p, party);
     game.enterRaid(s, { type: 'raid', ...game.newSession(raid.id, diff, Date.now()) });
     game.advanceRaid(s.activity, [p], Date.now(), null);
