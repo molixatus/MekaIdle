@@ -341,7 +341,7 @@
     me.state = state;
     offset = state.lastTick - Date.now();
     renderChrome();
-    if (isLivePage()) renderPage();
+    if (isLivePage()) refreshPage();
     celebrate(before, state);
   }
 
@@ -577,7 +577,7 @@
       me = data;
       offset = data.now - Date.now();
       renderChrome();
-      if (isLivePage() && pageChanged()) renderPage();
+      if (isLivePage()) refreshPage();
       else if (pageRefresh && ++polls % 2 === 0) pageRefresh();
       try { celebrate(before, data.state); } catch (err) { console.error(err); }
       if (pageTick) pageTick();
@@ -846,13 +846,16 @@
   const levelsSig = st => G.SKILLS.map(sk => G.levelFromXp(st.skills[sk.id].xp)).join(',');
   const itemsSig = (st, keep) => Object.entries(st.items).filter(([id]) => !keep || (G.ITEMS[id] && keep(G.ITEMS[id]))).sort().join(';');
   const PAGE_SIG = {
-    skill: st => JSON.stringify([st.skills, st.items, st.activity && [st.activity.id, st.activity.left, st.activity.type], st.side && [st.side.id, st.side.left], st.queue]),
+    skill: st => JSON.stringify([levelsSig(st), st.activity && [st.activity.id, st.activity.type], st.side && st.side.id]),
     equipment: st => JSON.stringify([st.equipment, st.supplies, st.subclasses, levelsSig(st), itemsSig(st, it => it.type === 'gear' || it.supply)]),
     inventory: st => JSON.stringify([itemsSig(st), st.equipment]),
     abilities: st => JSON.stringify([st.abilities, st.subclasses, st.multi, st.equipment, levelsSig(st)]),
     subclass: st => JSON.stringify([st.subclasses, st.multi, st.equipment, levelsSig(st)]),
   };
   let lastSig = null;
+  // In-place updaters registered by the page being shown (for changes that don't need a rebuild).
+  let softRefresh = [];
+  const refreshPage = () => { if (pageChanged()) renderPage(); else softRefresh.forEach(f => f()); };
   function pageChanged() {
     const f = PAGE_SIG[page.split(':')[0]];
     const sig = f ? f(me.state) : null;
@@ -878,6 +881,7 @@
   // Pages animate in when you go to them; the refresh every few seconds doesn't replay it.
   let enterNext = true;
   function renderPage() {
+    softRefresh = [];
     const sigF = PAGE_SIG[page.split(':')[0]];
     lastSig = sigF && me ? sigF(me.state) : null;
     if (pageCleanup) pageCleanup();
@@ -972,11 +976,21 @@
       fill.style.width = x.pct + '%';
       if (gained || levelled) { bar.classList.remove('xp-gain'); void bar.offsetWidth; bar.classList.add(levelled ? 'xp-level' : 'xp-gain'); }
     }, 30);
+    const pctEl = h('span', {}, `${Math.floor(x.pct)}%`), xpEl = h('b', {}, num(x.xp)), toGoEl = h('b', {}, num(x.toGo));
+    softRefresh.push(() => {
+      const y = xpInfo(id);
+      if (y.pct > (lastLevelBar[id] || {}).pct + 0.01) { bar.classList.remove('xp-gain'); void bar.offsetWidth; bar.classList.add('xp-gain'); }
+      lastLevelBar[id] = { level: y.level, pct: y.pct };
+      fill.style.width = y.pct + '%';
+      pctEl.textContent = `${Math.floor(y.pct)}%`;
+      xpEl.textContent = num(y.xp);
+      toGoEl.textContent = num(y.toGo);
+    });
     return h('div', { class: 'level-box' },
-      h('div', { class: 'level-row' }, h('span', {}, `Level ${x.level}`), h('span', {}, `${Math.floor(x.pct)}%`)),
+      h('div', { class: 'level-row' }, h('span', {}, `Level ${x.level}`), pctEl),
       bar,
-      h('div', { class: 'xp-row' }, h('span', {}, h('b', {}, num(x.xp)), ' XP'),
-        x.max ? h('span', {}, 'Maximum level') : h('span', {}, h('b', {}, num(x.toGo)), ` to level ${x.level + 1}`)));
+      h('div', { class: 'xp-row' }, h('span', {}, xpEl, ' XP'),
+        x.max ? h('span', {}, 'Maximum level') : h('span', {}, toGoEl, ` to level ${x.level + 1}`)));
   }
 
   // The gathering -> artisan -> combat chain a skill belongs to.
@@ -1036,6 +1050,18 @@
       if (q.length > G.QUEUE_MAX) { toast(`The queue holds ${G.QUEUE_MAX} actions.`, 'error'); return; }
       await act('/api/queue', { queue: q }, `Queued ${n() || 1} × ${a.name}.`);
     };
+    // The parts that change as you play (counts, what's left), refreshed in place.
+    const needsEl = h('div', { class: 'needs' }), footEl = h('div', { class: 'card-foot' });
+    const fillLive = () => {
+      const run = skillAct();
+      needsEl.replaceChildren(...(inputs.length
+        ? inputs.map(([id, q]) => needChip(id, String(q), `/${fmt(have(id))}`, have(id) < q ? 'short' : ''))
+        : [...outputs.map(([id, q]) => needChip(id, q[0] === q[1] ? `+${q[0]}` : `+${q[0]}–${q[1]}`)), ...a.chance.map(c => needChip(c.item, `${Math.round(c.p * 100)}%`))]));
+      footEl.replaceChildren(h('span', {}, inputs.length ? `Owned: ${fmt(have(a.item))}` : `Owned: ${[...outputs.map(([id]) => id), ...a.chance.map(c => c.item)].map(id => `${fmt(have(id))} ${G.ITEMS[id].name.split(' ').pop().toLowerCase()}`).join(', ')}`),
+        active && run ? h('span', { class: 'ok' }, run.left ? `${num(run.left)} left` : (me.state.side ? `Running · ${Math.round(G.DUAL_XP * 100)}% XP` : 'Running')) : null);
+    };
+    fillLive();
+    softRefresh.push(fillLive);
     const art = h('div', { class: 'card-art' }, itemIco(a.item, 'xl'));
     if (out) art.style.setProperty('--ic', out.colour);
     const tierBadge = out && out.tier ? h('span', { class: 'tier-badge' }, `T${out.tier}`) : null;
@@ -1046,11 +1072,8 @@
     h('div', { class: 'card-top' }, tierBadge, out && out.type !== 'resource' ? itemName(a.item) : h('span', {}, a.name), h('span', { class: 'card-time' }, secs(a.time))),
     art,
     locked ? h('div', { class: 'card-xp' }, ui('lock', 'sm'), `Level ${a.level}`) : h('div', { class: 'card-xp' }, `${a.xp} XP`),
-    inputs.length
-      ? h('div', { class: 'needs' }, inputs.map(([id, q]) => needChip(id, String(q), `/${fmt(have(id))}`, have(id) < q ? 'short' : '')))
-      : h('div', { class: 'needs' }, outputs.map(([id, q]) => needChip(id, q[0] === q[1] ? `+${q[0]}` : `+${q[0]}–${q[1]}`)),
-        a.chance.map(c => needChip(c.item, `${Math.round(c.p * 100)}%`))),
-    h('div', { class: 'card-foot' }, h('span', {}, inputs.length ? `Owned: ${fmt(have(a.item))}` : `Owned: ${[...outputs.map(([id]) => id), ...a.chance.map(c => c.item)].map(id => `${fmt(have(id))} ${G.ITEMS[id].name.split(' ').pop().toLowerCase()}`).join(', ')}`), active ? h('span', { class: 'ok' }, running.left ? `${num(running.left)} left` : (me.state.side ? `Running · ${Math.round(G.DUAL_XP * 100)}% XP` : "Running")) : null)),
+    needsEl,
+    footEl),
     () => itemTip(a.item, recipe));
     return h('div', { class: `card action${active ? ' active' : ''}${locked ? ' locked' : ''}` }, main,
       h('div', { class: 'card-controls' }, count,

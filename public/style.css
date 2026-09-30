@@ -1637,8 +1637,6 @@ body.dock-open.on-raids .page-head { display: none; }
 .now-card { display: none !important; }
 /* Notifications in the top right, clear of the bottom bar and the raid dock. */
 .toasts, body.dock-open .toasts, body.dock-closed .toasts { top: 16px; bottom: auto; align-content: start; }
-/* Skill pages list every tier: cards off screen aren't rendered until scrolled to. */
-.grid > .card.action { content-visibility: auto; contain-intrinsic-size: auto 230px; }
 /* Difficulty buttons on each boss row. */
 .raid-btns { flex-wrap: wrap; align-items: center; }
 .diff-btns { display: inline-flex; border-radius: 7px; overflow: hidden; border: 1px solid #2b3240; }

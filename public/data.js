@@ -925,6 +925,7 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'Fixed skill pages jumping while you scroll: counts and XP now update in place instead of the whole page being rebuilt after every action.',
       'Reeds now come in tiers like every other gathered material (Mendleaf reed, Fine mendleaf reed …), and scrolls, vestments and potions use the matching tier’s reeds. Reeds you already had become Mendleaf reeds.',
       'Rich veins no longer drop gold. Mining’s third node at each tier is now a geode seam instead of a gold deposit. Its geodes (e.g. Copper geode) are needed for Smithing’s weapons and shields (alongside ore) and, with ore and the tier’s raid material, to hone whetstone charms.',
       'Crafted trinkets for every chain, not just Runecrafting: Honing makes whetstone charms (power and armour pierce, for melee), Poisoncraft makes talismans (crit and attack speed, for ranged) and Alchemy makes lockets (healing and mana regen, for healers), one per tier, from the tier’s raid material.',
