@@ -508,7 +508,7 @@
   const ITEMS = {};
   const item = (id, o) => { ITEMS[id] = Object.assign({ id }, o); };
   const MAT_KEYS = ['ore', 'hide', 'bone', 'venom', 'branch', 'fibre', 'essence', 'herb'];
-  const matId = (key, t) => (key === 'reed' ? 'reed' : `${t.id}_${key}`);
+  const matId = (key, t) => `${t.id}_${key}`;
   const MAT_INFO = {
     ore: t => [t.ore, 'ore', `Mined at Mining ${t.level}. For Smithing, Armoursmithing and Honing.`],
     hide: t => [t.hide, 'hide', `From hunting the ${t.beast.toLowerCase()} at Hunting ${t.level}. For Leatherworking and Fletching.`],
@@ -521,11 +521,12 @@
   };
 
   item('gold', { name: 'Gold', type: 'resource', icon: 'gold', colour: '#f2c14e', desc: 'Raid bosses drop it.' });
-  item('reed', { name: 'Reed', type: 'resource', icon: 'reed', colour: '#c9d08a', desc: 'Gathered alongside herbs. Used for scrolls, vestments and potions.' });
   TIERS.forEach(t => MAT_KEYS.forEach(k => {
     const [name, icon, desc] = MAT_INFO[k](t);
     item(matId(k, t), { name, type: 'resource', icon, colour: t.colour, tier: t.n, desc: `Tier ${t.n}. ${desc}` });
   }));
+  TIERS.forEach(t => item(`${t.id}_reed`, { name: `${t.herb} reed`, type: 'resource', icon: 'reed', colour: t.colour, tier: t.n,
+    desc: `Tier ${t.n}. Cut from ${t.herb.toLowerCase()} reed beds at Herbalism ${t.level + 1}. For Scribing, Weaving and Alchemy.` }));
   TIERS.forEach(t => item(`${t.id}_geode`, { name: `${t.metal} geode`, type: 'resource', icon: 'ore', colour: t.colour, tier: t.n,
     desc: `Tier ${t.n}. Mined from ${t.metal.toLowerCase()} geode seams at Mining ${t.level + 2}. For Smithing and Honing’s whetstone charms.` }));
   TIERS.forEach(t => {
@@ -666,7 +667,7 @@
     gather(`essence_${t.id}`, 'foraging', `${t.essence} bloom`, 2, 4, matId('essence', t), [1, 1]);
     // Herbalism: herbs, reeds and a slower wild patch that gives more herbs.
     gather(`herb_${t.id}`, 'herbalism', t.patch, 0, 3, matId('herb', t), [1, 2]);
-    gather(`reeds_${t.id}`, 'herbalism', `${t.herb} reed bed`, 1, 3, 'reed', [2, 3]);
+    gather(`reeds_${t.id}`, 'herbalism', `${t.herb} reed bed`, 1, 3, matId('reed', t), [2, 3]);
     gather(`wild_${t.id}`, 'herbalism', `Wild ${lower(t.herb)}`, 2, 5, matId('herb', t), [2, 3]);
   });
 
@@ -924,6 +925,7 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'Reeds now come in tiers like every other gathered material (Mendleaf reed, Fine mendleaf reed …), and scrolls, vestments and potions use the matching tier’s reeds. Reeds you already had become Mendleaf reeds.',
       'Mining’s third node at each tier is now a geode seam instead of a gold deposit. Its geodes (e.g. Copper geode) are needed for Smithing’s weapons and shields (alongside ore) and, with ore and the tier’s raid material, to hone whetstone charms.',
       'Crafted trinkets for every chain, not just Runecrafting: Honing makes whetstone charms (power and armour pierce, for melee), Poisoncraft makes talismans (crit and attack speed, for ranged) and Alchemy makes lockets (healing and mana regen, for healers), one per tier, from the tier’s raid material.',
       'The beginner ease-in now only covers the first 3 bosses. From boss 4 on, every boss is fully tuned to its tier, so tier 1 gear (even with a few raid pieces and a high level) no longer carries you through tiers 2 and 3. Your mech’s base damage and HP now grow with your weapon’s tier, so every tier of gear is a full step stronger.',
