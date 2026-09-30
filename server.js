@@ -511,11 +511,14 @@ async function restartParty(party) {
 }
 
 // Ends a party's raid (members go idle). `self` is the already-loaded caller, saved by them.
-async function stopPartyRaid(party, self, disband) {
+async function stopPartyRaid(party, self, disband, selfSettled) {
+  const session = party.session ? JSON.parse(party.session) : null;
   for (const id of await memberIds(party.id)) {
     const o = self && id === self.id ? self : await loadPlayer(id);
     if (!o) continue;
     if (o !== self) game.advance(o.state, Date.now());
+    // Each member still gets a fight that already ended.
+    if (session && !(selfSettled && o === self) && o.state.activity && o.state.activity.party === party.id) game.settleRaid({ ...session }, [o], Date.now());
     if (o.state.activity && o.state.activity.type === 'party' && o.state.activity.party === party.id) o.state.activity = null;
     if (o !== self) await savePlayer(o);
   }
@@ -531,7 +534,8 @@ async function stopPartyRaid(party, self, disband) {
 // (a leaving leader hands the party to the next pilot).
 async function leaveRaid(p) {
   const a = p.state.activity;
-  if (a && a.type === 'raid') { p.state.activity = null; return; }
+  // A fight that already ended still pays out, even if you leave before the next one starts.
+  if (a && a.type === 'raid') { game.settleRaid(a, [p], Date.now()); p.state.activity = null; return; }
   const party = await partyOf(p.id);
   if (party && party.session) await leaveParty(p, party);
   if (p.state.activity && p.state.activity.type) p.state.activity = null;
@@ -540,8 +544,10 @@ async function leaveRaid(p) {
 // Leaving a party. When the leader leaves, the longest-standing member takes over; the party
 // only breaks up when nobody is left.
 async function leaveParty(p, party) {
+  // A fight that already ended still pays out to the pilot leaving.
+  if (party.session && p.state.activity && p.state.activity.party === party.id) game.settleRaid(JSON.parse(party.session), [p], Date.now());
   const others = (await memberIds(party.id)).filter(id => id !== p.id);
-  if (!others.length) return stopPartyRaid(party, p, true);
+  if (!others.length) return stopPartyRaid(party, p, true, true);
   if (party.leader_id === p.id) {
     await db.run('UPDATE parties SET leader_id = ? WHERE id = ?', others[0], party.id);
     party.leader_id = others[0];

@@ -477,8 +477,8 @@
   };
   const DIFFICULTIES = [
     { id: 'normal', name: 'Normal', hp: 1, dmg: 1, xp: 1, drop: 1, mats: 1, colour: '#5fd068' },
-    { id: 'heroic', name: 'Heroic', hp: 1.1, dmg: 1.1, xp: 1.4, drop: 1.6, mats: 1.3, colour: '#4f8ff0' },
-    { id: 'mythic', name: 'Mythic', hp: 1.2, dmg: 1.2, xp: 1.9, drop: 2.3, mats: 1.7, colour: '#ff9a3c' },
+    { id: 'heroic', name: 'Heroic', hp: 1.03, dmg: 1.03, xp: 1.4, drop: 1.6, mats: 1.3, colour: '#4f8ff0' },
+    { id: 'mythic', name: 'Mythic', hp: 1.05, dmg: 1.05, xp: 1.9, drop: 2.3, mats: 1.7, colour: '#ff9a3c' },
   ];
   const DIFF_BY_ID = Object.fromEntries(DIFFICULTIES.map(d => [d.id, d]));
   // bossKillS / trashKillS: seconds a reference pilot (matching crafted gear) needs to kill a boss or
@@ -784,9 +784,16 @@
       const rand = rng(7919 * (g + 1));
       const pick = list => list[Math.floor(rand() * list.length)];
       const finale = k === 24;
-      // The first four tiers ease new pilots in (no potions or abilities yet).
-      const intro = t.n <= 4 ? 0.55 + 0.1 * t.n : 1;
-      const f = RAID_CURVE.base * intro * (1 + RAID_CURVE.step * (k - 3 * t.grade)) * (finale ? RAID_CURVE.finale : 1);
+      // One even ladder: boss 1 Normal, Heroic, Mythic, boss 2 Normal ... each a step harder. A tier's
+      // steps (3 per boss) multiply to TIER_STEP, so its last Mythic sits just below the next tier's
+      // first Normal. The last tier of a region has 4 bosses, so its steps are a little smaller.
+      const nb = t.grade === 7 ? 4 : 3;
+      const j = k - 3 * t.grade;
+      const diffStep = Math.pow(TIER_STEP, 1 / (3 * nb));
+      // The first 12 bosses ease new pilots in (no potions or abilities yet).
+      const introIdx = (t.n - 1) * 3 + j;
+      const intro = introIdx < 12 ? 0.65 + 0.35 * introIdx / 12 : 1;
+      const f = RAID_CURVE.base * intro * Math.pow(diffStep, 3 * j);
       const bossFoe = reg.bosses[0];
       // This raid's boss: the next monster from the shuffled roster (a region never repeats one).
       const pick0 = finale ? null : BOSS_DECK[(ri * 24 + k) % BOSS_DECK.length];
@@ -836,7 +843,8 @@
         // Power needed per difficulty: the rating grows slower than fight difficulty (abilities,
         // subclass and set bonuses aren't in it), so the curve is compressed.
         recommended: Math.round(power(ref) * Math.pow(f, 0.6)),
-        recommendedBy: Object.fromEntries(DIFFICULTIES.map(d => [d.id, Math.round(power(ref) * Math.pow(f * Math.sqrt(d.hp * d.dmg), 0.6))])),
+        recommendedBy: Object.fromEntries(DIFFICULTIES.map((d, di) => [d.id, Math.round(power(ref) * Math.pow(f * Math.pow(diffStep, di), 0.6))])),
+        diffStep,
         xp: Math.round(COMBAT_XP[ri] * (0.85 + 0.3 * k / 24) * (finale ? 1.5 : 1)),
         drops: [
           { item: `mat_${t.n}`, qty: [1, 3] },
@@ -880,6 +888,8 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'Difficulty now climbs in one even ladder: boss 1 Normal, then Heroic, then Mythic, then boss 2 Normal, and so on, each a small step harder than the last, so a boss’s Mythic is never harder than the next boss’s Normal.',
+      'Fixed kills not counting if you stopped or left a raid in the few seconds between fights: a fight that has ended always pays out its clear, loot and XP.',
       'Your level bonus to damage now only counts up to your weapon’s tier level + 5, so levels gained while idling don’t make you much stronger until your gear catches up. Equipment shows your level bonus and its cap.',
       'Each boss row has Normal, Heroic and Mythic buttons: fight or switch straight to any unlocked difficulty. The next one to clear is highlighted and the one you’re on becomes Stop. The chips at the top now just pick which loot and power to show.',
       'Switch bosses mid-raid: the boss list stays visible while you fight, and a party leader picking a new boss takes the whole party along.',
