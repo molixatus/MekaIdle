@@ -998,7 +998,7 @@
     const head = [pageHead(id, 'skill-' + id, sk.name, sk.desc), lv];
     if (sk.group === 'combat') return [...head, chainBar(id), ...combatSkillBody(sk)];
     // Every tier on one screen, lowest level first, with a divider where each tier starts.
-    const tierOf = a => (G.ITEMS[a.item] || {}).tier || 1;
+    const tierOf = a => a.tier || (G.ITEMS[a.item] || {}).tier || 1;
     const all = G.ACTIONS.filter(a => a.skill === id).sort((x, y) => tierOf(x) - tierOf(y) || x.level - y.level);
     const cards = [];
     let lastTier = 0;
