@@ -35,29 +35,30 @@
   const COAT_COLS = [5, 6, 0, 12, 13, 2, 10, 4, 1, 3];
   const withHue = (list, hues) => list.concat(hues.map((h, i) => [...list[i % list.length], h]));
   // The sheet has four pairs of trousers: one shape per armour type, coloured by tier in the client.
-  const trousers = (r, c) => Array.from({ length: 10 }, () => [r, c]);
+  const TROUSERS = [[135, 14], [126, 14], [126, 15], [135, 15]];
+  const trousers = offset => TROUSERS.map((_, i) => TROUSERS[(i + offset) % TROUSERS.length]);
   const A = {
     plate: {
-      head: row(119, PLATE_COLS), body: row(120, PLATE_COLS), legs: trousers(135, 14),
+      head: row(119, PLATE_COLS), body: row(120, PLATE_COLS), legs: trousers(0),
       feet: [[115, 12], [115, 13], [115, 14], [115, 15], [135, 0], [135, 1], [135, 2], [135, 3], [135, 4], [135, 6]],
       hands: withHue([[128, 6], [128, 7], [128, 9], [128, 10], [128, 11]], [40, 90, 160, 220, 300]),
     },
     leather: {
       head: [[122, 0], [122, 1], [122, 2], [122, 3], [122, 4], [125, 14], [125, 15], [122, 5], [122, 6], [122, 13]],
       body: row(123, COAT_COLS), feet: row(124, COAT_COLS),
-      legs: trousers(126, 14),
+      legs: trousers(1),
       hands: withHue(row(127, [8, 9, 10, 11, 12, 13, 14, 15]), [120, 240]),
     },
     cloth: {
       head: row(125, [0, 1, 4, 5, 7, 3, 11, 12, 9, 6]),
       body: [[126, 0], [126, 1], [126, 2], [126, 3], [126, 4], [126, 5], [126, 6], [126, 7], [114, 5], [114, 6]],
-      legs: trousers(126, 15),
+      legs: trousers(2),
       feet: withHue(row(127, [0, 1, 2, 3, 4, 5, 6, 7]), [150, 270]),
       hands: row(127, [8, 9, 10, 11, 12, 13, 14, 15, 8, 9]).map((c, i) => [...c, 200 + i * 13]),
     },
     vestment: {
       head: [[114, 10], [114, 11], [114, 12], [114, 13], [114, 14], [114, 15], [129, 12], [129, 13], [129, 14], [129, 15]],
-      body: row(130, [0, 2, 5, 7, 8, 9, 10, 11, 13, 15]), legs: trousers(135, 15),
+      body: row(130, [0, 2, 5, 7, 8, 9, 10, 11, 13, 15]), legs: trousers(3),
       feet: [[115, 12, 280], [115, 13, 280], [115, 14, 280], [115, 15, 280], [135, 0, 280], [135, 1, 280], [135, 2, 280], [135, 3, 280], [135, 4, 280], [135, 6, 280]],
       hands: [[129, 0], [129, 1], [129, 2], [129, 3], [129, 4], [136, 0], [136, 1], [136, 2], [136, 3], [136, 4]],
     },
@@ -89,33 +90,32 @@
   function cellFor(it) {
     // 80 tiers share their region's sprites (10 per list); grades are told apart by the tier-colour tint.
     const tier = G.TIERS[(it.tier || 1) - 1] || G.TIERS[0];
-    const t = tier.region;
-    const regionOf = n => Math.floor((Number(n) - 1) / 8);
+    const pick = list => list[(tier.n - 1) % list.length];
+    const step = n => (Number(n) - 1) % 10;
     if (it.id === 'gold') return [9, 15];
     if (it.id === 'reed') return [15, 3];
     if (CONSUMABLE[it.id]) return CONSUMABLE[it.id];
     let m = /^mat_(\d+)$/.exec(it.id);
-    if (m) return RAID_MATS[regionOf(m[1])];
+    if (m) return RAID_MATS[step(m[1])];
     m = /^[a-z]+\d*_(ore|hide|bone|venom|branch|fibre|essence|herb)$/.exec(it.id);
-    if (m) return M[m[1]][t];
-    if ((m = /^sigil_(\d+)$/.exec(it.id))) return [132, regionOf(m[1])];
-    if ((m = /^trinket_(\d+)$/.exec(it.id))) return [115, 2 + regionOf(m[1]), 40 * tier.grade];
-    if ((m = /^charm_(\d+)$/.exec(it.id))) return [133, regionOf(m[1]), 40 * tier.grade];
+    if (m) return pick(M[m[1]]);
+    if ((m = /^sigil_(\d+)$/.exec(it.id))) return [132, (Number(m[1]) - 1) % 16];
+    if ((m = /^trinket_(\d+)$/.exec(it.id))) return [115, 2 + step(m[1]), 40 * tier.region];
+    if ((m = /^charm_(\d+)$/.exec(it.id))) return [133, (Number(m[1]) - 1) % 16, 40 * tier.region];
     // Raid weapons: the sheet's unique coloured weapons, a different one for every region and class.
     if ((m = /^u(\d+)_([a-z]+)$/.exec(it.id))) {
-      const i = regionOf(m[1]) * 4 + CLASS_ORDER.indexOf(m[2]);
-      return [105 + Math.floor(i / 16), i % 16, 40 * tier.grade];
+      const i = step(m[1]) * 4 + CLASS_ORDER.indexOf(m[2]);
+      return [105 + Math.floor(i / 16), i % 16, 40 * tier.region];
     }
     // Raid set pieces: armour of the set's type in a colour no crafted tier uses.
     if ((m = /^set(\d+)_([a-z]+)_(head|body|legs)$/.exec(it.id))) {
       const list = A[it.armour][m[3]];
-      const rn = regionOf(m[1]) + 1;
-      const [r, c, h] = list[(rn + 4) % list.length];
-      return [r, c, ((h || 0) + 35 * rn + 40 * tier.grade) % 360];
+      const [r, c, h] = list[(Number(m[1]) + 4) % list.length];
+      return [r, c, ((h || 0) + 35 * (tier.region + 1)) % 360];
     }
-    if (it.slot === 'weapon' && W[it.weapon]) return W[it.weapon][t];
-    if (it.slot === 'offhand' && W[it.offhand]) return W[it.offhand][t];
-    if (it.armour && A[it.armour] && A[it.armour][it.slot]) return A[it.armour][it.slot][t];
+    if (it.slot === 'weapon' && W[it.weapon]) return pick(W[it.weapon]);
+    if (it.slot === 'offhand' && W[it.offhand]) return pick(W[it.offhand]);
+    if (it.armour && A[it.armour] && A[it.armour][it.slot]) return pick(A[it.armour][it.slot]);
     return null;
   }
 

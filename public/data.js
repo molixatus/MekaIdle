@@ -644,6 +644,24 @@
       outputs: { [matId('branch', t)]: [1, 1], [matId('fibre', t)]: [1, 1] }, chance: [{ item: matId('essence', t), p: 0.4, qty: 1 }] });
     action({ id: `herb_${t.id}`, skill: 'herbalism', name: t.patch, level: t.level, time: 3000, xp: Math.round(r * 3 * 1.1), item: matId('herb', t),
       outputs: { [matId('herb', t)]: [1, 1], reed: [1, 2] } });
+    // More to gather at every tier: slower nodes that focus on one material, a level or two later.
+    const lower = x => x.charAt(0).toLowerCase() + x.slice(1);
+    action({ id: `mine_rich_${t.id}`, skill: 'mining', name: `Rich ${lower(t.vein)}`, level: t.level + 1, time: 5000, xp: Math.round(r * 5.2), item: matId('ore', t),
+      outputs: { [matId('ore', t)]: [2, 2] }, chance: [{ item: 'gold', p: 0.25, qty: 2 }] });
+    action({ id: `deposit_${t.id}`, skill: 'mining', name: `${t.metal} deposit`, level: t.level + 2, time: 5000, xp: Math.round(r * 5.2), item: 'gold',
+      outputs: { [matId('ore', t)]: [1, 1], gold: [Math.max(2, Math.round(3 * t.armourMult)), Math.max(4, Math.round(6 * t.armourMult))] } });
+    action({ id: `trap_${t.id}`, skill: 'hunting', name: `${t.beast} traps`, level: t.level + 1, time: 4500, xp: Math.round(r * 4.5 * 1.1), item: matId('bone', t),
+      outputs: { [matId('bone', t)]: [1, 2], [matId('venom', t)]: [1, 1] } });
+    action({ id: `skin_${t.id}`, skill: 'hunting', name: `Skinning ${lower(t.beast)}s`, level: t.level + 2, time: 5000, xp: Math.round(r * 5 * 1.1), item: matId('hide', t),
+      outputs: { [matId('hide', t)]: [2, 2] } });
+    action({ id: `thicket_${t.id}`, skill: 'foraging', name: `${t.fibre} thicket`, level: t.level + 1, time: 4500, xp: Math.round(r * 4.5 * 1.1), item: matId('fibre', t),
+      outputs: { [matId('fibre', t)]: [2, 2] } });
+    action({ id: `bloom_${t.id}`, skill: 'foraging', name: `${t.wood} essence bloom`, level: t.level + 2, time: 5000, xp: Math.round(r * 5 * 1.1), item: matId('essence', t),
+      outputs: { [matId('essence', t)]: [1, 1] }, chance: [{ item: matId('branch', t), p: 0.5, qty: 1 }] });
+    action({ id: `wild_${t.id}`, skill: 'herbalism', name: `Wild ${lower(t.herb)}`, level: t.level + 1, time: 4500, xp: Math.round(r * 4.5 * 1.1), item: matId('herb', t),
+      outputs: { [matId('herb', t)]: [2, 2] } });
+    action({ id: `reeds_${t.id}`, skill: 'herbalism', name: `${t.herb} reed bed`, level: t.level + 2, time: 4000, xp: Math.round(r * 4 * 1.1), item: 'reed',
+      outputs: { reed: [3, 4] }, chance: [{ item: matId('herb', t), p: 0.3, qty: 1 }] });
   });
 
   // Gear recipes: tier materials, plus the previous region's raid material from tier 2 on.
@@ -888,6 +906,8 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'Every gathering skill has 3 things to gather at each tier: rich veins and deposits (with gold) for Mining; traps and skinning for Hunting; thickets and essence blooms for Foraging; wild herbs and reed beds for Herbalism.',
+      'Much more variety in item sprites: each tier uses a different sprite from the one before, and a sprite only comes back after several tiers, instead of the same shape recoloured for a whole region.',
       'Effect animations in raids: shielded units get a shimmering bubble, and units that are bleeding, poisoned, burning, chilled, shadowed or healing over time show drops, bubbles, embers, frost, wisps or sparkles. Turn them off in Settings.',
       'Difficulty now climbs in one even ladder: boss 1 Normal, then Heroic, then Mythic, then boss 2 Normal, and so on, each a small step harder than the last, so a boss’s Mythic is never harder than the next boss’s Normal.',
       'Fixed kills not counting if you stopped or left a raid in the few seconds between fights: a fight that has ended always pays out its clear, loot and XP.',
