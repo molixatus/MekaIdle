@@ -1656,3 +1656,32 @@ body.dock-open.on-raids .page-head { display: none; }
 .diff-bar-label { color: var(--faint); font-weight: 700; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
 @media (min-width: 1601px) { .raid-row { grid-template-columns: 44px 104px minmax(200px, 1fr) 130px minmax(0, max-content) minmax(0, max-content) 66px auto; } }
 .raid-btns { justify-content: flex-end; }
+
+/* Effect animations over unit sprites: a shield bubble, and particles for bleed, poison, burn,
+   frost, shadow and heals over time. */
+.auras { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.aura-bubble { position: absolute; inset: 4%; border-radius: 50%; opacity: 0; transform: scale(.85); transition: opacity .3s, transform .3s;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .35), rgba(140, 190, 255, .12) 45%, rgba(110, 170, 255, .22) 70%, rgba(150, 200, 255, .45) 100%);
+  box-shadow: 0 0 12px rgba(120, 180, 255, .45), inset 0 0 10px rgba(180, 215, 255, .35); }
+.unit-art[data-aura*="shielded"] .aura-bubble { opacity: 1; transform: scale(1); animation: bubble-wobble 2.6s ease-in-out infinite; }
+@keyframes bubble-wobble { 50% { transform: scale(1.04, .97); } }
+.aura-parts { position: absolute; inset: 0; overflow: visible; }
+.aura-parts i { position: absolute; top: 30%; left: calc(18% + var(--i) * 12%); width: 5px; height: 5px; border-radius: 50%; opacity: 0; background: var(--part, #fff); }
+.unit-art[data-aura*="fx-"] .aura-parts i { animation: part-drip 1.4s ease-in infinite; animation-delay: calc(var(--i) * -0.23s); }
+/* Bleed: red droplets falling. */
+.unit-art[data-aura*="fx-bleed"] .aura-parts i { --part: #d8262a; width: 4px; height: 6px; border-radius: 50% 50% 50% 50% / 65% 65% 35% 35%; }
+/* Poison: green bubbles rising. */
+.unit-art[data-aura*="fx-poison"] .aura-parts i { --part: #7ee04a; top: 70%; box-shadow: 0 0 4px #7ee04a; animation-name: part-rise; }
+/* Burn: embers rising and flickering. */
+.unit-art[data-aura*="fx-burn"] .aura-parts i { --part: #ff9a3c; top: 75%; width: 4px; height: 4px; box-shadow: 0 0 6px #ff6a00; animation-name: part-rise; animation-duration: 1s; }
+/* Frost: pale sparkles drifting down. */
+.unit-art[data-aura*="fx-frost"] .aura-parts i { --part: #bff0ff; width: 4px; height: 4px; box-shadow: 0 0 5px #8fdcff; animation-name: part-drift; animation-duration: 2s; }
+/* Shadow: dark wisps rising. */
+.unit-art[data-aura*="fx-shadow"] .aura-parts i { --part: #7b5ccf; top: 70%; width: 7px; height: 7px; filter: blur(1.5px); animation-name: part-rise; animation-duration: 1.8s; }
+/* Heal over time: green sparkles rising. */
+.unit-art[data-aura*="fx-heal"] .aura-parts i { --part: #6ff0a8; top: 70%; width: 4px; height: 4px; box-shadow: 0 0 5px #3ddc84; animation-name: part-rise; animation-duration: 1.6s; }
+@keyframes part-drip { 0% { opacity: 0; transform: translateY(0); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(45px); } }
+@keyframes part-rise { 0% { opacity: 0; transform: translateY(0) scale(.6); } 20% { opacity: .95; } 100% { opacity: 0; transform: translateY(-50px) scale(1.1); } }
+@keyframes part-drift { 0% { opacity: 0; transform: translate(0, -10px); } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(8px, 40px) rotate(90deg); } }
+body.no-auras .auras { display: none; }
+@media (prefers-reduced-motion: reduce) { .aura-parts i { animation: none !important; } }

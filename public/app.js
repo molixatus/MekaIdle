@@ -119,11 +119,12 @@
 
   // Display settings, kept in this browser.
   const SETTINGS_KEY = 'mekaidle-settings';
-  const SETTINGS = { floats: true, groupFloats: true, flashes: true, shine: true, motion: true };
+  const SETTINGS = { floats: true, groupFloats: true, flashes: true, auras: true, shine: true, motion: true };
   try { Object.assign(SETTINGS, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch (e) { /* defaults */ }
   function applySettings() {
     document.body.classList.toggle('no-motion', !SETTINGS.motion);
     document.body.classList.toggle('no-shine', !SETTINGS.shine);
+    document.body.classList.toggle('no-auras', !SETTINGS.auras);
   }
   applySettings();
   function store(key, value) {
@@ -1471,6 +1472,7 @@
         h('h2', {}, 'Display'),
         toggle('floats', 'Damage and healing numbers', 'Numbers that float up from units in raids.'),
         toggle('groupFloats', 'Group damage numbers', 'Hits of the same type from the same pilot in quick succession add up into one number (with a ×count) instead of stacking.'),
+        toggle('auras', 'Effect animations', 'A bubble over shielded units, and blood, poison, embers, frost, shadow or healing sparkles over units with those effects.'),
         toggle('flashes', 'Hit flashes', 'Units flash red when hit, green when healed, and so on.'),
         toggle('shine', 'Item shine', 'The light sweep across rare and high-tier items.'),
         toggle('motion', 'Animations', 'Page transitions, bobbing sprites and other movement.')),
@@ -1993,7 +1995,9 @@
       const fxEl = h('span', { class: 'fx' }, o.art);
       bob.replaceChildren(fxEl);
       const actEl = h('span', { class: 'act' }, bob);
-      const artBox = h('div', { class: 'unit-art' }, actEl);
+      const auras = h('span', { class: 'auras', 'aria-hidden': 'true' }, h('span', { class: 'aura-bubble' }),
+        h('span', { class: 'aura-parts' }, Array.from({ length: 6 }, (_, i) => { const p = h('i'); p.style.setProperty('--i', String(i)); return p; })));
+      const artBox = h('div', { class: 'unit-art' }, actEl, auras);
       const hpFill = h('span', { class: 'hp-fill' }), hpTrail = h('span', { class: 'hp-trail' }), hpShield = h('span', { class: 'hp-shield' }), hpText = h('b');
       const hpBar = h('div', { class: 'hpbar' }, hpTrail, hpFill, hpShield, hpText);
       const manaFill = h('span');
@@ -2449,6 +2453,10 @@
           return s.el;
         };
         const pos = live.filter(([, b]) => !b.neg).map(badge), neg = live.filter(([, b]) => b.neg).map(badge);
+        const tys = new Set(live.map(([, b]) => (b.ty || '').toLowerCase()));
+        const partKind = u.down ? null : ['bleed', 'poison', 'burn', 'prismatic', 'frost', 'shadow', 'heal'].find(k => tys.has(k));
+        const aura = `${u.barrier >= 1 && !u.down ? 'shielded ' : ''}${partKind ? `fx-${partKind === 'prismatic' ? 'burn' : partKind}` : ''}`;
+        if (u.auraCls !== aura) { u.auraCls = aura; u.artBox.dataset.aura = aura; }
         [...u.statusEls.keys()].forEach(n => { if (!keep.has(n)) u.statusEls.delete(n); });
         if (u.down && u.respawnAt && !u.enemy) pos.unshift(h('span', { class: 'status down' }, `Respawn in ${Math.max(0, Math.ceil((u.respawnAt - clock) / 1000))}s`));
         // Only touch the DOM when the badges change: re-inserting one replays its pop-in (a flash).

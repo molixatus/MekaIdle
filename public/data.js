@@ -888,6 +888,7 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'Effect animations in raids: shielded units get a shimmering bubble, and units that are bleeding, poisoned, burning, chilled, shadowed or healing over time show drops, bubbles, embers, frost, wisps or sparkles. Turn them off in Settings.',
       'Difficulty now climbs in one even ladder: boss 1 Normal, then Heroic, then Mythic, then boss 2 Normal, and so on, each a small step harder than the last, so a boss’s Mythic is never harder than the next boss’s Normal.',
       'Fixed kills not counting if you stopped or left a raid in the few seconds between fights: a fight that has ended always pays out its clear, loot and XP.',
       'Your level bonus to damage now only counts up to your weapon’s tier level + 2, so levels gained while idling don’t make you much stronger until your gear catches up. Equipment shows your level bonus and its cap.',
