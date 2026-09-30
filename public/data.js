@@ -653,9 +653,9 @@
     const lower = x => x.charAt(0).toLowerCase() + x.slice(1);
     const gather = (id, skill, name, lvlAdd, secs, item, qty, chance) => action({ id, skill, name, tier: t.n, level: t.level + lvlAdd, time: secs * 1000,
       xp: Math.round(r * secs * (skill === 'mining' ? 1 : 1.1)), item, outputs: { [item]: qty }, chance: chance || [] });
-    // Mining: ore, a rich vein (more ore, sometimes gold) and a deposit (gold).
+    // Mining: ore, a rich vein (more ore) and a geode seam.
     gather(`mine_${t.id}`, 'mining', t.vein, 0, 3, matId('ore', t), [1, 1]);
-    gather(`mine_rich_${t.id}`, 'mining', `Rich ${lower(t.vein)}`, 1, 5, matId('ore', t), [2, 2], [{ item: 'gold', p: 0.25, qty: 2 }]);
+    gather(`mine_rich_${t.id}`, 'mining', `Rich ${lower(t.vein)}`, 1, 5, matId('ore', t), [2, 2]);
     gather(`deposit_${t.id}`, 'mining', `${t.metal} geode seam`, 2, 5, `${t.id}_geode`, [1, 1]);
     // Hunting: hides, bones and venom from the tier's beast.
     gather(`hunt_${t.id}`, 'hunting', `${t.beast} hides`, 0, 3.5, matId('hide', t), [1, 2]);
@@ -926,7 +926,7 @@
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
       'Reeds now come in tiers like every other gathered material (Mendleaf reed, Fine mendleaf reed …), and scrolls, vestments and potions use the matching tier’s reeds. Reeds you already had become Mendleaf reeds.',
-      'Mining’s third node at each tier is now a geode seam instead of a gold deposit. Its geodes (e.g. Copper geode) are needed for Smithing’s weapons and shields (alongside ore) and, with ore and the tier’s raid material, to hone whetstone charms.',
+      'Rich veins no longer drop gold. Mining’s third node at each tier is now a geode seam instead of a gold deposit. Its geodes (e.g. Copper geode) are needed for Smithing’s weapons and shields (alongside ore) and, with ore and the tier’s raid material, to hone whetstone charms.',
       'Crafted trinkets for every chain, not just Runecrafting: Honing makes whetstone charms (power and armour pierce, for melee), Poisoncraft makes talismans (crit and attack speed, for ranged) and Alchemy makes lockets (healing and mana regen, for healers), one per tier, from the tier’s raid material.',
       'The beginner ease-in now only covers the first 3 bosses. From boss 4 on, every boss is fully tuned to its tier, so tier 1 gear (even with a few raid pieces and a high level) no longer carries you through tiers 2 and 3. Your mech’s base damage and HP now grow with your weapon’s tier, so every tier of gear is a full step stronger.',
       'Every gathering skill has 3 things to gather at each tier, each giving its own material: Mining has veins, rich veins and deposits (gold); Hunting has hides, tusks and venom; Foraging has branches, fibre and essence; Herbalism has herbs, reeds and wild herbs.',
