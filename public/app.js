@@ -2144,7 +2144,7 @@
       sessionLootEl.replaceChildren(h('small', {}, 'Loot this session'),
         items.length ? h('div', { class: 'loot-icons' }, items.map(([id, n]) => tip(h('span', { class: `loot-ico${G.ITEMS[id].rare ? ' rare-loot' : ''}` }, itemIco(id, 'sm'), h('b', {}, num(n))), () => itemTip(id))))
           : h('span', { class: 'muted small' }, 'Nothing yet'),
-        mine ? h('span', { class: 'muted small session-count' }, `${mine.wins}/${mine.fights} fights won`) : null);
+        mine ? h('span', { class: 'muted small session-count' }, `${mine.wins}/${mine.fights} fights won`) : '');
     }
 
     function load(c) {

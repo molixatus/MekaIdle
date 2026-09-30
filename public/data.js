@@ -925,6 +925,7 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'On the Raids page the fight fills the screen above the bottom panel, and the boss list starts below it (scroll down to see it). Fixed a stray “null” in the Loot this session row.',
       'Fixed skill pages jumping while you scroll: counts and XP now update in place instead of the whole page being rebuilt after every action.',
       'Reeds now come in tiers like every other gathered material (Mendleaf reed, Fine mendleaf reed …), and scrolls, vestments and potions use the matching tier’s reeds. Reeds you already had become Mendleaf reeds.',
       'Rich veins no longer drop gold. Mining’s third node at each tier is now a geode seam instead of a gold deposit. Its geodes (e.g. Copper geode) are needed for Smithing’s weapons and shields (alongside ore) and, with ore and the tier’s raid material, to hone whetstone charms.',

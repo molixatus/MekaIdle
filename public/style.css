@@ -1689,3 +1689,7 @@ body.no-auras .auras { display: none; }
 .fighting-btn:hover .fb-idle { display: none; }
 .fighting-btn.was-done .fb-idle { color: #6ff0a8; font-weight: 800; }
 .fighting-btn.was-done:not(:hover) { background: color-mix(in srgb, var(--diff) 30%, #1a1f29); }
+/* Raids: the fight fills the screen above the bottom panel; the boss list starts below it. */
+body.on-raids .battle:not([hidden]) { display: flex; flex-direction: column; min-height: calc(100vh - var(--ab-h, 60px) - 44px - 16px); }
+body.on-raids.dock-open .battle:not([hidden]) { min-height: calc(100vh - var(--ab-h, 60px) - min(340px, 42vh) - 44px - 16px); }
+body.on-raids .battle:not([hidden]) > .battle-stage { flex: 1; }
