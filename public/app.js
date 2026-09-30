@@ -2527,7 +2527,13 @@
       });
       [...party, ...Object.values(foes)].forEach(u => {
         // Icon badges kept per effect (so they don't flicker), with the time left underneath.
-        const live = Object.entries(u.buffs).filter(([, b]) => b.until > clock);
+        // Stacking effects get one badge per stack, each with its own timer.
+        const live = Object.entries(u.buffs).filter(([, b]) => b.until > clock).flatMap(([n, b]) => {
+          const st = b.stacks ? b.stacks.filter(x => x > clock).sort((x, y) => x - y) : [];
+          if (st.length < 2) return [[n, b]];
+          const dur = b.from != null ? b.until - b.from : 0;
+          return st.map((until, i) => [i ? `${n}#${i}` : n, { ...b, _n: n, until, from: b.from != null ? until - dur : b.from }]);
+        });
         u.statusEls = u.statusEls || new Map();
         const keep = new Set();
         const badge = ([n, b]) => {
@@ -2536,9 +2542,9 @@
           if (!s) {
             const time = h('small', {});
             const el = tip(h('span', { class: `sbadge ${b.neg ? 'neg' : 'pos'}${b.ty ? ` ty-${b.ty.toLowerCase()}` : ''}${b.cls === 'taunt' ? ' ty-taunt' : ''}` },
-              gi(statusIcon(n, b), null, 'sm'), time), () => {
+              gi(statusIcon(b._n || n, b), null, 'sm'), time), () => {
               const left = b.until - clockNow();
-              return [h('b', {}, b.label || n), h('small', { class: 'muted' }, `${b.neg ? 'Debuff' : 'Buff'}${Number.isFinite(left) && b.until - b.from < 600000 ? ` · ${Math.max(0, left / 1000).toFixed(1)}s left` : ''}`)];
+              return [h('b', {}, b.label || b._n || n), h('small', { class: 'muted' }, `${b.neg ? 'Debuff' : 'Buff'}${Number.isFinite(left) && b.until - b.from < 600000 ? ` · ${Math.max(0, left / 1000).toFixed(1)}s left` : ''}`)];
             });
             s = { el, time };
             u.statusEls.set(n, s);
@@ -2546,8 +2552,7 @@
           const left = b.until - clock;
           // Fight-long effects (frenzy, enrage) show no timer.
           const timed = Number.isFinite(left) && b.from != null && b.until - b.from < 600000;
-          const stackN = b.stacks ? b.stacks.filter(x => x > clock).length : 1;
-          const txt = (timed ? (left >= 10000 ? `${Math.ceil(left / 1000)}s` : `${(left / 1000).toFixed(1)}s`) : '') + (stackN > 1 ? ` ×${stackN}` : '');
+          const txt = (timed ? (left >= 10000 ? `${Math.ceil(left / 1000)}s` : `${(left / 1000).toFixed(1)}s`) : '');
           if (s.time.textContent !== txt) s.time.textContent = txt;
           s.el.style.setProperty('--left', timed ? String(Math.max(0, Math.min(1, left / (b.until - b.from)))) : '1');
           return s.el;
