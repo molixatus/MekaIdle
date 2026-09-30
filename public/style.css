@@ -1758,3 +1758,6 @@ body.no-shine .mech-sprite .mech-glint { display: none; }
 /* Unit names and bars sit above the sprite (big bosses spill past their box), outlined to stay readable. */
 .unit-info { position: relative; z-index: 2; }
 .unit-name .unit-label { text-shadow: 0 0 4px #000, 0 1px 2px #000, 0 0 8px rgba(0, 0, 0, .8); }
+/* Boss: name and bars start clear of the sprite, which spills past its box. */
+.unit.enemy.boss .unit-info { margin-left: 70px; }
+@media (max-width: 900px) { .unit.enemy.boss .unit-info { margin-left: 30px; } }
