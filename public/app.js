@@ -371,6 +371,32 @@
   // ---------- Mech art ----------
   // Pixel-art mech for a set of fitted gear. Its colour follows the main weapon's class.
   // Sprite markup is generated locally from game data (colours and ids only), never player text.
+  // The main colour of an item's sprite (saturated pixels count more), measured once from the sheet,
+  // so rare weapons on the mech match their icon instead of the tier colour.
+  const spriteTone = {};
+  let sheetImg = null;
+  function spriteColour(id) {
+    if (id in spriteTone) return spriteTone[id];
+    const cell = SHEET && SHEET.map[id];
+    if (!cell) return null;
+    if (!sheetImg) { sheetImg = new Image(); sheetImg.src = SHEET.src; sheetImg.onload = () => { if (me) renderPage(); }; }
+    if (!sheetImg.complete || !sheetImg.naturalWidth) return null;
+    const cw = sheetImg.naturalWidth / SHEET.cols, ch = sheetImg.naturalHeight / SHEET.rows;
+    const c = document.createElement('canvas');
+    c.width = Math.round(cw); c.height = Math.round(ch);
+    const x = c.getContext('2d', { willReadFrequently: true });
+    if (cell[2]) x.filter = `hue-rotate(${cell[2]}deg)`;
+    x.drawImage(sheetImg, cell[1] * cw, cell[0] * ch, cw, ch, 0, 0, c.width, c.height);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    let rr = 0, gg = 0, bb = 0, n = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 128) continue;
+      const w = 1 + (Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2])) / 24;
+      rr += d[i] * w; gg += d[i + 1] * w; bb += d[i + 2] * w; n += w;
+    }
+    spriteTone[id] = n ? '#' + [rr, gg, bb].map(v => Math.round(v / n).toString(16).padStart(2, '0')).join('') : null;
+    return spriteTone[id];
+  }
   function mechArt(equipment = {}, label = 'Mech') {
     const piece = slot => {
       const it = G.ITEMS[equipment[slot]];
@@ -382,8 +408,8 @@
     const cls = weapon ? G.CLASSES[weapon.cls] : null;
     const el = h('span', { class: 'sprite mech-sprite', role: 'img', 'aria-label': label, html: window.SPRITES.mech({
       paint: cls ? cls.colour : G.UNARMED_COLOUR, accent: cls ? cls.accent : '#8cff5a', head: piece('head'), body: piece('body'), legs: piece('legs'),
-      hands: piece('hands'), feet: piece('feet'), weapon: weapon ? weapon.weapon : null, role: weapon ? weapon.cls : null, weaponColour: weapon ? weapon.colour : null,
-      offhand: off ? off.offhand : null, offhandColour: off ? off.colour : null, core: trinket ? trinket.colour : null,
+      hands: piece('hands'), feet: piece('feet'), weapon: weapon ? weapon.weapon : null, role: weapon ? weapon.cls : null, weaponColour: weapon ? (weapon.rare && spriteColour(weapon.id)) || weapon.colour : null,
+      offhand: off ? off.offhand : null, offhandColour: off ? (off.rare && spriteColour(off.id)) || off.colour : null, core: trinket ? trinket.colour : null,
       glint: Object.fromEntries(['weapon', 'offhand', 'head', 'body', 'legs', 'hands', 'feet'].map(sl => { const it = G.ITEMS[equipment[sl]]; return [sl, it && glints(it) ? it.colour : null]; })),
     }) });
     el.firstElementChild.removeAttribute('role');
