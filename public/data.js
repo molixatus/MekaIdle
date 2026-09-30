@@ -164,10 +164,10 @@
   // Every damage weapon averages the same damage per second before its extras, so they differ in
   // rhythm and effects. Two-handers hit 35% harder but leave the off-hand empty.
   const WEAPON_KINDS = [
-    { id: 'sword', noun: 'sword', cls: 'melee', maker: 'smithing', cast: 1000, action: 'Slash', dtype: 'Slash', crit: 0.1, spread: 0.15, extra: { crit: 4 }, mats: { ore: 6 }, offset: 0, note: 'Quick, steady slashes.' },
-    { id: 'axe', noun: 'axe', cls: 'melee', maker: 'smithing', cast: 1200, action: 'Hack', dtype: 'Slash', crit: 0.08, spread: 0.2, extra: { bleed: 15 }, mats: { ore: 6 }, offset: 2, note: 'Hacks that leave the target bleeding.' },
-    { id: 'mace', noun: 'mace', cls: 'melee', maker: 'smithing', cast: 1400, action: 'Smash', dtype: 'Crush', crit: 0.06, spread: 0.12, extra: { pen: 25 }, mats: { ore: 7 }, offset: 4, note: 'Smashes through a quarter of the target’s armour.' },
-    { id: 'greatsword', noun: 'greatsword', cls: 'melee', maker: 'smithing', cast: 2200, action: 'Cleave', dtype: 'Cleave', crit: 0.15, critMult: 2.4, spread: 0.15, twoHanded: true, extra: { critDmg: 20 }, mats: { ore: 10 }, offset: 6, note: 'Two-handed. Slow cleaves with brutal critical hits.' },
+    { id: 'sword', noun: 'sword', cls: 'melee', maker: 'smithing', cast: 1000, action: 'Slash', dtype: 'Slash', crit: 0.1, spread: 0.15, extra: { crit: 4 }, mats: { ore: 5, geode: 1 }, offset: 0, note: 'Quick, steady slashes.' },
+    { id: 'axe', noun: 'axe', cls: 'melee', maker: 'smithing', cast: 1200, action: 'Hack', dtype: 'Slash', crit: 0.08, spread: 0.2, extra: { bleed: 15 }, mats: { ore: 5, geode: 1 }, offset: 2, note: 'Hacks that leave the target bleeding.' },
+    { id: 'mace', noun: 'mace', cls: 'melee', maker: 'smithing', cast: 1400, action: 'Smash', dtype: 'Crush', crit: 0.06, spread: 0.12, extra: { pen: 25 }, mats: { ore: 5, geode: 2 }, offset: 4, note: 'Smashes through a quarter of the target’s armour.' },
+    { id: 'greatsword', noun: 'greatsword', cls: 'melee', maker: 'smithing', cast: 2200, action: 'Cleave', dtype: 'Cleave', crit: 0.15, critMult: 2.4, spread: 0.15, twoHanded: true, extra: { critDmg: 20 }, mats: { ore: 8, geode: 2 }, offset: 6, note: 'Two-handed. Slow cleaves with brutal critical hits.' },
     { id: 'shortbow', noun: 'shortbow', cls: 'ranged', maker: 'fletching', cast: 1000, action: 'Quick shot', dtype: 'Pierce', crit: 0.12, spread: 0.12, extra: { haste: 6 }, mats: { bone: 4, hide: 1 }, offset: 0, note: 'Fast arrows.' },
     { id: 'longbow', noun: 'longbow', cls: 'ranged', maker: 'fletching', cast: 2000, action: 'Aimed shot', dtype: 'Pierce', crit: 0.3, spread: 0.12, extra: { crit: 6 }, mats: { bone: 6, hide: 1 }, offset: 2, note: 'Slow aimed shots with a high critical chance.' },
     { id: 'crossbow', noun: 'crossbow', cls: 'ranged', maker: 'fletching', cast: 1700, action: 'Heavy bolt', dtype: 'Bolt', crit: 0.08, spread: 0.1, extra: { pen: 40 }, mats: { bone: 5, hide: 2 }, offset: 4, note: 'Bolts that ignore much of the target’s armour.' },
@@ -184,7 +184,7 @@
   const WEAPON_BY_ID = Object.fromEntries(WEAPON_KINDS.map(w => [w.id, w]));
 
   const OFFHAND_KINDS = [
-    { id: 'shield', noun: 'shield', cls: 'melee', maker: 'smithing', stats: { def: 8, hp: 200 }, extra: { block: 8 }, mats: { ore: 6 }, offset: 3, note: 'Blocks part of every hit.' },
+    { id: 'shield', noun: 'shield', cls: 'melee', maker: 'smithing', stats: { def: 8, hp: 200 }, extra: { block: 8 }, mats: { ore: 5, geode: 1 }, offset: 3, note: 'Blocks part of every hit.' },
     { id: 'quiver', noun: 'quiver', cls: 'ranged', maker: 'fletching', stats: { def: 3, hp: 100 }, extra: { haste: 6, crit: 3 }, mats: { hide: 4, bone: 1 }, offset: 3, note: 'Faster, sharper shots.' },
     { id: 'orb', noun: 'orb', cls: 'magic', maker: 'enchanting', stats: { def: 2, hp: 80, mana: 20 }, extra: { power: 6, regen: 1 }, mats: { essence: 3, branch: 2 }, offset: 3, note: 'Focuses power and mana.' },
     { id: 'relic', noun: 'relic', cls: 'healer', maker: 'scribing', stats: { def: 3, hp: 100, mana: 15 }, extra: { heal: 8, regen: 1 }, mats: { herb: 3, reed: 2 }, offset: 3, note: 'A holy focus for healers.' },
@@ -527,7 +527,7 @@
     item(matId(k, t), { name, type: 'resource', icon, colour: t.colour, tier: t.n, desc: `Tier ${t.n}. ${desc}` });
   }));
   TIERS.forEach(t => item(`${t.id}_geode`, { name: `${t.metal} geode`, type: 'resource', icon: 'ore', colour: t.colour, tier: t.n,
-    desc: `Tier ${t.n}. Mined from ${t.metal.toLowerCase()} geode seams at Mining ${t.level + 2}. For Honing’s whetstone charms.` }));
+    desc: `Tier ${t.n}. Mined from ${t.metal.toLowerCase()} geode seams at Mining ${t.level + 2}. For Smithing and Honing’s whetstone charms.` }));
   TIERS.forEach(t => {
     const reg = REGIONS[t.region];
     item(`mat_${t.n}`, { name: t.grade ? `${GRADES[t.grade]} ${reg.mat.toLowerCase()}` : reg.mat, type: 'material', icon: `mat_${t.region}`, colour: t.colour, tier: t.n,
@@ -924,7 +924,7 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
-      'Mining’s third node at each tier is now a geode seam instead of a gold deposit. Its geodes (e.g. Copper geode) are needed, with ore and the tier’s raid material, to hone whetstone charms.',
+      'Mining’s third node at each tier is now a geode seam instead of a gold deposit. Its geodes (e.g. Copper geode) are needed for Smithing’s weapons and shields (alongside ore) and, with ore and the tier’s raid material, to hone whetstone charms.',
       'Crafted trinkets for every chain, not just Runecrafting: Honing makes whetstone charms (power and armour pierce, for melee), Poisoncraft makes talismans (crit and attack speed, for ranged) and Alchemy makes lockets (healing and mana regen, for healers), one per tier, from the tier’s raid material.',
       'The beginner ease-in now only covers the first 3 bosses. From boss 4 on, every boss is fully tuned to its tier, so tier 1 gear (even with a few raid pieces and a high level) no longer carries you through tiers 2 and 3. Your mech’s base damage and HP now grow with your weapon’s tier, so every tier of gear is a full step stronger.',
       'Every gathering skill has 3 things to gather at each tier, each giving its own material: Mining has veins, rich veins and deposits (gold); Hunting has hides, tusks and venom; Foraging has branches, fibre and essence; Herbalism has herbs, reeds and wild herbs.',
