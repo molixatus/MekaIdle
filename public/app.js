@@ -1589,7 +1589,10 @@
       const off = need && G.DIFFICULTIES.indexOf(need) > G.DIFFICULTIES.findIndex(d => d.id === (diff || 'normal'));
       const tag = need ? h('span', { class: 'diff-dot', title: `${need.name}${need.id === 'heroic' ? ' and Mythic' : ''} only` }, need.name[0]) : null;
       if (tag) tag.style.setProperty('--diff', need.colour);
-      const chip = h('span', { class: `loot-ico${x.rare ? ' rare' : ''}${cls ? ' class-loot' : ''}${off ? ' off-diff' : ''}` }, itemIco(x.item, 'sm'), h('small', {}, off ? '–' : text), tag);
+      // Raid gear you already have (in storage or fitted) is dimmed with a tick.
+      const got = G.ITEMS[x.item] && G.ITEMS[x.item].type === 'gear' && (have(x.item) > 0 || Object.values(me.state.equipment).includes(x.item));
+      const chip = h('span', { class: `loot-ico${x.rare ? ' rare' : ''}${cls ? ' class-loot' : ''}${off ? ' off-diff' : ''}${got ? ' owned' : ''}`, title: got ? 'You have this' : null },
+        itemIco(x.item, 'sm'), h('small', {}, off ? '–' : text), tag, got ? h('span', { class: 'owned-tick', 'aria-label': 'owned' }, '✓') : null);
       if (cls) { chip.style.setProperty('--cls', G.CLASSES[cls].colour); chip.title = `${G.CLASSES[cls].name} gear`; }
       return tip(chip, () => itemTip(x.item, h('p', { class: off ? 'bad' : x.rare ? 'rare-loot' : 'ok' }, off ? `Only drops on ${need.name}${need.id === 'heroic' ? ' or Mythic' : ''}.` : x.p ? `${text} chance per win${need ? ` (${need.name}${need.id === 'heroic' ? ' and Mythic' : ''} only)` : ''}` : `${text} per win`)));
     }));

@@ -925,6 +925,7 @@
 
   const PATCH_NOTES = [
     { v: '0.12', date: '2026-09-29', notes: [
+      'In the boss list, raid gear you already have is dimmed with a tick, like the cleared difficulties.',
       'On the Raids page the fight fills the screen above the bottom panel, and the boss list starts below it (scroll down to see it). Fixed a stray “null” in the Loot this session row.',
       'Fixed skill pages jumping while you scroll: counts and XP now update in place instead of the whole page being rebuilt after every action.',
       'Reeds now come in tiers like every other gathered material (Mendleaf reed, Fine mendleaf reed …), and scrolls, vestments and potions use the matching tier’s reeds. Reeds you already had become Mendleaf reeds.',

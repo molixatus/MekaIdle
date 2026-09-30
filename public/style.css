@@ -1696,3 +1696,6 @@ body.on-raids .battle:not([hidden]) > .battle-stage { flex: 1; }
 @media (max-width: 900px) {
   body.on-raids.dock-open .battle:not([hidden]) { min-height: calc(100vh - var(--ab-h, 60px) - min(420px, 55vh) - 44px - 16px); }
 }
+/* Raid gear you already own: dimmed, with a tick. */
+.loot-ico.owned { filter: saturate(.55) brightness(.62); position: relative; }
+.loot-ico.owned .owned-tick { color: #6ff0a8; font-weight: 800; font-size: 12px; margin-left: 2px; filter: brightness(1.8) saturate(1.6); }
